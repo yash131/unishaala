@@ -357,9 +357,21 @@ class UnishaalaAPITester:
 
     def test_mock_tests_api(self):
         """Test Mock Tests API endpoints"""
+        if not self.auth_token:
+            self.log_test("Mock Tests API", False, "No authentication token available", "")
+            return
+            
         try:
-            # First get available mock tests
-            response = requests.get(f"{self.api_base}/admin/mock-tests", timeout=30)
+            headers = {
+                'Authorization': f'Bearer {self.auth_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            # First get available mock tests with auth
+            response = requests.get(f"{self.api_base}/admin/mock-tests", 
+                                  headers=headers, 
+                                  cookies=self.auth_cookies,
+                                  timeout=30)
             
             if response.status_code == 200:
                 data = response.json()
@@ -367,7 +379,7 @@ class UnishaalaAPITester:
                     mock_tests = data['data']
                     
                     if mock_tests:
-                        # Test individual mock test endpoint
+                        # Test individual mock test endpoint (public endpoint)
                         test_id = mock_tests[0].get('id')
                         if test_id:
                             test_response = requests.get(f"{self.api_base}/mock-test/{test_id}", 
@@ -377,7 +389,7 @@ class UnishaalaAPITester:
                                 test_data = test_response.json()
                                 if test_data.get('success') and 'data' in test_data:
                                     self.log_test("Mock Tests API", True, 
-                                                f"Mock test endpoint working", 
+                                                f"Mock test endpoints working", 
                                                 f"Retrieved test: {test_data['data'].get('title', 'N/A')}")
                                 else:
                                     self.log_test("Mock Tests API", False, 
@@ -390,11 +402,14 @@ class UnishaalaAPITester:
                         else:
                             self.log_test("Mock Tests API", False, "No test ID found in mock tests", "")
                     else:
-                        self.log_test("Mock Tests API", True, "Mock tests endpoint returns empty array", 
+                        self.log_test("Mock Tests API", True, "Mock tests endpoint working with empty array", 
                                     "No mock tests available but API is working")
                 else:
                     self.log_test("Mock Tests API", False, "Invalid response structure", 
                                 f"Response: {data}")
+            elif response.status_code == 401:
+                self.log_test("Mock Tests API", False, "Authentication failed", 
+                            "Auth token might be invalid or expired")
             else:
                 self.log_test("Mock Tests API", False, f"HTTP {response.status_code}", 
                             f"Response: {response.text[:200]}")
