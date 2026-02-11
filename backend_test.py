@@ -13,7 +13,7 @@ from typing import Dict, Any, Optional
 class UnishaalaAPITester:
     def __init__(self):
         # Get base URL from environment
-        self.base_url = "https://unishaala-web.preview.emergentagent.com"
+        self.base_url = "https://unishaala-edu.preview.emergentagent.com"
         self.api_base = f"{self.base_url}/api"
         
         # Admin credentials for testing
