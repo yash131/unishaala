@@ -734,7 +734,184 @@ export async function POST(request) {
         return jsonResponse({ success: true, data: testData });
       }
 
-      // Create Question
+      // Create Question (new format)
+      if (path === '/admin/questions/create') {
+        const questions = await getCollection('questions');
+        const mockTests = await getCollection('mock_tests');
+        
+        // Check for duplicate
+        const existing = await questions.findOne({
+          test_title: body.test_title,
+          question_title: body.question_title
+        });
+        
+        if (existing) {
+          return jsonResponse({ success: false, error: 'Duplicate question: same question already exists for this test' }, 400);
+        }
+
+        // Auto-create mock test if not exists
+        let test = await mockTests.findOne({ title: body.test_title });
+        if (!test) {
+          test = {
+            id: uuidv4(),
+            title: body.test_title,
+            description: '',
+            duration: 60,
+            totalQuestions: 0,
+            totalMarks: 0,
+            isFree: true,
+            price: 0,
+            status: 'Active',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          await mockTests.insertOne(test);
+        }
+
+        const questionData = {
+          id: uuidv4(),
+          test_title: body.test_title,
+          topic_title: body.topic_title || '',
+          question_title: body.question_title,
+          duration: parseInt(body.duration) || 2,
+          description: body.description || '',
+          solution_text: body.solution_text || '',
+          tip: body.tip || '',
+          status: body.status || 'Active',
+          option1_title: body.option1_title,
+          option2_title: body.option2_title,
+          option3_title: body.option3_title,
+          option4_title: body.option4_title,
+          correct_option_number: parseInt(body.correct_option_number),
+          createdAt: new Date()
+        };
+        
+        await questions.insertOne(questionData);
+        
+        // Update test question count
+        const count = await questions.countDocuments({ test_title: body.test_title });
+        await mockTests.updateOne({ title: body.test_title }, { $set: { totalQuestions: count } });
+        
+        return jsonResponse({ success: true, data: questionData });
+      }
+
+      // Bulk Upload Questions (new CSV format)
+      if (path === '/admin/questions/bulk-upload') {
+        const { questions: questionsData } = body;
+        
+        if (!Array.isArray(questionsData)) {
+          return jsonResponse({ success: false, error: 'Invalid data format' }, 400);
+        }
+
+        const questions = await getCollection('questions');
+        const mockTests = await getCollection('mock_tests');
+        let inserted = 0;
+        let failed = 0;
+        let testsCreated = 0;
+        const errors = [];
+        const createdTests = new Set();
+
+        for (const q of questionsData) {
+          try {
+            // Validate required fields
+            if (!q.test_title || !q.question_title) {
+              errors.push({ row: q.rowNumber, error: 'Missing test_title or question_title' });
+              failed++;
+              continue;
+            }
+
+            if (!q.option1_title || !q.option2_title || !q.option3_title || !q.option4_title) {
+              errors.push({ row: q.rowNumber, error: 'Missing options' });
+              failed++;
+              continue;
+            }
+
+            const correctOption = parseInt(q.correct_option_number);
+            if (isNaN(correctOption) || correctOption < 1 || correctOption > 4) {
+              errors.push({ row: q.rowNumber, error: 'correct_option_number must be 1-4' });
+              failed++;
+              continue;
+            }
+
+            // Check for duplicate
+            const existing = await questions.findOne({
+              test_title: q.test_title,
+              question_title: q.question_title
+            });
+            
+            if (existing) {
+              errors.push({ row: q.rowNumber, error: 'Duplicate question' });
+              failed++;
+              continue;
+            }
+
+            // Auto-create mock test if not exists
+            if (!createdTests.has(q.test_title)) {
+              let test = await mockTests.findOne({ title: q.test_title });
+              if (!test) {
+                test = {
+                  id: uuidv4(),
+                  title: q.test_title,
+                  description: '',
+                  duration: 60,
+                  totalQuestions: 0,
+                  totalMarks: 0,
+                  isFree: true,
+                  price: 0,
+                  status: 'Active',
+                  createdAt: new Date(),
+                  updatedAt: new Date()
+                };
+                await mockTests.insertOne(test);
+                testsCreated++;
+              }
+              createdTests.add(q.test_title);
+            }
+
+            // Insert question
+            await questions.insertOne({
+              id: uuidv4(),
+              test_title: q.test_title,
+              topic_title: q.topic_title || '',
+              question_title: q.question_title,
+              duration: parseInt(q.duration) || 2,
+              description: q.description || '',
+              solution_text: q.solution_text || '',
+              tip: q.tip || '',
+              status: q.status || 'Active',
+              option1_title: q.option1_title,
+              option2_title: q.option2_title,
+              option3_title: q.option3_title,
+              option4_title: q.option4_title,
+              correct_option_number: correctOption,
+              createdAt: new Date()
+            });
+            inserted++;
+          } catch (err) {
+            errors.push({ row: q.rowNumber, error: err.message });
+            failed++;
+          }
+        }
+
+        // Update question counts for all affected tests
+        for (const testTitle of createdTests) {
+          const count = await questions.countDocuments({ test_title: testTitle });
+          await mockTests.updateOne({ title: testTitle }, { $set: { totalQuestions: count } });
+        }
+
+        return jsonResponse({
+          success: true,
+          data: {
+            total: questionsData.length,
+            inserted,
+            failed,
+            testsCreated,
+            errors: errors.slice(0, 20) // Limit errors to first 20
+          }
+        });
+      }
+
+      // Create Question (old format - keep for compatibility)
       if (path === '/admin/questions') {
         const questionData = {
           id: uuidv4(),
