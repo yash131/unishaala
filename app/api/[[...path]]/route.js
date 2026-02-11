@@ -78,21 +78,34 @@ export async function GET(request) {
       const topperNotes = await getCollection('topper_notes');
       const questions = await getCollection('questions');
 
-      // Only show published mock tests to users
-      const publishedTests = await mockTests.find({ 
-        examId: exam.id, 
-        isPublished: true,
-        status: 'Active'
-      }).toArray();
+      // Get ALL published mock tests with questions (for now, show all published tests)
+      // Filter: isPublished = true, status = Active, totalQuestions > 0
+      const allTests = await mockTests.find({}).toArray();
+      
+      // Filter for published tests with questions
+      const publishedTests = allTests.filter(test => 
+        test.isPublished === true && 
+        test.status === 'Active' && 
+        (test.totalQuestions > 0 || test.questionCount > 0)
+      );
+
+      // Add question count to each test
+      const testsWithCount = await Promise.all(publishedTests.map(async (test) => {
+        const qCount = await questions.countDocuments({ mockTestId: test.id, status: 'Active' });
+        return { ...test, questionCount: qCount };
+      }));
+
+      // Only return tests that actually have questions
+      const finalTests = testsWithCount.filter(t => t.questionCount > 0);
 
       return jsonResponse({
         success: true,
         data: {
           exam,
-          mockTests: publishedTests,
+          mockTests: finalTests,
           previousPapers: await previousPapers.find({ examId: exam.id }).toArray(),
           topperNotes: await topperNotes.find({ examId: exam.id }).toArray(),
-          questionBankCount: await questions.countDocuments({ examId: exam.id, status: 'Active' })
+          questionBankCount: await questions.countDocuments({ status: 'Active' })
         }
       });
     }
