@@ -248,9 +248,11 @@ export default function MockTestPage() {
         <div className="container mx-auto px-4">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center gap-4">
-              <div className="w-8 h-8 bg-teal-600 rounded flex items-center justify-center">
-                <GraduationCap className="w-5 h-5 text-white" />
-              </div>
+              <img 
+                src="https://customer-assets.emergentagent.com/job_unishaala-web/artifacts/2nf9p203_Unishaala-logo.jpg"
+                alt="Unishaala" 
+                className="h-8 w-auto object-contain"
+              />
               <span className="font-semibold text-gray-900 hidden md:block">{test.title}</span>
             </div>
 
