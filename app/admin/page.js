@@ -398,11 +398,12 @@ function MockTestsTab({ mockTests, onRefresh }) {
   );
 }
 
-// Enhanced Questions Tab with CSV Upload
+// Enhanced Questions Tab with CSV Upload - Select Test First
 function QuestionsTab({ questions, mockTests, topics, onRefresh }) {
   const [search, setSearch] = useState('');
   const [filterTest, setFilterTest] = useState('all');
   const [filterTopic, setFilterTopic] = useState('all');
+  const [selectedTestForUpload, setSelectedTestForUpload] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [selectedQuestion, setSelectedQuestion] = useState(null);
@@ -446,16 +447,17 @@ function QuestionsTab({ questions, mockTests, topics, onRefresh }) {
     currentPage * itemsPerPage
   );
 
-  // CSV Sample Headers
+  // CSV Sample Headers (tab-separated)
   const csvHeaders = ['test_title', 'topic_title', 'question_title', 'duration', 'description', 'solution_text', 'tip', 'status', 'option1_title', 'option2_title', 'option3_title', 'option4_title', 'correct_option_number'];
 
   const downloadSampleCSV = () => {
+    // Tab-separated format
     const sampleData = [
-      csvHeaders.join(','),
-      'GATE CS Mock Test,Data Structures,What is the time complexity of binary search?,2,"Binary search algorithm question","Binary search divides search space in half each iteration, hence O(log n)","Remember: divide and conquer",Active,O(n),O(log n),O(n²),O(1),2'
+      csvHeaders.join('\t'),
+      'GATE CS Mock Test\tData Structures\tWhat is the time complexity of binary search?\t2\tBinary search algorithm question\tBinary search divides search space in half each iteration, hence O(log n)\tRemember: divide and conquer\tActive\tO(n)\tO(log n)\tO(n²)\tO(1)\t2'
     ].join('\n');
     
-    const blob = new Blob([sampleData], { type: 'text/csv' });
+    const blob = new Blob([sampleData], { type: 'text/tab-separated-values' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -465,28 +467,30 @@ function QuestionsTab({ questions, mockTests, topics, onRefresh }) {
   };
 
   const exportCSV = () => {
-    const dataToExport = filterTest === 'all' ? questions : questions.filter(q => q.test_title === filterTest);
+    const testToExport = filterTest !== 'all' ? filterTest : selectedTestForUpload;
+    const dataToExport = testToExport ? questions.filter(q => q.test_title === testToExport) : questions;
     
+    // Tab-separated format
     const csvContent = [
-      csvHeaders.join(','),
+      csvHeaders.join('\t'),
       ...dataToExport.map(q => [
-        `"${q.test_title || ''}"`,
-        `"${q.topic_title || ''}"`,
-        `"${(q.question_title || '').replace(/"/g, '""')}"`,
+        q.test_title || '',
+        q.topic_title || '',
+        (q.question_title || '').replace(/\t/g, ' '),
         q.duration || 2,
-        `"${(q.description || '').replace(/"/g, '""')}"`,
-        `"${(q.solution_text || '').replace(/"/g, '""')}"`,
-        `"${(q.tip || '').replace(/"/g, '""')}"`,
+        (q.description || '').replace(/\t/g, ' '),
+        (q.solution_text || '').replace(/\t/g, ' '),
+        (q.tip || '').replace(/\t/g, ' '),
         q.status || 'Active',
-        `"${q.option1_title || ''}"`,
-        `"${q.option2_title || ''}"`,
-        `"${q.option3_title || ''}"`,
-        `"${q.option4_title || ''}"`,
+        q.option1_title || '',
+        q.option2_title || '',
+        q.option3_title || '',
+        q.option4_title || '',
         q.correct_option_number || 1
-      ].join(','))
+      ].join('\t'))
     ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const blob = new Blob([csvContent], { type: 'text/tab-separated-values' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -498,6 +502,12 @@ function QuestionsTab({ questions, mockTests, topics, onRefresh }) {
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    if (!selectedTestForUpload) {
+      toast.error('Please select a test first before uploading CSV');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
 
     setUploading(true);
     setUploadResult(null);
@@ -512,12 +522,92 @@ function QuestionsTab({ questions, mockTests, topics, onRefresh }) {
         return;
       }
 
+      // Detect delimiter (tab or comma)
+      const firstLine = lines[0];
+      const delimiter = firstLine.includes('\t') ? '\t' : ',';
+
       // Parse headers
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/^"|"$/g, ''));
+      const headers = firstLine.split(delimiter).map(h => h.trim().toLowerCase().replace(/^"|"$/g, ''));
       
-      // Validate headers
-      const requiredHeaders = ['test_title', 'question_title', 'option1_title', 'option2_title', 'option3_title', 'option4_title', 'correct_option_number'];
+      // Validate headers - we need these columns
+      const requiredHeaders = ['question_title', 'option1_title', 'option2_title', 'option3_title', 'option4_title', 'correct_option_number'];
       const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+      
+      if (missingHeaders.length > 0) {
+        toast.error(`Missing required columns: ${missingHeaders.join(', ')}`);
+        setUploading(false);
+        return;
+      }
+
+      // Parse rows
+      const parseRow = (row) => {
+        if (delimiter === '\t') {
+          return row.split('\t').map(v => v.trim());
+        }
+        // Handle comma-separated with possible quoted fields
+        const result = [];
+        let current = '';
+        let inQuotes = false;
+        
+        for (let i = 0; i < row.length; i++) {
+          const char = row[i];
+          if (char === '"') {
+            inQuotes = !inQuotes;
+          } else if (char === ',' && !inQuotes) {
+            result.push(current.trim().replace(/^"|"$/g, ''));
+            current = '';
+          } else {
+            current += char;
+          }
+        }
+        result.push(current.trim().replace(/^"|"$/g, ''));
+        return result;
+      };
+
+      const questionsData = lines.slice(1).map((line, index) => {
+        const values = parseRow(line);
+        const obj = {};
+        headers.forEach((header, i) => {
+          obj[header] = values[i] || '';
+        });
+        obj.rowNumber = index + 2;
+        // Override test_title with selected test
+        obj.test_title = selectedTestForUpload;
+        return obj;
+      }).filter(q => q.question_title); // Skip empty rows
+
+      if (questionsData.length === 0) {
+        toast.error('No valid questions found in CSV');
+        setUploading(false);
+        return;
+      }
+
+      // Send to API
+      const response = await fetch('/api/admin/questions/bulk-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questions: questionsData, testTitle: selectedTestForUpload })
+      });
+
+      const result = await response.json();
+      
+      if (result.success) {
+        setUploadResult(result.data);
+        toast.success(`Upload complete: ${result.data.inserted} inserted, ${result.data.failed} failed`);
+        onRefresh();
+      } else {
+        toast.error(result.error || 'Upload failed');
+      }
+    } catch (error) {
+      toast.error('Failed to parse CSV file');
+      console.error(error);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
       
       if (missingHeaders.length > 0) {
         toast.error(`Missing required columns: ${missingHeaders.join(', ')}`);
