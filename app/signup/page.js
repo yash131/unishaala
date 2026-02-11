@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Logo } from '@/components/Logo';
 import { GraduationCap, Eye, EyeOff, Mail, Lock, User, Phone, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
