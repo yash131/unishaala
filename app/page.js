@@ -442,11 +442,8 @@ function Footer() {
       <div className="container mx-auto px-4">
         <div className="grid md:grid-cols-4 gap-8 mb-12">
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-10 h-10 bg-teal-600 rounded-lg flex items-center justify-center">
-                <GraduationCap className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-xl font-bold text-teal-700">Unishaala</span>
+            <div className="mb-4">
+              <Logo size="default" showText={false} />
             </div>
             <p className="text-gray-600 text-sm mb-4">
               Your trusted partner for competitive exam preparation. Join millions of students achieving their dreams.
