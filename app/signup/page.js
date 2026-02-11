@@ -79,12 +79,9 @@ export default function SignupPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-teal-50 to-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <Link href="/" className="flex items-center justify-center gap-2 mb-8">
-          <div className="w-12 h-12 bg-teal-600 rounded-lg flex items-center justify-center">
-            <GraduationCap className="w-7 h-7 text-white" />
-          </div>
-          <span className="text-2xl font-bold text-teal-700">Unishaala</span>
-        </Link>
+        <div className="flex justify-center mb-8">
+          <Logo size="large" showText={false} />
+        </div>
 
         <Card className="shadow-xl">
           <CardHeader className="text-center">
