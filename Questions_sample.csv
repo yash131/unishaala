@@ -1,0 +1,11 @@
+test_title,topic_title,question_title,duration,description,solution_text,tip,status,option1_title,option2_title,option3_title,option4_title,correct_option_number
+Measurement and Instrumentation,Water pollution,What is the primary source of freshwater for human consumption?,2,"The Lissajous pattern obtained on a CRO is used to determine:
+Nagaland PSC CTSE (Degree) ? 2016, paper ? I 
+TNPSC AE ? 2013","Lissajous patterns help measure phase difference and frequency when a CRO is used.
+If the pattern is a straight line, the signals are in phase.
+If the pattern is a circle, the signals are 90° out of phase.
+Thus, the correct answer is (c) Phase shift and frequency.",Instrumentation ,Active,Amplitude of applied signal,Current in a circuit,Phase shift and frequency,Distortion in a system,3
+Measurement and Instrumentation,Differential Equations,What is the main purpose of desalination?,2,"For accurate measurement of voltage, the most suitable equipment is:
+MPPCS forest service Exam ? 2014","Cathode Ray Oscilloscope (CRO) provides real-time and accurate voltage measurements, especially for waveform analysis.
+It helps in measuring instantaneous voltage, peak-to-peak voltage, and frequency.
+Thus, the correct answer is (c) CRO.",Instrumentation ,Active,Analog Voltmeter,Digital Voltmeter,CRO,None of these,3
