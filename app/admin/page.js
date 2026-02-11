@@ -62,12 +62,14 @@ function AdminSidebar({ activeTab, setActiveTab }) {
   return (
     <aside className="w-64 bg-white shadow-lg min-h-screen fixed left-0 top-0 z-40">
       <div className="p-4 border-b">
-        <Link href="/" className="flex items-center gap-2">
-          <div className="w-10 h-10 bg-teal-600 rounded-lg flex items-center justify-center">
-            <GraduationCap className="w-6 h-6 text-white" />
-          </div>
+        <Link href="/" className="flex items-center gap-3">
+          <img 
+            src="https://customer-assets.emergentagent.com/job_unishaala-web/artifacts/2nf9p203_Unishaala-logo.jpg"
+            alt="Unishaala" 
+            className="h-10 w-auto object-contain"
+          />
           <div>
-            <span className="text-xl font-bold text-teal-700">Unishaala</span>
+            <span className="text-lg font-bold text-teal-600">Unishaala</span>
             <p className="text-xs text-gray-500">Admin Panel</p>
           </div>
         </Link>
