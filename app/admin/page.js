@@ -713,32 +713,53 @@ function QuestionsTab({ questions, mockTests, topics, onRefresh }) {
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <Upload className="w-5 h-5" /> CSV Upload
+            <Upload className="w-5 h-5" /> CSV Upload - Select Test First
           </CardTitle>
         </CardHeader>
         <CardContent>
+          <div className="mb-4">
+            <Label className="text-sm font-medium mb-2 block">1. Select Test for Upload *</Label>
+            <Select value={selectedTestForUpload} onValueChange={setSelectedTestForUpload}>
+              <SelectTrigger className="w-full md:w-96">
+                <SelectValue placeholder="Choose a test to upload questions..." />
+              </SelectTrigger>
+              <SelectContent>
+                {mockTests.map((test) => (
+                  <SelectItem key={test.id} value={test.title}>{test.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!selectedTestForUpload && (
+              <p className="text-sm text-orange-600 mt-1">⚠️ Please select a test before uploading CSV</p>
+            )}
+          </div>
+
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex-1">
+              <Label className="text-sm font-medium mb-2 block">2. Upload CSV File</Label>
               <Input
                 ref={fileInputRef}
                 type="file"
-                accept=".csv"
+                accept=".csv,.tsv"
                 onChange={handleFileUpload}
-                disabled={uploading}
+                disabled={uploading || !selectedTestForUpload}
               />
+              <p className="text-xs text-gray-500 mt-1">Supports both tab-separated and comma-separated formats</p>
             </div>
-            <Button variant="outline" onClick={downloadSampleCSV}>
-              <Download className="w-4 h-4 mr-2" /> Download Sample CSV
-            </Button>
-            <Button variant="outline" onClick={exportCSV}>
-              <Download className="w-4 h-4 mr-2" /> Export CSV
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={downloadSampleCSV}>
+                <Download className="w-4 h-4 mr-2" /> Sample CSV
+              </Button>
+              <Button variant="outline" onClick={exportCSV}>
+                <Download className="w-4 h-4 mr-2" /> Export
+              </Button>
+            </div>
           </div>
 
           {uploading && (
             <div className="flex items-center gap-2 mt-4 text-teal-600">
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Processing CSV...</span>
+              <span>Processing CSV for "{selectedTestForUpload}"...</span>
             </div>
           )}
 
