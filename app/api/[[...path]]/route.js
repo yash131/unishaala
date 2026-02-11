@@ -29,7 +29,6 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
 
   try {
-    // Initialize DB and seed if needed
     await connectToDatabase();
 
     // Home page data
@@ -64,7 +63,7 @@ export async function GET(request) {
       });
     }
 
-    // Single Exam by slug
+    // Single Exam by slug - only show PUBLISHED mock tests to users
     if (path.startsWith('/exams/')) {
       const slug = path.split('/exams/')[1];
       const exams = await getCollection('exams');
@@ -74,25 +73,31 @@ export async function GET(request) {
         return jsonResponse({ success: false, error: 'Exam not found' }, 404);
       }
 
-      // Get related data
       const mockTests = await getCollection('mock_tests');
       const previousPapers = await getCollection('previous_papers');
       const topperNotes = await getCollection('topper_notes');
       const questions = await getCollection('questions');
 
+      // Only show published mock tests to users
+      const publishedTests = await mockTests.find({ 
+        examId: exam.id, 
+        isPublished: true,
+        status: 'Active'
+      }).toArray();
+
       return jsonResponse({
         success: true,
         data: {
           exam,
-          mockTests: await mockTests.find({ examId: exam.id }).toArray(),
+          mockTests: publishedTests,
           previousPapers: await previousPapers.find({ examId: exam.id }).toArray(),
           topperNotes: await topperNotes.find({ examId: exam.id }).toArray(),
-          questionBankCount: await questions.countDocuments({ examId: exam.id })
+          questionBankCount: await questions.countDocuments({ examId: exam.id, status: 'Active' })
         }
       });
     }
 
-    // Mock Test by ID
+    // Get Mock Test by ID (for users - only published)
     if (path.startsWith('/mock-test/')) {
       const testId = path.split('/mock-test/')[1];
       const mockTests = await getCollection('mock_tests');
@@ -102,20 +107,39 @@ export async function GET(request) {
         return jsonResponse({ success: false, error: 'Mock test not found' }, 404);
       }
 
+      // Check if test is published for regular users
+      const user = await getAuthUser(request);
+      const isAdmin = user && ['SUPER_ADMIN', 'ADMIN', 'CONTENT_MANAGER'].includes(user.role);
+      
+      if (!isAdmin && !test.isPublished) {
+        return jsonResponse({ success: false, error: 'Test not available' }, 404);
+      }
+
       return jsonResponse({ success: true, data: test });
     }
 
-    // Get questions for a mock test
+    // Get questions for a mock test (User taking test - only Active questions)
     if (path.startsWith('/mock-test-questions/')) {
       const testId = path.split('/mock-test-questions/')[1];
       const questions = await getCollection('questions');
-      const testQuestions = await questions.find({ mockTestId: testId }).toArray();
+      
+      // Only fetch Active questions for this mockTestId
+      const testQuestions = await questions.find({ 
+        mockTestId: testId,
+        status: 'Active'
+      }).sort({ questionNumber: 1 }).toArray();
       
       // Remove correct answers for test mode
       const questionsWithoutAnswers = testQuestions.map(q => ({
-        ...q,
-        correctOption: undefined,
-        solution: undefined
+        id: q.id,
+        questionNumber: q.questionNumber,
+        question_title: q.question_title,
+        questionText: q.question_title, // Backward compatibility
+        description: q.description,
+        topic_title: q.topic_title,
+        options: [q.option1_title, q.option2_title, q.option3_title, q.option4_title],
+        marks: q.marks || 2,
+        duration: q.duration
       }));
 
       return jsonResponse({ success: true, data: questionsWithoutAnswers });
@@ -141,18 +165,15 @@ export async function GET(request) {
       if (!job) {
         return jsonResponse({ success: false, error: 'Job not found' }, 404);
       }
-
       return jsonResponse({ success: true, data: job });
     }
 
     // Colleges
     if (path === '/colleges') {
       const colleges = await getCollection('colleges');
-      const exam = searchParams.get('exam');
-      const query = exam ? { acceptedExams: exam } : {};
       return jsonResponse({
         success: true,
-        data: await colleges.find(query).sort({ ranking: 1 }).toArray()
+        data: await colleges.find({}).sort({ ranking: 1 }).toArray()
       });
     }
 
@@ -165,7 +186,7 @@ export async function GET(request) {
       });
     }
 
-    // Exam Notifications
+    // Notifications
     if (path === '/notifications') {
       const notifications = await getCollection('exam_notifications');
       return jsonResponse({
@@ -184,20 +205,7 @@ export async function GET(request) {
       return jsonResponse({ success: true, data: userData });
     }
 
-    // User test attempts
-    if (path === '/my-attempts') {
-      const user = await getAuthUser(request);
-      if (!user) {
-        return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
-      }
-      const attempts = await getCollection('test_attempts');
-      return jsonResponse({
-        success: true,
-        data: await attempts.find({ userId: user.id }).sort({ createdAt: -1 }).toArray()
-      });
-    }
-
-    // Test attempt result
+    // Test attempt result with solutions
     if (path.startsWith('/attempt/')) {
       const attemptId = path.split('/attempt/')[1];
       const attempts = await getCollection('test_attempts');
@@ -207,13 +215,24 @@ export async function GET(request) {
         return jsonResponse({ success: false, error: 'Attempt not found' }, 404);
       }
 
-      // Get questions with solutions for review
       const questions = await getCollection('questions');
       const testQuestions = await questions.find({ mockTestId: attempt.mockTestId }).toArray();
+      
+      // Format questions with solutions for review
+      const formattedQuestions = testQuestions.map(q => ({
+        id: q.id,
+        questionNumber: q.questionNumber,
+        questionText: q.question_title,
+        options: [q.option1_title, q.option2_title, q.option3_title, q.option4_title],
+        correctOption: q.correct_option_number,
+        solution: q.solution_text,
+        topic: q.topic_title,
+        marks: q.marks || 2
+      }));
 
       return jsonResponse({
         success: true,
-        data: { attempt, questions: testQuestions }
+        data: { attempt, questions: formattedQuestions }
       });
     }
 
@@ -231,7 +250,6 @@ export async function GET(request) {
         const mockTests = await getCollection('mock_tests');
         const questions = await getCollection('questions');
         const jobs = await getCollection('jobs');
-        const transactions = await getCollection('transactions');
 
         return jsonResponse({
           success: true,
@@ -241,7 +259,7 @@ export async function GET(request) {
             totalMockTests: await mockTests.countDocuments(),
             totalQuestions: await questions.countDocuments(),
             totalJobs: await jobs.countDocuments(),
-            totalRevenue: 0 // Will calculate from transactions
+            totalRevenue: 0
           }
         });
       }
@@ -249,8 +267,10 @@ export async function GET(request) {
       // Admin - Get all users
       if (path === '/admin/users') {
         const users = await getCollection('users');
-        const allUsers = await users.find({}).project({ password: 0 }).toArray();
-        return jsonResponse({ success: true, data: allUsers });
+        return jsonResponse({ 
+          success: true, 
+          data: await users.find({}).project({ password: 0 }).toArray() 
+        });
       }
 
       // Admin - Get all exams
@@ -259,18 +279,31 @@ export async function GET(request) {
         return jsonResponse({ success: true, data: await exams.find({}).toArray() });
       }
 
-      // Admin - Get all mock tests
+      // Admin - Get all mock tests (including unpublished)
       if (path === '/admin/mock-tests') {
         const mockTests = await getCollection('mock_tests');
-        return jsonResponse({ success: true, data: await mockTests.find({}).toArray() });
+        const questions = await getCollection('questions');
+        
+        const tests = await mockTests.find({}).toArray();
+        
+        // Add question count to each test
+        const testsWithCount = await Promise.all(tests.map(async (test) => {
+          const count = await questions.countDocuments({ mockTestId: test.id });
+          return { ...test, questionCount: count };
+        }));
+        
+        return jsonResponse({ success: true, data: testsWithCount });
       }
 
-      // Admin - Get all questions
+      // Admin - Get questions for a specific mock test
       if (path === '/admin/questions') {
-        const questions = await getCollection('questions');
         const mockTestId = searchParams.get('mockTestId');
+        const questions = await getCollection('questions');
+        
         const query = mockTestId ? { mockTestId } : {};
-        return jsonResponse({ success: true, data: await questions.find(query).toArray() });
+        const allQuestions = await questions.find(query).sort({ createdAt: -1 }).toArray();
+        
+        return jsonResponse({ success: true, data: allQuestions });
       }
 
       // Admin - Get all jobs
@@ -285,7 +318,7 @@ export async function GET(request) {
         return jsonResponse({ success: true, data: await colleges.find({}).toArray() });
       }
 
-      // Admin - Get all testimonials
+      // Admin - Get testimonials
       if (path === '/admin/testimonials') {
         const testimonials = await getCollection('testimonials');
         return jsonResponse({ success: true, data: await testimonials.find({}).toArray() });
@@ -345,14 +378,12 @@ export async function POST(request) {
         role: 'USER',
         isVerified: false,
         otp,
-        otpExpiry: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+        otpExpiry: new Date(Date.now() + 10 * 60 * 1000),
         createdAt: new Date(),
         updatedAt: new Date()
       };
 
       await users.insertOne(newUser);
-      
-      // In production, send OTP via SMS/Email
       console.log(`OTP for ${email}: ${otp}`);
 
       return jsonResponse({
@@ -398,7 +429,7 @@ export async function POST(request) {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 // 7 days
+        maxAge: 7 * 24 * 60 * 60
       });
 
       return response;
@@ -496,6 +527,11 @@ export async function POST(request) {
         return jsonResponse({ success: false, error: 'Mock test not found' }, 404);
       }
 
+      // Check if published
+      if (!test.isPublished) {
+        return jsonResponse({ success: false, error: 'Test not available' }, 404);
+      }
+
       // Check if it's a paid test
       if (!test.isFree && test.price > 0) {
         const transactions = await getCollection('transactions');
@@ -515,6 +551,10 @@ export async function POST(request) {
         }
       }
 
+      // Get question count
+      const questions = await getCollection('questions');
+      const questionCount = await questions.countDocuments({ mockTestId, status: 'Active' });
+
       const attempts = await getCollection('test_attempts');
       const attempt = {
         id: uuidv4(),
@@ -525,7 +565,7 @@ export async function POST(request) {
         status: 'IN_PROGRESS',
         answers: {},
         score: 0,
-        totalMarks: test.totalMarks,
+        totalMarks: test.totalMarks || questionCount * 2,
         createdAt: new Date()
       };
 
@@ -533,26 +573,8 @@ export async function POST(request) {
 
       return jsonResponse({
         success: true,
-        data: { attemptId: attempt.id, duration: test.duration }
+        data: { attemptId: attempt.id, duration: test.duration, totalQuestions: questionCount }
       });
-    }
-
-    // Submit Test Answer
-    if (path === '/submit-answer') {
-      const user = await getAuthUser(request);
-      if (!user) {
-        return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
-      }
-
-      const { attemptId, questionId, selectedOption } = body;
-      const attempts = await getCollection('test_attempts');
-      
-      await attempts.updateOne(
-        { id: attemptId, userId: user.id },
-        { $set: { [`answers.${questionId}`]: selectedOption } }
-      );
-
-      return jsonResponse({ success: true, message: 'Answer saved' });
     }
 
     // Submit Test
@@ -583,11 +605,11 @@ export async function POST(request) {
         const userAnswer = answers[q.id];
         if (userAnswer === undefined || userAnswer === null) {
           unanswered++;
-        } else if (userAnswer === q.correctOption) {
-          score += q.marks;
+        } else if (userAnswer === q.correct_option_number) {
+          score += (q.marks || 2);
           correct++;
         } else {
-          score -= q.negativeMarks || 0;
+          score -= (q.negativeMarks || 0.66);
           incorrect++;
         }
       });
@@ -599,7 +621,7 @@ export async function POST(request) {
             answers: answers || attempt.answers,
             endTime: new Date(),
             status: 'COMPLETED',
-            score,
+            score: Math.max(0, score),
             correct,
             incorrect,
             unanswered
@@ -611,7 +633,7 @@ export async function POST(request) {
         success: true,
         data: {
           attemptId,
-          score,
+          score: Math.max(0, score),
           totalMarks: attempt.totalMarks,
           correct,
           incorrect,
@@ -624,7 +646,6 @@ export async function POST(request) {
     if (path === '/rank-predictor') {
       const { examSlug, score, totalMarks } = body;
       
-      // Simple rank prediction logic (can be enhanced with real data)
       const percentage = (score / totalMarks) * 100;
       let rankRange = { min: 0, max: 0 };
       let recommendations = [];
@@ -652,59 +673,216 @@ export async function POST(request) {
       });
     }
 
-    // Create Payment Order (Mock - Razorpay ready)
-    if (path === '/create-order') {
-      const user = await getAuthUser(request);
-      if (!user) {
-        return jsonResponse({ success: false, error: 'Please login to make purchase' }, 401);
-      }
-
-      const { mockTestId, amount } = body;
-      
-      // Mock order creation - Replace with Razorpay when keys provided
-      const orderId = `order_${uuidv4().replace(/-/g, '').substring(0, 16)}`;
-      
-      const transactions = await getCollection('transactions');
-      await transactions.insertOne({
-        id: uuidv4(),
-        orderId,
-        userId: user.id,
-        mockTestId,
-        amount,
-        currency: 'INR',
-        status: 'PENDING',
-        createdAt: new Date()
-      });
-
-      return jsonResponse({
-        success: true,
-        data: {
-          orderId,
-          amount,
-          currency: 'INR',
-          // key: process.env.RAZORPAY_KEY_ID // Uncomment when Razorpay is configured
-        }
-      });
-    }
-
-    // Verify Payment (Mock)
-    if (path === '/verify-payment') {
-      const { orderId, paymentId } = body;
-      
-      const transactions = await getCollection('transactions');
-      await transactions.updateOne(
-        { orderId },
-        { $set: { paymentId, status: 'SUCCESS', updatedAt: new Date() } }
-      );
-
-      return jsonResponse({ success: true, message: 'Payment verified' });
-    }
-
     // ======= ADMIN ROUTES =======
     if (path.startsWith('/admin')) {
       const user = await getAuthUser(request);
       if (!user || !['SUPER_ADMIN', 'ADMIN', 'CONTENT_MANAGER'].includes(user.role)) {
         return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+      }
+
+      // Create Mock Test
+      if (path === '/admin/mock-tests') {
+        const mockTests = await getCollection('mock_tests');
+        
+        const testData = {
+          id: uuidv4(),
+          title: body.title,
+          description: body.description || '',
+          examId: body.examId || null,
+          duration: parseInt(body.duration) || 60,
+          totalQuestions: 0,
+          totalMarks: 0,
+          isFree: body.isFree ?? true,
+          price: parseInt(body.price) || 0,
+          status: body.status || 'Active',
+          isPublished: false, // Default to unpublished
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        
+        await mockTests.insertOne(testData);
+        return jsonResponse({ success: true, data: testData });
+      }
+
+      // Publish/Unpublish Mock Test
+      if (path === '/admin/mock-tests/publish') {
+        const { testId, isPublished } = body;
+        const mockTests = await getCollection('mock_tests');
+        
+        await mockTests.updateOne(
+          { id: testId },
+          { $set: { isPublished, updatedAt: new Date() } }
+        );
+        
+        return jsonResponse({ success: true, message: isPublished ? 'Test published' : 'Test unpublished' });
+      }
+
+      // Save Questions (from CSV preview) - Save Draft or Publish
+      if (path === '/admin/questions/save-batch') {
+        const { mockTestId, questions: questionsData, publish } = body;
+        
+        if (!mockTestId || !Array.isArray(questionsData) || questionsData.length === 0) {
+          return jsonResponse({ success: false, error: 'mockTestId and questions are required' }, 400);
+        }
+
+        const mockTests = await getCollection('mock_tests');
+        const test = await mockTests.findOne({ id: mockTestId });
+        
+        if (!test) {
+          return jsonResponse({ success: false, error: 'Mock test not found' }, 404);
+        }
+
+        const questions = await getCollection('questions');
+        let inserted = 0;
+        let duplicates = 0;
+        let failed = 0;
+        const errors = [];
+
+        for (let i = 0; i < questionsData.length; i++) {
+          const q = questionsData[i];
+          
+          try {
+            // Check for duplicate (same mockTestId + question_title)
+            const existing = await questions.findOne({
+              mockTestId,
+              question_title: q.question_title
+            });
+            
+            if (existing) {
+              duplicates++;
+              continue;
+            }
+
+            // Validate required fields
+            if (!q.question_title || !q.option1_title || !q.option2_title || !q.option3_title || !q.option4_title) {
+              errors.push({ row: i + 1, error: 'Missing required fields' });
+              failed++;
+              continue;
+            }
+
+            const correctOption = parseInt(q.correct_option_number);
+            if (isNaN(correctOption) || correctOption < 1 || correctOption > 4) {
+              errors.push({ row: i + 1, error: 'correct_option_number must be 1-4' });
+              failed++;
+              continue;
+            }
+
+            // Insert question with mockTestId
+            await questions.insertOne({
+              id: uuidv4(),
+              mockTestId: mockTestId,
+              questionNumber: inserted + 1,
+              test_title: test.title,
+              topic_title: q.topic_title || '',
+              question_title: q.question_title,
+              duration: parseInt(q.duration) || 2,
+              description: q.description || '',
+              solution_text: q.solution_text || '',
+              tip: q.tip || '',
+              status: q.status || 'Active',
+              option1_title: q.option1_title,
+              option2_title: q.option2_title,
+              option3_title: q.option3_title,
+              option4_title: q.option4_title,
+              correct_option_number: correctOption,
+              marks: 2,
+              negativeMarks: 0.66,
+              createdAt: new Date()
+            });
+            inserted++;
+          } catch (err) {
+            errors.push({ row: i + 1, error: err.message });
+            failed++;
+          }
+        }
+
+        // Update mock test question count and marks
+        const totalQuestions = await questions.countDocuments({ mockTestId });
+        await mockTests.updateOne(
+          { id: mockTestId },
+          { 
+            $set: { 
+              totalQuestions,
+              totalMarks: totalQuestions * 2,
+              isPublished: publish === true,
+              updatedAt: new Date()
+            } 
+          }
+        );
+
+        return jsonResponse({
+          success: true,
+          data: {
+            total: questionsData.length,
+            inserted,
+            duplicates,
+            failed,
+            errors: errors.slice(0, 20),
+            testPublished: publish === true
+          }
+        });
+      }
+
+      // Create single question
+      if (path === '/admin/questions/create') {
+        const { mockTestId } = body;
+        
+        if (!mockTestId) {
+          return jsonResponse({ success: false, error: 'mockTestId is required' }, 400);
+        }
+
+        const mockTests = await getCollection('mock_tests');
+        const test = await mockTests.findOne({ id: mockTestId });
+        
+        if (!test) {
+          return jsonResponse({ success: false, error: 'Mock test not found' }, 404);
+        }
+
+        const questions = await getCollection('questions');
+        
+        // Check duplicate
+        const existing = await questions.findOne({
+          mockTestId,
+          question_title: body.question_title
+        });
+        
+        if (existing) {
+          return jsonResponse({ success: false, error: 'Duplicate question exists' }, 400);
+        }
+
+        const count = await questions.countDocuments({ mockTestId });
+        
+        const questionData = {
+          id: uuidv4(),
+          mockTestId,
+          questionNumber: count + 1,
+          test_title: test.title,
+          topic_title: body.topic_title || '',
+          question_title: body.question_title,
+          duration: parseInt(body.duration) || 2,
+          description: body.description || '',
+          solution_text: body.solution_text || '',
+          tip: body.tip || '',
+          status: body.status || 'Active',
+          option1_title: body.option1_title,
+          option2_title: body.option2_title,
+          option3_title: body.option3_title,
+          option4_title: body.option4_title,
+          correct_option_number: parseInt(body.correct_option_number),
+          marks: 2,
+          negativeMarks: 0.66,
+          createdAt: new Date()
+        };
+        
+        await questions.insertOne(questionData);
+        
+        // Update test count
+        await mockTests.updateOne(
+          { id: mockTestId },
+          { $set: { totalQuestions: count + 1, totalMarks: (count + 1) * 2 } }
+        );
+        
+        return jsonResponse({ success: true, data: questionData });
       }
 
       // Create Exam
@@ -721,274 +899,6 @@ export async function POST(request) {
         return jsonResponse({ success: true, data: examData });
       }
 
-      // Create Mock Test
-      if (path === '/admin/mock-tests') {
-        const testData = {
-          id: uuidv4(),
-          ...body,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        };
-        const mockTests = await getCollection('mock_tests');
-        await mockTests.insertOne(testData);
-        return jsonResponse({ success: true, data: testData });
-      }
-
-      // Create Question (new format)
-      if (path === '/admin/questions/create') {
-        const questions = await getCollection('questions');
-        const mockTests = await getCollection('mock_tests');
-        
-        // Check for duplicate
-        const existing = await questions.findOne({
-          test_title: body.test_title,
-          question_title: body.question_title
-        });
-        
-        if (existing) {
-          return jsonResponse({ success: false, error: 'Duplicate question: same question already exists for this test' }, 400);
-        }
-
-        // Auto-create mock test if not exists
-        let test = await mockTests.findOne({ title: body.test_title });
-        if (!test) {
-          test = {
-            id: uuidv4(),
-            title: body.test_title,
-            description: '',
-            duration: 60,
-            totalQuestions: 0,
-            totalMarks: 0,
-            isFree: true,
-            price: 0,
-            status: 'Active',
-            createdAt: new Date(),
-            updatedAt: new Date()
-          };
-          await mockTests.insertOne(test);
-        }
-
-        const questionData = {
-          id: uuidv4(),
-          test_title: body.test_title,
-          topic_title: body.topic_title || '',
-          question_title: body.question_title,
-          duration: parseInt(body.duration) || 2,
-          description: body.description || '',
-          solution_text: body.solution_text || '',
-          tip: body.tip || '',
-          status: body.status || 'Active',
-          option1_title: body.option1_title,
-          option2_title: body.option2_title,
-          option3_title: body.option3_title,
-          option4_title: body.option4_title,
-          correct_option_number: parseInt(body.correct_option_number),
-          createdAt: new Date()
-        };
-        
-        await questions.insertOne(questionData);
-        
-        // Update test question count
-        const count = await questions.countDocuments({ test_title: body.test_title });
-        await mockTests.updateOne({ title: body.test_title }, { $set: { totalQuestions: count } });
-        
-        return jsonResponse({ success: true, data: questionData });
-      }
-
-      // Bulk Upload Questions (new CSV format)
-      if (path === '/admin/questions/bulk-upload') {
-        const { questions: questionsData } = body;
-        
-        if (!Array.isArray(questionsData)) {
-          return jsonResponse({ success: false, error: 'Invalid data format' }, 400);
-        }
-
-        const questions = await getCollection('questions');
-        const mockTests = await getCollection('mock_tests');
-        let inserted = 0;
-        let failed = 0;
-        let testsCreated = 0;
-        const errors = [];
-        const createdTests = new Set();
-
-        for (const q of questionsData) {
-          try {
-            // Validate required fields
-            if (!q.test_title || !q.question_title) {
-              errors.push({ row: q.rowNumber, error: 'Missing test_title or question_title' });
-              failed++;
-              continue;
-            }
-
-            if (!q.option1_title || !q.option2_title || !q.option3_title || !q.option4_title) {
-              errors.push({ row: q.rowNumber, error: 'Missing options' });
-              failed++;
-              continue;
-            }
-
-            const correctOption = parseInt(q.correct_option_number);
-            if (isNaN(correctOption) || correctOption < 1 || correctOption > 4) {
-              errors.push({ row: q.rowNumber, error: 'correct_option_number must be 1-4' });
-              failed++;
-              continue;
-            }
-
-            // Check for duplicate
-            const existing = await questions.findOne({
-              test_title: q.test_title,
-              question_title: q.question_title
-            });
-            
-            if (existing) {
-              errors.push({ row: q.rowNumber, error: 'Duplicate question' });
-              failed++;
-              continue;
-            }
-
-            // Auto-create mock test if not exists
-            if (!createdTests.has(q.test_title)) {
-              let test = await mockTests.findOne({ title: q.test_title });
-              if (!test) {
-                test = {
-                  id: uuidv4(),
-                  title: q.test_title,
-                  description: '',
-                  duration: 60,
-                  totalQuestions: 0,
-                  totalMarks: 0,
-                  isFree: true,
-                  price: 0,
-                  status: 'Active',
-                  createdAt: new Date(),
-                  updatedAt: new Date()
-                };
-                await mockTests.insertOne(test);
-                testsCreated++;
-              }
-              createdTests.add(q.test_title);
-            }
-
-            // Insert question
-            await questions.insertOne({
-              id: uuidv4(),
-              test_title: q.test_title,
-              topic_title: q.topic_title || '',
-              question_title: q.question_title,
-              duration: parseInt(q.duration) || 2,
-              description: q.description || '',
-              solution_text: q.solution_text || '',
-              tip: q.tip || '',
-              status: q.status || 'Active',
-              option1_title: q.option1_title,
-              option2_title: q.option2_title,
-              option3_title: q.option3_title,
-              option4_title: q.option4_title,
-              correct_option_number: correctOption,
-              createdAt: new Date()
-            });
-            inserted++;
-          } catch (err) {
-            errors.push({ row: q.rowNumber, error: err.message });
-            failed++;
-          }
-        }
-
-        // Update question counts for all affected tests
-        for (const testTitle of createdTests) {
-          const count = await questions.countDocuments({ test_title: testTitle });
-          await mockTests.updateOne({ title: testTitle }, { $set: { totalQuestions: count } });
-        }
-
-        return jsonResponse({
-          success: true,
-          data: {
-            total: questionsData.length,
-            inserted,
-            failed,
-            testsCreated,
-            errors: errors.slice(0, 20) // Limit errors to first 20
-          }
-        });
-      }
-
-      // Create Question (old format - keep for compatibility)
-      if (path === '/admin/questions') {
-        const questionData = {
-          id: uuidv4(),
-          ...body,
-          createdAt: new Date()
-        };
-        const questions = await getCollection('questions');
-        await questions.insertOne(questionData);
-        return jsonResponse({ success: true, data: questionData });
-      }
-
-      // Bulk Upload Questions (CSV)
-      if (path === '/admin/questions/bulk') {
-        const { questions: questionsData, mockTestId } = body;
-        
-        if (!Array.isArray(questionsData)) {
-          return jsonResponse({ success: false, error: 'Invalid data format' }, 400);
-        }
-
-        const questions = await getCollection('questions');
-        let success = 0;
-        let failed = 0;
-        const errors = [];
-
-        for (let i = 0; i < questionsData.length; i++) {
-          try {
-            const q = questionsData[i];
-            if (!q.questionText || !q.options || q.correctOption === undefined) {
-              errors.push({ row: i + 1, error: 'Missing required fields' });
-              failed++;
-              continue;
-            }
-
-            // Check for duplicates
-            const existing = await questions.findOne({
-              mockTestId,
-              questionText: q.questionText
-            });
-            
-            if (existing) {
-              errors.push({ row: i + 1, error: 'Duplicate question' });
-              failed++;
-              continue;
-            }
-
-            await questions.insertOne({
-              id: uuidv4(),
-              mockTestId,
-              questionNumber: i + 1,
-              questionText: q.questionText,
-              options: q.options,
-              correctOption: parseInt(q.correctOption),
-              marks: parseFloat(q.marks) || 2,
-              negativeMarks: parseFloat(q.negativeMarks) || 0.66,
-              solution: q.solution || '',
-              topic: q.topic || '',
-              difficulty: q.difficulty || 'Medium',
-              createdAt: new Date()
-            });
-            success++;
-          } catch (err) {
-            errors.push({ row: i + 1, error: err.message });
-            failed++;
-          }
-        }
-
-        return jsonResponse({
-          success: true,
-          data: {
-            total: questionsData.length,
-            success,
-            failed,
-            errors
-          }
-        });
-      }
-
       // Create Job
       if (path === '/admin/jobs') {
         const jobData = {
@@ -1002,65 +912,6 @@ export async function POST(request) {
         return jsonResponse({ success: true, data: jobData });
       }
 
-      // Create College
-      if (path === '/admin/colleges') {
-        const collegeData = {
-          id: uuidv4(),
-          ...body,
-          createdAt: new Date()
-        };
-        const colleges = await getCollection('colleges');
-        await colleges.insertOne(collegeData);
-        return jsonResponse({ success: true, data: collegeData });
-      }
-
-      // Bulk Upload Colleges
-      if (path === '/admin/colleges/bulk') {
-        const { colleges: collegesData } = body;
-        
-        if (!Array.isArray(collegesData)) {
-          return jsonResponse({ success: false, error: 'Invalid data format' }, 400);
-        }
-
-        const colleges = await getCollection('colleges');
-        let success = 0;
-        let failed = 0;
-        const errors = [];
-
-        for (let i = 0; i < collegesData.length; i++) {
-          try {
-            const c = collegesData[i];
-            if (!c.name) {
-              errors.push({ row: i + 1, error: 'Missing college name' });
-              failed++;
-              continue;
-            }
-
-            const existing = await colleges.findOne({ name: c.name });
-            if (existing) {
-              errors.push({ row: i + 1, error: 'Duplicate college' });
-              failed++;
-              continue;
-            }
-
-            await colleges.insertOne({
-              id: uuidv4(),
-              ...c,
-              createdAt: new Date()
-            });
-            success++;
-          } catch (err) {
-            errors.push({ row: i + 1, error: err.message });
-            failed++;
-          }
-        }
-
-        return jsonResponse({
-          success: true,
-          data: { total: collegesData.length, success, failed, errors }
-        });
-      }
-
       // Create Testimonial
       if (path === '/admin/testimonials') {
         const testimonialData = {
@@ -1071,18 +922,6 @@ export async function POST(request) {
         const testimonials = await getCollection('testimonials');
         await testimonials.insertOne(testimonialData);
         return jsonResponse({ success: true, data: testimonialData });
-      }
-
-      // Create Notification
-      if (path === '/admin/notifications') {
-        const notificationData = {
-          id: uuidv4(),
-          ...body,
-          createdAt: new Date()
-        };
-        const notifications = await getCollection('exam_notifications');
-        await notifications.insertOne(notificationData);
-        return jsonResponse({ success: true, data: notificationData });
       }
     }
 
@@ -1106,15 +945,12 @@ export async function PUT(request) {
       if (!user) {
         return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
       }
-
       const { name, phone } = body;
       const users = await getCollection('users');
-      
       await users.updateOne(
         { id: user.id },
         { $set: { name, phone, updatedAt: new Date() } }
       );
-
       return jsonResponse({ success: true, message: 'Profile updated' });
     }
 
@@ -1122,17 +958,6 @@ export async function PUT(request) {
     if (path.startsWith('/admin')) {
       if (!user || !['SUPER_ADMIN', 'ADMIN', 'CONTENT_MANAGER'].includes(user.role)) {
         return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
-      }
-
-      // Update Exam
-      if (path.startsWith('/admin/exams/')) {
-        const examId = path.split('/admin/exams/')[1];
-        const exams = await getCollection('exams');
-        await exams.updateOne(
-          { id: examId },
-          { $set: { ...body, updatedAt: new Date() } }
-        );
-        return jsonResponse({ success: true, message: 'Exam updated' });
       }
 
       // Update Mock Test
@@ -1157,6 +982,17 @@ export async function PUT(request) {
         return jsonResponse({ success: true, message: 'Question updated' });
       }
 
+      // Update Exam
+      if (path.startsWith('/admin/exams/')) {
+        const examId = path.split('/admin/exams/')[1];
+        const exams = await getCollection('exams');
+        await exams.updateOne(
+          { id: examId },
+          { $set: { ...body, updatedAt: new Date() } }
+        );
+        return jsonResponse({ success: true, message: 'Exam updated' });
+      }
+
       // Update Job
       if (path.startsWith('/admin/jobs/')) {
         const jobId = path.split('/admin/jobs/')[1];
@@ -1166,31 +1002,6 @@ export async function PUT(request) {
           { $set: { ...body, updatedAt: new Date() } }
         );
         return jsonResponse({ success: true, message: 'Job updated' });
-      }
-
-      // Update College
-      if (path.startsWith('/admin/colleges/')) {
-        const collegeId = path.split('/admin/colleges/')[1];
-        const colleges = await getCollection('colleges');
-        await colleges.updateOne(
-          { id: collegeId },
-          { $set: { ...body, updatedAt: new Date() } }
-        );
-        return jsonResponse({ success: true, message: 'College updated' });
-      }
-
-      // Update User Role
-      if (path.startsWith('/admin/users/')) {
-        if (user.role !== 'SUPER_ADMIN') {
-          return jsonResponse({ success: false, error: 'Only super admin can update roles' }, 403);
-        }
-        const userId = path.split('/admin/users/')[1];
-        const users = await getCollection('users');
-        await users.updateOne(
-          { id: userId },
-          { $set: { role: body.role, updatedAt: new Date() } }
-        );
-        return jsonResponse({ success: true, message: 'User role updated' });
       }
     }
 
@@ -1212,6 +1023,39 @@ export async function DELETE(request) {
       return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
     }
 
+    // Delete Mock Test (also delete its questions)
+    if (path.startsWith('/admin/mock-tests/')) {
+      const testId = path.split('/admin/mock-tests/')[1];
+      const mockTests = await getCollection('mock_tests');
+      const questions = await getCollection('questions');
+      
+      await mockTests.deleteOne({ id: testId });
+      await questions.deleteMany({ mockTestId: testId });
+      
+      return jsonResponse({ success: true, message: 'Mock test and questions deleted' });
+    }
+
+    // Delete Question
+    if (path.startsWith('/admin/questions/')) {
+      const questionId = path.split('/admin/questions/')[1];
+      const questions = await getCollection('questions');
+      const question = await questions.findOne({ id: questionId });
+      
+      if (question) {
+        await questions.deleteOne({ id: questionId });
+        
+        // Update test count
+        const mockTests = await getCollection('mock_tests');
+        const count = await questions.countDocuments({ mockTestId: question.mockTestId });
+        await mockTests.updateOne(
+          { id: question.mockTestId },
+          { $set: { totalQuestions: count, totalMarks: count * 2 } }
+        );
+      }
+      
+      return jsonResponse({ success: true, message: 'Question deleted' });
+    }
+
     // Delete Exam
     if (path.startsWith('/admin/exams/')) {
       const examId = path.split('/admin/exams/')[1];
@@ -1220,36 +1064,12 @@ export async function DELETE(request) {
       return jsonResponse({ success: true, message: 'Exam deleted' });
     }
 
-    // Delete Mock Test
-    if (path.startsWith('/admin/mock-tests/')) {
-      const testId = path.split('/admin/mock-tests/')[1];
-      const mockTests = await getCollection('mock_tests');
-      await mockTests.deleteOne({ id: testId });
-      return jsonResponse({ success: true, message: 'Mock test deleted' });
-    }
-
-    // Delete Question
-    if (path.startsWith('/admin/questions/')) {
-      const questionId = path.split('/admin/questions/')[1];
-      const questions = await getCollection('questions');
-      await questions.deleteOne({ id: questionId });
-      return jsonResponse({ success: true, message: 'Question deleted' });
-    }
-
     // Delete Job
     if (path.startsWith('/admin/jobs/')) {
       const jobId = path.split('/admin/jobs/')[1];
       const jobs = await getCollection('jobs');
       await jobs.deleteOne({ id: jobId });
       return jsonResponse({ success: true, message: 'Job deleted' });
-    }
-
-    // Delete College
-    if (path.startsWith('/admin/colleges/')) {
-      const collegeId = path.split('/admin/colleges/')[1];
-      const colleges = await getCollection('colleges');
-      await colleges.deleteOne({ id: collegeId });
-      return jsonResponse({ success: true, message: 'College deleted' });
     }
 
     // Delete Testimonial
