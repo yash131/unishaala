@@ -861,10 +861,20 @@ export default function AdminPage() {
         const res = await fetch('/api/admin/stats');
         const d = await res.json();
         if (d.success) setStats(d.data);
-      } else if (activeTab === 'mock-tests' || activeTab === 'questions') {
+      } else if (activeTab === 'mock-tests') {
         const res = await fetch('/api/admin/mock-tests');
         const d = await res.json();
         if (d.success) setData(p => ({ ...p, mockTests: d.data }));
+      } else if (activeTab === 'questions') {
+        // Fetch both exams and mock tests for questions tab
+        const [examsRes, testsRes] = await Promise.all([
+          fetch('/api/admin/exams'),
+          fetch('/api/admin/mock-tests')
+        ]);
+        const examsData = await examsRes.json();
+        const testsData = await testsRes.json();
+        if (examsData.success) setData(p => ({ ...p, exams: examsData.data }));
+        if (testsData.success) setData(p => ({ ...p, mockTests: testsData.data }));
       } else {
         const endpoints = { exams: '/api/admin/exams', jobs: '/api/admin/jobs', colleges: '/api/admin/colleges', users: '/api/admin/users', testimonials: '/api/admin/testimonials', contacts: '/api/admin/contacts' };
         const endpoint = endpoints[activeTab];
