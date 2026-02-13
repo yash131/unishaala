@@ -789,6 +789,11 @@ export async function POST(request) {
             }
 
             // Insert question with mockTestId
+            // Normalize status to 'Active' (capitalize first letter)
+            let questionStatus = q.status || 'Active';
+            if (questionStatus.toLowerCase() === 'active') questionStatus = 'Active';
+            if (questionStatus.toLowerCase() === 'inactive') questionStatus = 'Inactive';
+            
             await questions.insertOne({
               id: uuidv4(),
               mockTestId: mockTestId,
@@ -800,7 +805,7 @@ export async function POST(request) {
               description: q.description || '',
               solution_text: q.solution_text || '',
               tip: q.tip || '',
-              status: q.status || 'Active',
+              status: questionStatus,
               option1_title: q.option1_title,
               option2_title: q.option2_title,
               option3_title: q.option3_title,
