@@ -621,15 +621,11 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
       await fetch(`/api/admin/questions/${id}`, { method: 'DELETE' });
       toast.success('Deleted');
       fetchQuestions();
+      onRefresh();
     } catch (e) {
       toast.error('Failed');
     }
   };
-
-  const filteredQuestions = questions.filter(q => 
-    q.question_title?.toLowerCase().includes(search.toLowerCase()) ||
-    q.topic_title?.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <div>
