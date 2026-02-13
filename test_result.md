@@ -325,6 +325,25 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 
+  - task: "Mock Tests Visibility Fix"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Fixed critical bug where published mock tests were not appearing. Made API case-insensitive for status filtering, normalized question save logic, updated seed data. Lines 82-107 (GET /api/exams/gate), 143-171 (GET /api/mock-test-questions), 746-854 (POST /admin/questions/save-batch)"
+
+test_plan:
+  current_focus:
+    - "Mock Tests Visibility Fix"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
 agent_communication:
   - agent: "main"
     message: "Initial implementation of Unishaala complete. All pages and APIs implemented. Admin panel with CSV upload working. Need to test the core APIs - auth, mock tests, and admin CRUD."
