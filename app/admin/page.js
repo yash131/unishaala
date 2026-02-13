@@ -453,12 +453,6 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
     setIsDeleting(false);
   };
 
-  // Filter questions by search
-  const filteredQuestions = questions.filter(q => 
-    q.question_title?.toLowerCase().includes(search.toLowerCase()) ||
-    q.topic_title?.toLowerCase().includes(search.toLowerCase())
-  );
-
   // CSV Headers
   const csvHeaders = ['test_title', 'topic_title', 'question_title', 'duration', 'description', 'solution_text', 'tip', 'status', 'option1_title', 'option2_title', 'option3_title', 'option4_title', 'correct_option_number'];
 
