@@ -357,6 +357,10 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
 
+  // Bulk Delete State
+  const [selectedQuestions, setSelectedQuestions] = useState([]);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   // Filter mock tests by selected exam
   const filteredMockTests = selectedExamId 
     ? mockTests.filter(t => t.examId === selectedExamId)
@@ -368,6 +372,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
     setQuestions([]);
     setPreviewData([]);
     setShowPreview(false);
+    setSelectedQuestions([]);
   }, [selectedExamId]);
 
   // Fetch questions when test is selected
@@ -377,6 +382,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
     } else {
       setQuestions([]);
     }
+    setSelectedQuestions([]);
   }, [selectedTestId]);
 
   const fetchQuestions = async () => {
@@ -393,6 +399,59 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
 
   const selectedExam = exams.find(e => e.id === selectedExamId);
   const selectedTest = mockTests.find(t => t.id === selectedTestId);
+
+  // Bulk delete functions
+  const toggleSelectQuestion = (questionId) => {
+    setSelectedQuestions(prev => 
+      prev.includes(questionId) 
+        ? prev.filter(id => id !== questionId)
+        : [...prev, questionId]
+    );
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedQuestions.length === filteredQuestions.length) {
+      setSelectedQuestions([]);
+    } else {
+      setSelectedQuestions(filteredQuestions.map(q => q.id));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedQuestions.length === 0) return;
+    if (!confirm(`Are you sure you want to delete ${selectedQuestions.length} questions?`)) return;
+    
+    setIsDeleting(true);
+    try {
+      const res = await fetch('/api/admin/questions/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionIds: selectedQuestions,
+          mockTestId: selectedTestId
+        })
+      });
+      
+      const result = await res.json();
+      if (result.success) {
+        toast.success(`Deleted ${result.deletedCount} questions`);
+        setSelectedQuestions([]);
+        fetchQuestions();
+        onRefresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (e) {
+      toast.error('Failed to delete questions');
+    }
+    setIsDeleting(false);
+  };
+
+  // Filter questions by search
+  const filteredQuestions = questions.filter(q => 
+    q.question_title?.toLowerCase().includes(search.toLowerCase()) ||
+    q.topic_title?.toLowerCase().includes(search.toLowerCase())
+  );
 
   // CSV Headers
   const csvHeaders = ['test_title', 'topic_title', 'question_title', 'duration', 'description', 'solution_text', 'tip', 'status', 'option1_title', 'option2_title', 'option3_title', 'option4_title', 'correct_option_number'];
