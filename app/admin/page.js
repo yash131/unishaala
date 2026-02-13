@@ -215,12 +215,12 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
         <h2 className="text-2xl font-bold">Mock Tests</h2>
         <div className="flex gap-4">
           {/* Filter by Exam */}
-          <Select value={filterExamId} onValueChange={setFilterExamId}>
+          <Select value={filterExamId || "all"} onValueChange={(v) => setFilterExamId(v === "all" ? "" : v)}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="All Exams" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">All Exams</SelectItem>
+              <SelectItem value="all">All Exams</SelectItem>
               {exams?.map(e => (
                 <SelectItem key={e.id} value={e.id}>
                   {e.icon} {e.name}
