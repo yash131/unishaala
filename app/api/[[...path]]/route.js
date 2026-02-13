@@ -63,7 +63,7 @@ export async function GET(request) {
       });
     }
 
-    // Single Exam by slug - only show PUBLISHED mock tests to users
+    // Single Exam by slug - only show PUBLISHED mock tests for THIS EXAM to users
     if (path.startsWith('/exams/')) {
       const slug = path.split('/exams/')[1];
       const exams = await getCollection('exams');
@@ -78,19 +78,16 @@ export async function GET(request) {
       const topperNotes = await getCollection('topper_notes');
       const questions = await getCollection('questions');
 
-      // Get ALL published mock tests with questions (for now, show all published tests)
-      // Filter: isPublished = true, status = Active, totalQuestions > 0
-      const allTests = await mockTests.find({}).toArray();
-      
-      // Filter for published tests with questions
-      const publishedTests = allTests.filter(test => 
-        test.isPublished === true && 
-        test.status === 'Active' && 
-        (test.totalQuestions > 0 || test.questionCount > 0)
-      );
+      // Get ONLY mock tests for THIS EXAM that are published and active
+      // Filter by: examId matches current exam, isPublished = true, status = Active
+      const examMockTests = await mockTests.find({
+        examId: exam.id,
+        isPublished: true,
+        status: 'Active'
+      }).toArray();
 
       // Add question count to each test (case-insensitive status check)
-      const testsWithCount = await Promise.all(publishedTests.map(async (test) => {
+      const testsWithCount = await Promise.all(examMockTests.map(async (test) => {
         // Count questions with status Active or active (case-insensitive)
         const qCount = await questions.countDocuments({ 
           mockTestId: test.id, 
