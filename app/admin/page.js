@@ -925,8 +925,8 @@ export default function AdminPage() {
         </header>
         <main className="p-8">
           {activeTab === 'dashboard' && <DashboardTab stats={stats} />}
-          {activeTab === 'mock-tests' && <MockTestsTab mockTests={data.mockTests} onRefresh={fetchData} />}
-          {activeTab === 'questions' && <QuestionsTab mockTests={data.mockTests} onRefresh={fetchData} />}
+          {activeTab === 'mock-tests' && <MockTestsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
+          {activeTab === 'questions' && <QuestionsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'exams' && <CRUDTable title="Exams" data={data.exams} columns={[{ key: 'name', label: 'Name' }, { key: 'category', label: 'Category' }, { key: 'status', label: 'Status', render: v => <Badge className={v === 'Active' ? 'bg-green-500' : 'bg-gray-500'}>{v}</Badge> }]} onDelete={id => handleDelete('exams', id)} loading={loading} />}
           {activeTab === 'jobs' && <CRUDTable title="Jobs" data={data.jobs} columns={[{ key: 'title', label: 'Title' }, { key: 'organization', label: 'Org' }, { key: 'vacancies', label: 'Vacancies' }, { key: 'status', label: 'Status', render: v => <Badge className={v === 'Active' ? 'bg-green-500' : 'bg-gray-500'}>{v}</Badge> }]} onDelete={id => handleDelete('jobs', id)} loading={loading} />}
           {activeTab === 'colleges' && <CRUDTable title="Colleges" data={data.colleges} columns={[{ key: 'name', label: 'Name' }, { key: 'location', label: 'Location' }, { key: 'ranking', label: 'Rank' }]} onDelete={id => handleDelete('colleges', id)} loading={loading} />}
