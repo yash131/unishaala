@@ -214,11 +214,25 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Mock Tests</h2>
         <div className="flex gap-4">
+          {/* Filter by Exam */}
+          <Select value={filterExamId} onValueChange={setFilterExamId}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All Exams" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">All Exams</SelectItem>
+              {exams?.map(e => (
+                <SelectItem key={e.id} value={e.id}>
+                  {e.icon} {e.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input placeholder="Search..." className="pl-10 w-64" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <Button onClick={() => { setEditingTest(null); setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active' }); setShowAddDialog(true); }} className="bg-teal-600 hover:bg-teal-700">
+          <Button onClick={() => { setEditingTest(null); setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '' }); setShowAddDialog(true); }} className="bg-teal-600 hover:bg-teal-700">
             <Plus className="w-4 h-4 mr-2" /> Add Test
           </Button>
         </div>
@@ -228,6 +242,7 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Exam</TableHead>
               <TableHead>Title</TableHead>
               <TableHead>Duration</TableHead>
               <TableHead>Questions</TableHead>
@@ -239,17 +254,20 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
           <TableBody>
             {filteredTests.map(test => (
               <TableRow key={test.id}>
+                <TableCell>
+                  <Badge variant="outline">{getExamName(test.examId)}</Badge>
+                </TableCell>
                 <TableCell className="font-medium">{test.title}</TableCell>
                 <TableCell>{test.duration} min</TableCell>
                 <TableCell>{test.questionCount || test.totalQuestions || 0}</TableCell>
                 <TableCell><Badge className={test.status === 'Active' ? 'bg-green-500' : 'bg-gray-500'}>{test.status}</Badge></TableCell>
                 <TableCell>
-                  <Button variant="ghost" size="sm" onClick={() => togglePublish(test)}>
+                  <Button variant="ghost" size="sm" onClick={() => togglePublish(test)} title={test.isPublished ? 'Click to Unpublish' : 'Click to Publish'}>
                     {test.isPublished ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
                   </Button>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="sm" onClick={() => { setEditingTest(test); setFormData({ title: test.title, description: test.description || '', duration: test.duration, isFree: test.isFree ?? true, price: test.price || 0, status: test.status }); setShowAddDialog(true); }}>
+                  <Button variant="ghost" size="sm" onClick={() => { setEditingTest(test); setFormData({ title: test.title, description: test.description || '', duration: test.duration, isFree: test.isFree ?? true, price: test.price || 0, status: test.status, examId: test.examId || '' }); setShowAddDialog(true); }}>
                     <Edit className="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="sm" className="text-red-500" onClick={() => handleDelete(test.id)}>
@@ -258,22 +276,38 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
                 </TableCell>
               </TableRow>
             ))}
-            {filteredTests.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-500">No tests found</TableCell></TableRow>}
+            {filteredTests.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-8 text-gray-500">No tests found</TableCell></TableRow>}
           </TableBody>
         </Table>
       </Card>
 
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>{editingTest ? 'Edit' : 'Add'} Mock Test</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
+            {/* Exam Selection - Required for new tests */}
+            <div>
+              <Label>Exam *</Label>
+              <Select value={formData.examId} onValueChange={v => setFormData({ ...formData, examId: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Exam (GATE, CAT, UPSC...)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {exams?.map(e => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.icon} {e.name} - {e.fullName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label>Title *</Label>
-              <Input value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} />
+              <Input value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="e.g., GATE CS Full Mock Test 1" />
             </div>
             <div>
               <Label>Description</Label>
-              <Textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} />
+              <Textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Brief description of the test" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -294,7 +328,7 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
             <div className="flex items-center gap-4">
               <Switch checked={formData.isFree} onCheckedChange={c => setFormData({ ...formData, isFree: c })} />
               <Label>Free Test</Label>
-              {!formData.isFree && <Input type="number" placeholder="Price" className="w-32" value={formData.price} onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) })} />}
+              {!formData.isFree && <Input type="number" placeholder="Price (₹)" className="w-32" value={formData.price} onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) })} />}
             </div>
           </div>
           <DialogFooter>
