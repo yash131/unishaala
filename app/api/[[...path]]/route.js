@@ -89,9 +89,17 @@ export async function GET(request) {
         (test.totalQuestions > 0 || test.questionCount > 0)
       );
 
-      // Add question count to each test
+      // Add question count to each test (case-insensitive status check)
       const testsWithCount = await Promise.all(publishedTests.map(async (test) => {
-        const qCount = await questions.countDocuments({ mockTestId: test.id, status: 'Active' });
+        // Count questions with status Active or active (case-insensitive)
+        const qCount = await questions.countDocuments({ 
+          mockTestId: test.id, 
+          $or: [
+            { status: 'Active' },
+            { status: 'active' },
+            { status: { $exists: false } }
+          ]
+        });
         return { ...test, questionCount: qCount };
       }));
 
