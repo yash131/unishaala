@@ -862,9 +862,15 @@ export default function AdminPage() {
         const d = await res.json();
         if (d.success) setStats(d.data);
       } else if (activeTab === 'mock-tests') {
-        const res = await fetch('/api/admin/mock-tests');
-        const d = await res.json();
-        if (d.success) setData(p => ({ ...p, mockTests: d.data }));
+        // Fetch both exams and mock tests
+        const [examsRes, testsRes] = await Promise.all([
+          fetch('/api/admin/exams'),
+          fetch('/api/admin/mock-tests')
+        ]);
+        const examsData = await examsRes.json();
+        const testsData = await testsRes.json();
+        if (examsData.success) setData(p => ({ ...p, exams: examsData.data }));
+        if (testsData.success) setData(p => ({ ...p, mockTests: testsData.data }));
       } else if (activeTab === 'questions') {
         // Fetch both exams and mock tests for questions tab
         const [examsRes, testsRes] = await Promise.all([
