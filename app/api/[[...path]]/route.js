@@ -950,6 +950,38 @@ export async function POST(request) {
         await testimonials.insertOne(testimonialData);
         return jsonResponse({ success: true, data: testimonialData });
       }
+
+      // Bulk Delete Questions
+      if (path === '/admin/questions/bulk-delete') {
+        const { questionIds, mockTestId } = body;
+        
+        if (!Array.isArray(questionIds) || questionIds.length === 0) {
+          return jsonResponse({ success: false, error: 'questionIds array is required' }, 400);
+        }
+
+        const questions = await getCollection('questions');
+        
+        // Delete all selected questions
+        const result = await questions.deleteMany({ 
+          id: { $in: questionIds } 
+        });
+        
+        // Update mock test question count if mockTestId provided
+        if (mockTestId) {
+          const mockTests = await getCollection('mock_tests');
+          const count = await questions.countDocuments({ mockTestId });
+          await mockTests.updateOne(
+            { id: mockTestId },
+            { $set: { totalQuestions: count, totalMarks: count * 2 } }
+          );
+        }
+        
+        return jsonResponse({ 
+          success: true, 
+          message: `Deleted ${result.deletedCount} questions`,
+          deletedCount: result.deletedCount
+        });
+      }
     }
 
     return jsonResponse({ success: false, error: 'Endpoint not found' }, 404);
