@@ -295,8 +295,9 @@ function MockTestsTab({ mockTests, onRefresh }) {
   );
 }
 
-// Questions Tab with CSV Preview
-function QuestionsTab({ mockTests, onRefresh }) {
+// Questions Tab with Exam -> Mock Test -> CSV flow
+function QuestionsTab({ mockTests, exams, onRefresh }) {
+  const [selectedExamId, setSelectedExamId] = useState('');
   const [selectedTestId, setSelectedTestId] = useState('');
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -307,6 +308,19 @@ function QuestionsTab({ mockTests, onRefresh }) {
   const [showPreview, setShowPreview] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Filter mock tests by selected exam
+  const filteredMockTests = selectedExamId 
+    ? mockTests.filter(t => t.examId === selectedExamId)
+    : [];
+
+  // Reset test selection when exam changes
+  useEffect(() => {
+    setSelectedTestId('');
+    setQuestions([]);
+    setPreviewData([]);
+    setShowPreview(false);
+  }, [selectedExamId]);
 
   // Fetch questions when test is selected
   useEffect(() => {
@@ -329,6 +343,7 @@ function QuestionsTab({ mockTests, onRefresh }) {
     setLoading(false);
   };
 
+  const selectedExam = exams.find(e => e.id === selectedExamId);
   const selectedTest = mockTests.find(t => t.id === selectedTestId);
 
   // CSV Headers
