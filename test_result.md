@@ -341,8 +341,7 @@ test_plan:
         comment: "✅ TESTED: Mock tests visibility fix working correctly. GET /api/exams/gate returns 2 published mock tests (isPublished: true, status: 'Active', questionCount > 0). GET /api/mock-test-questions/{testId} successfully retrieves questions with proper security (answers hidden). POST /admin/questions/save-batch normalizes status values correctly ('active'/'ACTIVE' → 'Active'). Case-insensitive status filtering working. Minor: Some test questions have null field values but this doesn't affect core functionality."
 
 test_plan:
-  current_focus:
-    - "Mock Tests Visibility Fix"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
