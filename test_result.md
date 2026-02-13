@@ -327,15 +327,18 @@ test_plan:
 
   - task: "Mock Tests Visibility Fix"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/app/api/[[...path]]/route.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Fixed critical bug where published mock tests were not appearing. Made API case-insensitive for status filtering, normalized question save logic, updated seed data. Lines 82-107 (GET /api/exams/gate), 143-171 (GET /api/mock-test-questions), 746-854 (POST /admin/questions/save-batch)"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Mock tests visibility fix working correctly. GET /api/exams/gate returns 2 published mock tests (isPublished: true, status: 'Active', questionCount > 0). GET /api/mock-test-questions/{testId} successfully retrieves questions with proper security (answers hidden). POST /admin/questions/save-batch normalizes status values correctly ('active'/'ACTIVE' → 'Active'). Case-insensitive status filtering working. Minor: Some test questions have null field values but this doesn't affect core functionality."
 
 test_plan:
   current_focus:
