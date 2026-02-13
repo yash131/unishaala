@@ -127,20 +127,34 @@ function DashboardTab({ stats }) {
 }
 
 // Mock Tests Tab
-function MockTestsTab({ mockTests, onRefresh }) {
+function MockTestsTab({ mockTests, exams, onRefresh }) {
   const [search, setSearch] = useState('');
+  const [filterExamId, setFilterExamId] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingTest, setEditingTest] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active'
+    title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: ''
   });
 
-  const filteredTests = mockTests.filter(t => t.title?.toLowerCase().includes(search.toLowerCase()));
+  const filteredTests = mockTests.filter(t => {
+    const matchesSearch = t.title?.toLowerCase().includes(search.toLowerCase());
+    const matchesExam = !filterExamId || t.examId === filterExamId;
+    return matchesSearch && matchesExam;
+  });
+
+  const getExamName = (examId) => {
+    const exam = exams?.find(e => e.id === examId);
+    return exam ? exam.name : '-';
+  };
 
   const handleSave = async () => {
     if (!formData.title) {
       toast.error('Title is required');
+      return;
+    }
+    if (!formData.examId && !editingTest) {
+      toast.error('Please select an exam');
       return;
     }
     setLoading(true);
@@ -159,7 +173,7 @@ function MockTestsTab({ mockTests, onRefresh }) {
         toast.success(editingTest ? 'Test updated!' : 'Test created!');
         setShowAddDialog(false);
         setEditingTest(null);
-        setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active' });
+        setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '' });
         onRefresh();
       } else {
         toast.error(result.error);
