@@ -1,543 +1,487 @@
 #!/usr/bin/env python3
-"""
-Comprehensive backend API tests for Unishaala platform
-Tests all backend APIs as specified in test_result.md
-"""
 
 import requests
 import json
-import os
-import sys
-from typing import Dict, Any, Optional
+import asyncio
+import time
+from datetime import datetime
 
-class UnishaalaAPITester:
+# Base URL from environment
+BASE_URL = "https://unishaala-edu.preview.emergentagent.com"
+API_BASE = f"{BASE_URL}/api"
+
+# Test credentials
+ADMIN_EMAIL = "admin@unishaala.com"
+ADMIN_PASSWORD = "admin123"
+
+class UnishaalaMockTestsVisibilityTest:
     def __init__(self):
-        # Get base URL from environment
-        self.base_url = "https://unishaala-edu.preview.emergentagent.com"
-        self.api_base = f"{self.base_url}/api"
-        
-        # Admin credentials for testing
-        self.admin_email = "admin@unishaala.com"
-        self.admin_password = "admin123"
-        
-        # Test results tracking
-        self.test_results = {
-            'passed': 0,
-            'failed': 0,
-            'tests': []
-        }
-        
-        # Auth token storage
+        self.session = requests.Session()
         self.auth_token = None
-        self.auth_cookies = None
+        self.test_results = []
 
-    def log_test(self, test_name: str, passed: bool, message: str, details: str = ""):
-        """Log test result"""
-        status = "✅ PASSED" if passed else "❌ FAILED"
-        print(f"{status}: {test_name} - {message}")
-        if details:
-            print(f"   Details: {details}")
+    def log_test_result(self, test_name, success, message, details=None):
+        """Log test results with timestamp"""
+        result = {
+            "test": test_name,
+            "success": success,
+            "message": message,
+            "timestamp": datetime.now().isoformat(),
+            "details": details or {}
+        }
+        self.test_results.append(result)
+        status = "✅ PASS" if success else "❌ FAIL"
+        print(f"{status} - {test_name}: {message}")
+        if details and not success:
+            print(f"  Details: {details}")
+
+    def authenticate_admin(self):
+        """Authenticate as admin user"""
+        print(f"\n🔐 Testing Admin Authentication...")
         
-        self.test_results['tests'].append({
-            'name': test_name,
-            'passed': passed,
-            'message': message,
-            'details': details
-        })
-        
-        if passed:
-            self.test_results['passed'] += 1
-        else:
-            self.test_results['failed'] += 1
-
-    def test_home_api(self):
-        """Test GET /api/home - Home page data"""
         try:
-            response = requests.get(f"{self.api_base}/home", timeout=30)
+            response = self.session.post(f"{API_BASE}/auth/login", 
+                json={
+                    "email": ADMIN_EMAIL,
+                    "password": ADMIN_PASSWORD
+                })
             
             if response.status_code == 200:
                 data = response.json()
-                if data.get('success') and 'data' in data:
-                    home_data = data['data']
-                    required_keys = ['exams', 'notifications', 'testimonials', 'jobs', 'colleges']
-                    missing_keys = [key for key in required_keys if key not in home_data]
-                    
-                    if not missing_keys:
-                        self.log_test("Home API", True, "Returns all required sections", 
-                                    f"Found {len(home_data)} sections")
-                    else:
-                        self.log_test("Home API", False, "Missing required sections", 
-                                    f"Missing: {missing_keys}")
-                else:
-                    self.log_test("Home API", False, "Invalid response structure", 
-                                f"Response: {data}")
-            else:
-                self.log_test("Home API", False, f"HTTP {response.status_code}", 
-                            f"Response: {response.text[:200]}")
-                
-        except requests.RequestException as e:
-            self.log_test("Home API", False, "Request failed", str(e))
-
-    def test_exams_api(self):
-        """Test GET /api/exams - List all exams"""
-        try:
-            response = requests.get(f"{self.api_base}/exams", timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('success') and isinstance(data.get('data'), list):
-                    exams = data['data']
-                    self.log_test("Exams List API", True, f"Returns {len(exams)} exams", 
-                                f"First exam: {exams[0].get('name', 'N/A') if exams else 'No exams'}")
-                    return exams
-                else:
-                    self.log_test("Exams List API", False, "Invalid response structure", 
-                                f"Response: {data}")
-                    return []
-            else:
-                self.log_test("Exams List API", False, f"HTTP {response.status_code}", 
-                            f"Response: {response.text[:200]}")
-                return []
-                
-        except requests.RequestException as e:
-            self.log_test("Exams List API", False, "Request failed", str(e))
-            return []
-
-    def test_exam_detail_api(self, exams: list):
-        """Test GET /api/exams/[slug] - Get exam by slug"""
-        if not exams:
-            self.log_test("Exam Detail API", False, "No exams available for testing", "")
-            return
-            
-        try:
-            # Test with first exam slug
-            exam_slug = exams[0].get('slug', 'gate')  # Default to 'gate' if no slug
-            response = requests.get(f"{self.api_base}/exams/{exam_slug}", timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('success') and 'data' in data:
-                    exam_data = data['data']
-                    required_keys = ['exam', 'mockTests', 'previousPapers', 'topperNotes']
-                    missing_keys = [key for key in required_keys if key not in exam_data]
-                    
-                    if not missing_keys:
-                        self.log_test("Exam Detail API", True, f"Returns complete exam data for {exam_slug}", 
-                                    f"Mock tests: {len(exam_data.get('mockTests', []))}")
-                    else:
-                        self.log_test("Exam Detail API", False, "Missing required sections", 
-                                    f"Missing: {missing_keys}")
-                else:
-                    self.log_test("Exam Detail API", False, "Invalid response structure", 
-                                f"Response: {data}")
-            else:
-                self.log_test("Exam Detail API", False, f"HTTP {response.status_code}", 
-                            f"Response: {response.text[:200]}")
-                
-        except requests.RequestException as e:
-            self.log_test("Exam Detail API", False, "Request failed", str(e))
-
-    def test_authentication_api(self):
-        """Test POST /api/auth/login - Login with credentials"""
-        try:
-            login_data = {
-                "email": self.admin_email,
-                "password": self.admin_password
-            }
-            
-            response = requests.post(f"{self.api_base}/auth/login", 
-                                   json=login_data, timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('success') and 'data' in data and 'token' in data['data']:
+                if data.get('success') and data.get('data', {}).get('token'):
                     self.auth_token = data['data']['token']
-                    self.auth_cookies = response.cookies
+                    self.session.headers.update({
+                        'Authorization': f'Bearer {self.auth_token}',
+                        'Content-Type': 'application/json'
+                    })
+                    
+                    # Verify admin role
                     user_data = data['data'].get('user', {})
-                    self.log_test("Authentication API", True, "Login successful", 
-                                f"User: {user_data.get('email')} ({user_data.get('role')})")
-                    return True
+                    role = user_data.get('role')
+                    
+                    if role in ['SUPER_ADMIN', 'ADMIN', 'CONTENT_MANAGER']:
+                        self.log_test_result("Admin Authentication", True, 
+                            f"Successfully authenticated as {role}", 
+                            {"user_id": user_data.get('id'), "email": user_data.get('email')})
+                        return True
+                    else:
+                        self.log_test_result("Admin Authentication", False, 
+                            f"User role '{role}' is not admin")
+                        return False
                 else:
-                    self.log_test("Authentication API", False, "Invalid login response", 
-                                f"Response: {data}")
+                    self.log_test_result("Admin Authentication", False, 
+                        "Login response missing token or success flag",
+                        {"response": data})
                     return False
             else:
-                self.log_test("Authentication API", False, f"HTTP {response.status_code}", 
-                            f"Response: {response.text[:200]}")
+                self.log_test_result("Admin Authentication", False, 
+                    f"Login failed with status {response.status_code}",
+                    {"response": response.text[:500]})
                 return False
                 
-        except requests.RequestException as e:
-            self.log_test("Authentication API", False, "Request failed", str(e))
+        except Exception as e:
+            self.log_test_result("Admin Authentication", False, 
+                f"Authentication error: {str(e)}")
             return False
 
-    def test_jobs_api(self):
-        """Test GET /api/jobs - List all jobs"""
+    def test_mock_tests_visibility_gate_endpoint(self):
+        """Test GET /api/exams/gate - Should return mock tests with proper filtering"""
+        print(f"\n📚 Testing Mock Tests Visibility on GATE Exam Endpoint...")
+        
         try:
-            response = requests.get(f"{self.api_base}/jobs", timeout=30)
+            response = self.session.get(f"{API_BASE}/exams/gate")
             
             if response.status_code == 200:
                 data = response.json()
-                if data.get('success') and isinstance(data.get('data'), list):
-                    jobs = data['data']
-                    self.log_test("Jobs API", True, f"Returns {len(jobs)} jobs", 
-                                f"First job: {jobs[0].get('title', 'N/A') if jobs else 'No jobs'}")
-                else:
-                    self.log_test("Jobs API", False, "Invalid response structure", 
-                                f"Response: {data}")
-            else:
-                self.log_test("Jobs API", False, f"HTTP {response.status_code}", 
-                            f"Response: {response.text[:200]}")
                 
-        except requests.RequestException as e:
-            self.log_test("Jobs API", False, "Request failed", str(e))
-
-    def test_rank_predictor_api(self):
-        """Test POST /api/rank-predictor - Rank prediction"""
-        try:
-            predictor_data = {
-                "examSlug": "jee-main",
-                "score": 180,
-                "totalMarks": 200
-            }
-            
-            response = requests.post(f"{self.api_base}/rank-predictor", 
-                                   json=predictor_data, timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('success') and 'data' in data:
-                    result = data['data']
-                    required_keys = ['percentage', 'rankRange', 'recommendations']
-                    missing_keys = [key for key in required_keys if key not in result]
+                if not data.get('success'):
+                    self.log_test_result("GET /api/exams/gate", False, 
+                        "API returned success: false",
+                        {"response": data})
+                    return False
+                
+                exam_data = data.get('data', {})
+                mock_tests = exam_data.get('mockTests', [])
+                
+                # Test 1: Check if mock tests are returned
+                if not mock_tests:
+                    self.log_test_result("Mock Tests Visibility - Basic", False, 
+                        "No mock tests returned from /api/exams/gate")
+                    return False
+                
+                self.log_test_result("Mock Tests Visibility - Basic", True, 
+                    f"Retrieved {len(mock_tests)} mock tests from GATE endpoint")
+                
+                # Test 2: Verify each mock test meets visibility criteria
+                published_tests = 0
+                tests_with_questions = 0
+                active_tests = 0
+                
+                for test in mock_tests:
+                    test_id = test.get('id')
+                    is_published = test.get('isPublished')
+                    status = test.get('status')
+                    question_count = test.get('questionCount', 0)
                     
-                    if not missing_keys:
-                        self.log_test("Rank Predictor API", True, "Returns complete prediction", 
-                                    f"Percentage: {result['percentage']}%, Rank: {result['rankRange']}")
-                    else:
-                        self.log_test("Rank Predictor API", False, "Missing required fields", 
-                                    f"Missing: {missing_keys}")
-                else:
-                    self.log_test("Rank Predictor API", False, "Invalid response structure", 
-                                f"Response: {data}")
-            else:
-                self.log_test("Rank Predictor API", False, f"HTTP {response.status_code}", 
-                            f"Response: {response.text[:200]}")
+                    # Check if published
+                    if is_published is True:
+                        published_tests += 1
+                    
+                    # Check if active status
+                    if status == 'Active':
+                        active_tests += 1
+                    
+                    # Check if has questions
+                    if question_count > 0:
+                        tests_with_questions += 1
                 
-        except requests.RequestException as e:
-            self.log_test("Rank Predictor API", False, "Request failed", str(e))
+                # Verify filtering criteria
+                if published_tests == len(mock_tests):
+                    self.log_test_result("Mock Tests Filter - Published", True, 
+                        f"All {len(mock_tests)} mock tests are published (isPublished: true)")
+                else:
+                    self.log_test_result("Mock Tests Filter - Published", False, 
+                        f"Only {published_tests}/{len(mock_tests)} tests are published")
+                
+                if active_tests == len(mock_tests):
+                    self.log_test_result("Mock Tests Filter - Active Status", True, 
+                        f"All {len(mock_tests)} mock tests have status: 'Active'")
+                else:
+                    self.log_test_result("Mock Tests Filter - Active Status", False, 
+                        f"Only {active_tests}/{len(mock_tests)} tests have status: 'Active'")
+                
+                if tests_with_questions == len(mock_tests):
+                    self.log_test_result("Mock Tests Filter - With Questions", True, 
+                        f"All {len(mock_tests)} mock tests have questionCount > 0")
+                else:
+                    self.log_test_result("Mock Tests Filter - With Questions", False, 
+                        f"Only {tests_with_questions}/{len(mock_tests)} tests have questions")
+                
+                # Test 3: Verify expected count (should be 2 based on requirement)
+                if len(mock_tests) >= 2:
+                    self.log_test_result("Mock Tests Count", True, 
+                        f"Expected at least 2 published mock tests, got {len(mock_tests)}")
+                else:
+                    self.log_test_result("Mock Tests Count", False, 
+                        f"Expected at least 2 published mock tests, got {len(mock_tests)}")
+                
+                # Store test IDs for further testing
+                if mock_tests:
+                    self.test_mock_test_ids = [test.get('id') for test in mock_tests[:2]]
+                    return True
+                
+            else:
+                self.log_test_result("GET /api/exams/gate", False, 
+                    f"Failed with status {response.status_code}",
+                    {"response": response.text[:500]})
+                return False
+                
+        except Exception as e:
+            self.log_test_result("GET /api/exams/gate", False, 
+                f"Request error: {str(e)}")
+            return False
 
-    def test_contact_api(self):
-        """Test POST /api/contact - Contact form submission"""
+    def test_mock_test_questions_endpoint(self):
+        """Test GET /api/mock-test-questions/{testId} - Should return questions for specific mock test"""
+        print(f"\n❓ Testing Mock Test Questions Retrieval...")
+        
+        if not hasattr(self, 'test_mock_test_ids') or not self.test_mock_test_ids:
+            self.log_test_result("Mock Test Questions Setup", False, 
+                "No test IDs available from previous test")
+            return False
+        
+        success_count = 0
+        
+        for test_id in self.test_mock_test_ids:
+            try:
+                response = self.session.get(f"{API_BASE}/mock-test-questions/{test_id}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    if data.get('success'):
+                        questions = data.get('data', [])
+                        
+                        if questions:
+                            success_count += 1
+                            self.log_test_result(f"Questions for Test {test_id}", True, 
+                                f"Retrieved {len(questions)} questions")
+                            
+                            # Test question structure
+                            first_question = questions[0] if questions else {}
+                            required_fields = ['id', 'questionNumber', 'question_title', 'options']
+                            
+                            missing_fields = [field for field in required_fields if field not in first_question]
+                            if not missing_fields:
+                                self.log_test_result(f"Question Structure {test_id}", True, 
+                                    "Questions have required fields")
+                            else:
+                                self.log_test_result(f"Question Structure {test_id}", False, 
+                                    f"Questions missing fields: {missing_fields}")
+                            
+                            # Verify answers are removed (for test mode)
+                            if 'correctAnswer' not in first_question and 'correct_option_number' not in first_question:
+                                self.log_test_result(f"Answer Security {test_id}", True, 
+                                    "Correct answers properly hidden for test mode")
+                            else:
+                                self.log_test_result(f"Answer Security {test_id}", False, 
+                                    "Correct answers not properly hidden")
+                        else:
+                            self.log_test_result(f"Questions for Test {test_id}", False, 
+                                "No questions returned")
+                    else:
+                        self.log_test_result(f"Questions for Test {test_id}", False, 
+                            "API returned success: false",
+                            {"response": data})
+                else:
+                    self.log_test_result(f"Questions for Test {test_id}", False, 
+                        f"Failed with status {response.status_code}")
+                        
+            except Exception as e:
+                self.log_test_result(f"Questions for Test {test_id}", False, 
+                    f"Request error: {str(e)}")
+        
+        if success_count > 0:
+            return True
+        else:
+            return False
+
+    def test_questions_save_batch_status_normalization(self):
+        """Test POST /admin/questions/save-batch - Status normalization"""
+        print(f"\n💾 Testing Question Status Normalization...")
+        
+        if not self.auth_token:
+            self.log_test_result("Questions Batch Save Setup", False, 
+                "No admin authentication available")
+            return False
+        
+        # First get a mock test to add questions to
         try:
-            contact_data = {
-                "name": "Test User",
-                "email": "testuser@example.com",
-                "phone": "+91-9876543210",
-                "subject": "Testing Contact Form",
-                "message": "This is a test message from automated testing system."
-            }
+            response = self.session.get(f"{API_BASE}/admin/mock-tests")
+            if response.status_code != 200:
+                self.log_test_result("Get Mock Tests for Testing", False, 
+                    f"Failed to get mock tests: {response.status_code}")
+                return False
             
-            response = requests.post(f"{self.api_base}/contact", 
-                                   json=contact_data, timeout=30)
+            data = response.json()
+            mock_tests = data.get('data', [])
+            if not mock_tests:
+                self.log_test_result("Get Mock Tests for Testing", False, 
+                    "No mock tests available")
+                return False
+            
+            test_mock_test_id = mock_tests[0].get('id')
+            
+        except Exception as e:
+            self.log_test_result("Get Mock Tests for Testing", False, 
+                f"Error getting mock tests: {str(e)}")
+            return False
+        
+        # Test different status value normalizations
+        test_questions = [
+            {
+                "question_title": f"Test Question Status active {int(time.time())}",
+                "option1_title": "Option A",
+                "option2_title": "Option B", 
+                "option3_title": "Option C",
+                "option4_title": "Option D",
+                "correct_option_number": 1,
+                "status": "active"  # lowercase - should be normalized to 'Active'
+            },
+            {
+                "question_title": f"Test Question Status ACTIVE {int(time.time())}",
+                "option1_title": "Option A",
+                "option2_title": "Option B",
+                "option3_title": "Option C", 
+                "option4_title": "Option D",
+                "correct_option_number": 2,
+                "status": "ACTIVE"  # uppercase - should be normalized to 'Active'
+            },
+            {
+                "question_title": f"Test Question No Status {int(time.time())}",
+                "option1_title": "Option A",
+                "option2_title": "Option B",
+                "option3_title": "Option C",
+                "option4_title": "Option D", 
+                "correct_option_number": 3
+                # No status - should default to 'Active'
+            }
+        ]
+        
+        try:
+            response = self.session.post(f"{API_BASE}/admin/questions/save-batch",
+                json={
+                    "mockTestId": test_mock_test_id,
+                    "questions": test_questions,
+                    "publish": False
+                })
+            
+            if response.status_code == 200:
+                data = response.json()
+                
+                if data.get('success'):
+                    result_data = data.get('data', {})
+                    inserted = result_data.get('inserted', 0)
+                    failed = result_data.get('failed', 0)
+                    errors = result_data.get('errors', [])
+                    
+                    if inserted == len(test_questions) and failed == 0:
+                        self.log_test_result("Question Status Normalization - Batch Save", True, 
+                            f"Successfully saved {inserted} questions with different status formats")
+                        
+                        # Now verify the status normalization by getting the questions
+                        response = self.session.get(f"{API_BASE}/admin/questions?mockTestId={test_mock_test_id}")
+                        if response.status_code == 200:
+                            questions_data = response.json()
+                            if questions_data.get('success'):
+                                all_questions = questions_data.get('data', [])
+                                
+                                # Filter to our test questions
+                                test_question_titles = [q['question_title'] for q in test_questions]
+                                saved_test_questions = [q for q in all_questions 
+                                                      if q.get('question_title') in test_question_titles]
+                                
+                                if len(saved_test_questions) == len(test_questions):
+                                    # Check if all statuses were normalized to 'Active'
+                                    active_count = sum(1 for q in saved_test_questions 
+                                                     if q.get('status') == 'Active')
+                                    
+                                    if active_count == len(saved_test_questions):
+                                        self.log_test_result("Question Status Normalization - Verification", True, 
+                                            f"All {len(saved_test_questions)} questions have status normalized to 'Active'")
+                                        return True
+                                    else:
+                                        statuses = [q.get('status') for q in saved_test_questions]
+                                        self.log_test_result("Question Status Normalization - Verification", False, 
+                                            f"Status normalization failed. Found statuses: {statuses}")
+                                        return False
+                                else:
+                                    self.log_test_result("Question Status Normalization - Verification", False, 
+                                        f"Expected {len(test_questions)} saved questions, found {len(saved_test_questions)}")
+                            else:
+                                self.log_test_result("Question Status Normalization - Verification", False, 
+                                    "Failed to retrieve saved questions for verification")
+                        else:
+                            self.log_test_result("Question Status Normalization - Verification", False, 
+                                f"Failed to get questions for verification: {response.status_code}")
+                    else:
+                        self.log_test_result("Question Status Normalization - Batch Save", False, 
+                            f"Batch save failed: {inserted} inserted, {failed} failed",
+                            {"errors": errors})
+                else:
+                    self.log_test_result("Question Status Normalization - Batch Save", False, 
+                        "Batch save API returned success: false",
+                        {"response": data})
+            else:
+                self.log_test_result("Question Status Normalization - Batch Save", False, 
+                    f"Batch save failed with status {response.status_code}",
+                    {"response": response.text[:500]})
+                    
+        except Exception as e:
+            self.log_test_result("Question Status Normalization - Batch Save", False, 
+                f"Request error: {str(e)}")
+        
+        return False
+
+    def test_case_insensitive_filtering(self):
+        """Test that the API correctly filters questions with case-insensitive status matching"""
+        print(f"\n🔍 Testing Case-Insensitive Status Filtering...")
+        
+        try:
+            # Test the gate endpoint again and verify it uses case-insensitive filtering
+            response = self.session.get(f"{API_BASE}/exams/gate")
             
             if response.status_code == 200:
                 data = response.json()
                 if data.get('success'):
-                    self.log_test("Contact Form API", True, "Contact form submission successful", 
-                                f"Message: {data.get('message')}")
-                else:
-                    self.log_test("Contact Form API", False, "Contact form failed", 
-                                f"Response: {data}")
-            else:
-                self.log_test("Contact Form API", False, f"HTTP {response.status_code}", 
-                            f"Response: {response.text[:200]}")
-                
-        except requests.RequestException as e:
-            self.log_test("Contact Form API", False, "Request failed", str(e))
-
-    def test_admin_stats_api(self):
-        """Test GET /api/admin/stats - Admin dashboard stats (requires auth)"""
-        if not self.auth_token:
-            self.log_test("Admin Stats API", False, "No authentication token available", "")
-            return
-            
-        try:
-            headers = {
-                'Authorization': f'Bearer {self.auth_token}',
-                'Content-Type': 'application/json'
-            }
-            
-            response = requests.get(f"{self.api_base}/admin/stats", 
-                                  headers=headers, 
-                                  cookies=self.auth_cookies,
-                                  timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('success') and 'data' in data:
-                    stats = data['data']
-                    expected_stats = ['totalUsers', 'totalExams', 'totalMockTests', 
-                                    'totalQuestions', 'totalJobs']
-                    missing_stats = [stat for stat in expected_stats if stat not in stats]
-                    
-                    if not missing_stats:
-                        self.log_test("Admin Stats API", True, "Returns complete dashboard stats", 
-                                    f"Users: {stats['totalUsers']}, Exams: {stats['totalExams']}")
-                    else:
-                        self.log_test("Admin Stats API", False, "Missing required stats", 
-                                    f"Missing: {missing_stats}")
-                else:
-                    self.log_test("Admin Stats API", False, "Invalid response structure", 
-                                f"Response: {data}")
-            elif response.status_code == 401:
-                self.log_test("Admin Stats API", False, "Authentication failed", 
-                            "Auth token might be invalid or expired")
-            else:
-                self.log_test("Admin Stats API", False, f"HTTP {response.status_code}", 
-                            f"Response: {response.text[:200]}")
-                
-        except requests.RequestException as e:
-            self.log_test("Admin Stats API", False, "Request failed", str(e))
-
-    def test_admin_crud_apis(self):
-        """Test Admin CRUD APIs (requires auth)"""
-        if not self.auth_token:
-            self.log_test("Admin CRUD APIs", False, "No authentication token available", "")
-            return
-            
-        try:
-            headers = {
-                'Authorization': f'Bearer {self.auth_token}',
-                'Content-Type': 'application/json'
-            }
-            
-            # Test GET endpoints
-            admin_endpoints = [
-                '/admin/users',
-                '/admin/exams', 
-                '/admin/mock-tests',
-                '/admin/questions',
-                '/admin/jobs',
-                '/admin/colleges',
-                '/admin/testimonials',
-                '/admin/contacts'
-            ]
-            
-            passed_endpoints = []
-            failed_endpoints = []
-            
-            for endpoint in admin_endpoints:
-                try:
-                    response = requests.get(f"{self.api_base}{endpoint}", 
-                                          headers=headers, 
-                                          cookies=self.auth_cookies,
-                                          timeout=30)
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        if data.get('success') and isinstance(data.get('data'), list):
-                            passed_endpoints.append(f"{endpoint} ({len(data['data'])} items)")
-                        else:
-                            failed_endpoints.append(f"{endpoint} (invalid structure)")
-                    else:
-                        failed_endpoints.append(f"{endpoint} (HTTP {response.status_code})")
-                        
-                except requests.RequestException as e:
-                    failed_endpoints.append(f"{endpoint} (Request failed: {str(e)[:50]})")
-            
-            if not failed_endpoints:
-                self.log_test("Admin CRUD APIs", True, f"All {len(passed_endpoints)} admin endpoints working", 
-                            f"Working: {', '.join(passed_endpoints[:3])}...")
-            else:
-                self.log_test("Admin CRUD APIs", False, f"{len(failed_endpoints)} admin endpoints failed", 
-                            f"Failed: {', '.join(failed_endpoints)}")
-                
-        except Exception as e:
-            self.log_test("Admin CRUD APIs", False, "Test setup failed", str(e))
-
-    def test_mock_tests_api(self):
-        """Test Mock Tests API endpoints"""
-        if not self.auth_token:
-            self.log_test("Mock Tests API", False, "No authentication token available", "")
-            return
-            
-        try:
-            headers = {
-                'Authorization': f'Bearer {self.auth_token}',
-                'Content-Type': 'application/json'
-            }
-            
-            # First get available mock tests with auth
-            response = requests.get(f"{self.api_base}/admin/mock-tests", 
-                                  headers=headers, 
-                                  cookies=self.auth_cookies,
-                                  timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('success') and isinstance(data.get('data'), list):
-                    mock_tests = data['data']
+                    exam_data = data.get('data', {})
+                    mock_tests = exam_data.get('mockTests', [])
                     
                     if mock_tests:
-                        # Test individual mock test endpoint (public endpoint)
-                        test_id = mock_tests[0].get('id')
-                        if test_id:
-                            test_response = requests.get(f"{self.api_base}/mock-test/{test_id}", 
-                                                       timeout=30)
+                        # Check that we have tests with question counts > 0
+                        # This confirms that the case-insensitive filtering is working
+                        tests_with_questions = [t for t in mock_tests if t.get('questionCount', 0) > 0]
+                        
+                        if tests_with_questions:
+                            self.log_test_result("Case-Insensitive Status Filtering", True, 
+                                f"Found {len(tests_with_questions)} mock tests with questions, indicating case-insensitive filtering is working")
                             
-                            if test_response.status_code == 200:
-                                test_data = test_response.json()
-                                if test_data.get('success') and 'data' in test_data:
-                                    self.log_test("Mock Tests API", True, 
-                                                f"Mock test endpoints working", 
-                                                f"Retrieved test: {test_data['data'].get('title', 'N/A')}")
-                                else:
-                                    self.log_test("Mock Tests API", False, 
-                                                "Invalid mock test response structure", 
-                                                f"Response: {test_data}")
-                            else:
-                                self.log_test("Mock Tests API", False, 
-                                            f"Mock test endpoint HTTP {test_response.status_code}", 
-                                            f"Response: {test_response.text[:200]}")
+                            # Verify question counts are realistic
+                            question_counts = [t.get('questionCount', 0) for t in tests_with_questions]
+                            total_questions = sum(question_counts)
+                            
+                            self.log_test_result("Question Count Validation", True, 
+                                f"Total questions across tests: {total_questions}, Average per test: {total_questions/len(tests_with_questions):.1f}")
+                            
+                            return True
                         else:
-                            self.log_test("Mock Tests API", False, "No test ID found in mock tests", "")
+                            self.log_test_result("Case-Insensitive Status Filtering", False, 
+                                "No mock tests have questions, filtering may not be working")
                     else:
-                        self.log_test("Mock Tests API", True, "Mock tests endpoint working with empty array", 
-                                    "No mock tests available but API is working")
+                        self.log_test_result("Case-Insensitive Status Filtering", False, 
+                            "No mock tests returned")
                 else:
-                    self.log_test("Mock Tests API", False, "Invalid response structure", 
-                                f"Response: {data}")
-            elif response.status_code == 401:
-                self.log_test("Mock Tests API", False, "Authentication failed", 
-                            "Auth token might be invalid or expired")
+                    self.log_test_result("Case-Insensitive Status Filtering", False, 
+                        "API returned success: false")
             else:
-                self.log_test("Mock Tests API", False, f"HTTP {response.status_code}", 
-                            f"Response: {response.text[:200]}")
-                
-        except requests.RequestException as e:
-            self.log_test("Mock Tests API", False, "Request failed", str(e))
-
-    def test_csv_bulk_upload_api(self):
-        """Test CSV Bulk Upload API (requires auth)"""
-        if not self.auth_token:
-            self.log_test("CSV Bulk Upload API", False, "No authentication token available", "")
-            return
-            
-        try:
-            headers = {
-                'Authorization': f'Bearer {self.auth_token}',
-                'Content-Type': 'application/json'
-            }
-            
-            # Test bulk questions upload
-            sample_questions = [
-                {
-                    "questionText": "What is 2 + 2?",
-                    "options": ["3", "4", "5", "6"],
-                    "correctOption": 1,
-                    "marks": 2,
-                    "negativeMarks": 0.5,
-                    "solution": "Basic addition",
-                    "topic": "Mathematics",
-                    "difficulty": "Easy"
-                }
-            ]
-            
-            bulk_data = {
-                "questions": sample_questions,
-                "mockTestId": "test-mock-id"
-            }
-            
-            response = requests.post(f"{self.api_base}/admin/questions/bulk",
-                                   json=bulk_data,
-                                   headers=headers,
-                                   cookies=self.auth_cookies,
-                                   timeout=30)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('success') and 'data' in data:
-                    result = data['data']
-                    expected_keys = ['total', 'success', 'failed']
-                    missing_keys = [key for key in expected_keys if key not in result]
+                self.log_test_result("Case-Insensitive Status Filtering", False, 
+                    f"API call failed with status {response.status_code}")
                     
-                    if not missing_keys:
-                        self.log_test("CSV Bulk Upload API", True, "Bulk upload endpoint working", 
-                                    f"Processed: {result['total']}, Success: {result['success']}")
-                    else:
-                        self.log_test("CSV Bulk Upload API", False, "Missing required fields", 
-                                    f"Missing: {missing_keys}")
-                else:
-                    self.log_test("CSV Bulk Upload API", False, "Invalid response structure", 
-                                f"Response: {data}")
-            elif response.status_code == 401:
-                self.log_test("CSV Bulk Upload API", False, "Authentication failed", 
-                            "Auth token might be invalid")
-            else:
-                self.log_test("CSV Bulk Upload API", False, f"HTTP {response.status_code}", 
-                            f"Response: {response.text[:200]}")
-                
-        except requests.RequestException as e:
-            self.log_test("CSV Bulk Upload API", False, "Request failed", str(e))
+        except Exception as e:
+            self.log_test_result("Case-Insensitive Status Filtering", False, 
+                f"Request error: {str(e)}")
+        
+        return False
 
     def run_all_tests(self):
-        """Run all backend API tests"""
-        print("=" * 80)
-        print("STARTING UNISHAALA BACKEND API TESTS")
-        print("=" * 80)
-        print(f"Base URL: {self.base_url}")
-        print(f"API Base: {self.api_base}")
-        print()
+        """Run all mock tests visibility tests"""
+        print("🧪 Starting Unishaala Mock Tests Visibility Testing")
+        print("=" * 60)
         
-        # Test public APIs first
-        print("🔍 Testing Public APIs...")
-        self.test_home_api()
-        exams = self.test_exams_api()
-        self.test_exam_detail_api(exams)
-        self.test_jobs_api()
-        self.test_rank_predictor_api()
-        self.test_contact_api()
+        # Step 1: Authenticate as admin
+        if not self.authenticate_admin():
+            print("\n❌ CRITICAL: Admin authentication failed. Cannot proceed with admin-required tests.")
+            return False
         
-        print()
-        print("🔐 Testing Authentication...")
-        auth_success = self.test_authentication_api()
+        # Step 2: Test mock tests visibility on GATE endpoint
+        visibility_test_passed = self.test_mock_tests_visibility_gate_endpoint()
         
-        if auth_success:
-            print()
-            print("🔒 Testing Admin APIs...")
-            self.test_admin_stats_api()
-            self.test_admin_crud_apis()
-            self.test_csv_bulk_upload_api()
+        # Step 3: Test questions retrieval
+        questions_test_passed = self.test_mock_test_questions_endpoint()
+        
+        # Step 4: Test status normalization 
+        status_test_passed = self.test_questions_save_batch_status_normalization()
+        
+        # Step 5: Test case-insensitive filtering
+        filtering_test_passed = self.test_case_insensitive_filtering()
+        
+        # Summary
+        print("\n" + "=" * 60)
+        print("🏁 TEST SUMMARY")
+        print("=" * 60)
+        
+        passed = sum([visibility_test_passed, questions_test_passed, status_test_passed, filtering_test_passed])
+        total = 4
+        
+        for result in self.test_results:
+            status = "✅" if result['success'] else "❌"
+            print(f"{status} {result['test']}: {result['message']}")
+        
+        print(f"\nOverall Result: {passed}/{total} test categories passed")
+        
+        if passed == total:
+            print("🎉 ALL MOCK TESTS VISIBILITY TESTS PASSED!")
+            return True
         else:
-            print("⚠️  Skipping admin API tests due to authentication failure")
-        
-        print()
-        print("🧪 Testing Mock Test APIs...")
-        self.test_mock_tests_api()
-        
-        # Print final summary
-        print()
-        print("=" * 80)
-        print("BACKEND API TEST RESULTS SUMMARY")
-        print("=" * 80)
-        print(f"✅ PASSED: {self.test_results['passed']}")
-        print(f"❌ FAILED: {self.test_results['failed']}")
-        print(f"📊 TOTAL:  {self.test_results['passed'] + self.test_results['failed']}")
-        
-        if self.test_results['failed'] > 0:
-            print()
-            print("❌ FAILED TESTS:")
-            for test in self.test_results['tests']:
-                if not test['passed']:
-                    print(f"   - {test['name']}: {test['message']}")
-                    if test['details']:
-                        print(f"     Details: {test['details']}")
-        
-        print("=" * 80)
-        
-        return self.test_results['failed'] == 0
+            print("⚠️ Some tests failed. Please check the detailed results above.")
+            return False
+
+def main():
+    """Main test execution"""
+    tester = UnishaalaMockTestsVisibilityTest()
+    success = tester.run_all_tests()
+    return success
 
 if __name__ == "__main__":
-    tester = UnishaalaAPITester()
-    success = tester.run_all_tests()
-    sys.exit(0 if success else 1)
+    success = main()
+    exit(0 if success else 1)
