@@ -330,3 +330,5 @@ agent_communication:
     message: "Initial implementation of Unishaala complete. All pages and APIs implemented. Admin panel with CSV upload working. Need to test the core APIs - auth, mock tests, and admin CRUD."
   - agent: "testing"
     message: "✅ BACKEND TESTING COMPLETE: All 11 backend API tests PASSED. Comprehensive testing performed covering: Public APIs (Home, Exams, Jobs, Rank Predictor, Contact), Authentication (admin login working), Admin APIs (all 8 CRUD endpoints + stats), Mock Tests, and CSV Bulk Upload. Database seeding working, authentication & authorization working properly. No critical issues found - all core functionality working as expected."
+  - agent: "main"
+    message: "Fixed critical bug where published mock tests were not appearing on user panel. Root cause: questions had status 'active' (lowercase) or undefined, but API filtered for 'Active' (capitalized). Fix: 1) Made API case-insensitive for status filtering 2) Updated question save logic to normalize status 3) Updated seed data to include isPublished:true and status:'Active'. Need to test mock tests visibility on user-facing exams page."
