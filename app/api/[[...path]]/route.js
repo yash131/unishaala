@@ -144,10 +144,14 @@ export async function GET(request) {
       const testId = path.split('/mock-test-questions/')[1];
       const questions = await getCollection('questions');
       
-      // Only fetch Active questions for this mockTestId
+      // Only fetch Active questions for this mockTestId (case-insensitive)
       const testQuestions = await questions.find({ 
         mockTestId: testId,
-        status: 'Active'
+        $or: [
+          { status: 'Active' },
+          { status: 'active' },
+          { status: { $exists: false } }
+        ]
       }).sort({ questionNumber: 1 }).toArray();
       
       // Remove correct answers for test mode
