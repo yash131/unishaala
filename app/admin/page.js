@@ -528,40 +528,93 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
     <div>
       <h2 className="text-2xl font-bold mb-6">Questions Management</h2>
 
-      {/* Step 1: Select Test */}
+      {/* Step 1: Select Exam */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle className="text-lg">Step 1: Select Mock Test</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <GraduationCap className="w-5 h-5 text-teal-600" /> Step 1: Select Exam
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <Select value={selectedTestId} onValueChange={setSelectedTestId}>
+          <Select value={selectedExamId} onValueChange={setSelectedExamId}>
             <SelectTrigger className="w-full md:w-96">
-              <SelectValue placeholder="Choose a mock test..." />
+              <SelectValue placeholder="Choose an exam (GATE, CAT, UPSC, JEE...)..." />
             </SelectTrigger>
             <SelectContent>
-              {mockTests.map(t => (
-                <SelectItem key={t.id} value={t.id}>
-                  {t.title} {t.isPublished ? '✓' : '(Draft)'}
+              {exams.map(e => (
+                <SelectItem key={e.id} value={e.id}>
+                  <span className="flex items-center gap-2">
+                    <span>{e.icon}</span> {e.name} - {e.fullName}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           
-          {selectedTest && (
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+          {selectedExam && (
+            <div className="mt-4 p-4 bg-teal-50 rounded-lg border border-teal-200">
               <div className="flex items-center gap-4">
-                <Badge className={selectedTest.isPublished ? 'bg-green-500' : 'bg-yellow-500'}>
-                  {selectedTest.isPublished ? 'Published' : 'Draft'}
-                </Badge>
-                <span className="text-sm text-gray-600">Duration: {selectedTest.duration} min</span>
-                <span className="text-sm text-gray-600">Questions: {questions.length}</span>
+                <span className="text-2xl">{selectedExam.icon}</span>
+                <div>
+                  <p className="font-semibold text-teal-800">{selectedExam.name}</p>
+                  <p className="text-sm text-teal-600">{selectedExam.fullName}</p>
+                </div>
+                <Badge className="ml-auto bg-teal-600">{selectedExam.category}</Badge>
               </div>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Step 2: Upload CSV (only if test selected) */}
+      {/* Step 2: Select Mock Test (only if exam selected) */}
+      {selectedExamId && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ClipboardList className="w-5 h-5 text-blue-600" /> Step 2: Select Mock Test
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {filteredMockTests.length > 0 ? (
+              <>
+                <Select value={selectedTestId} onValueChange={setSelectedTestId}>
+                  <SelectTrigger className="w-full md:w-96">
+                    <SelectValue placeholder="Choose a mock test..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredMockTests.map(t => (
+                      <SelectItem key={t.id} value={t.id}>
+                        {t.title} ({t.questionCount || t.totalQuestions || 0} Qs) {t.isPublished ? '✓' : '(Draft)'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                {selectedTest && (
+                  <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <Badge className={selectedTest.isPublished ? 'bg-green-500' : 'bg-yellow-500'}>
+                        {selectedTest.isPublished ? 'Published' : 'Draft'}
+                      </Badge>
+                      <span className="text-sm text-gray-600">Duration: {selectedTest.duration} min</span>
+                      <span className="text-sm text-gray-600">Questions: {questions.length}</span>
+                      <span className="text-sm text-gray-600">{selectedTest.isFree ? 'FREE' : `₹${selectedTest.price}`}</span>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="p-6 text-center bg-gray-50 rounded-lg">
+                <ClipboardList className="w-12 h-12 text-gray-400 mx-auto mb-3" />
+                <p className="text-gray-500 mb-4">No mock tests found for {selectedExam?.name}</p>
+                <p className="text-sm text-gray-400">Create a mock test first in the "Mock Tests" tab</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 3: Upload CSV (only if test selected) */}
       {selectedTestId && !showPreview && (
         <Card className="mb-6">
           <CardHeader>
