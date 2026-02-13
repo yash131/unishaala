@@ -619,7 +619,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Upload className="w-5 h-5" /> Step 2: Upload CSV
+              <Upload className="w-5 h-5 text-purple-600" /> Step 3: Upload CSV
             </CardTitle>
           </CardHeader>
           <CardContent>
