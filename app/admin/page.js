@@ -400,6 +400,12 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
   const selectedExam = exams.find(e => e.id === selectedExamId);
   const selectedTest = mockTests.find(t => t.id === selectedTestId);
 
+  // Filter questions by search - defined early so it can be used in other functions
+  const filteredQuestions = questions.filter(q => 
+    q.question_title?.toLowerCase().includes(search.toLowerCase()) ||
+    q.topic_title?.toLowerCase().includes(search.toLowerCase())
+  );
+
   // Bulk delete functions
   const toggleSelectQuestion = (questionId) => {
     setSelectedQuestions(prev => 
