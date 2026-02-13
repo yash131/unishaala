@@ -842,7 +842,21 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
       {selectedTestId && !showPreview && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-lg">Questions in "{selectedTest?.title}"</CardTitle>
+            <div className="flex items-center gap-4">
+              <CardTitle className="text-lg">Questions in "{selectedTest?.title}"</CardTitle>
+              {selectedQuestions.length > 0 && (
+                <Button 
+                  variant="destructive" 
+                  size="sm" 
+                  onClick={handleBulkDelete}
+                  disabled={isDeleting}
+                  className="flex items-center gap-2"
+                >
+                  {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                  Delete Selected ({selectedQuestions.length})
+                </Button>
+              )}
+            </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input placeholder="Search..." className="pl-10 w-64" value={search} onChange={e => setSearch(e.target.value)} />
@@ -855,6 +869,14 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <input
+                        type="checkbox"
+                        checked={filteredQuestions.length > 0 && selectedQuestions.length === filteredQuestions.length}
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                      />
+                    </TableHead>
                     <TableHead className="w-12">#</TableHead>
                     <TableHead>Question</TableHead>
                     <TableHead>Topic</TableHead>
@@ -865,7 +887,15 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
                 </TableHeader>
                 <TableBody>
                   {filteredQuestions.map((q, i) => (
-                    <TableRow key={q.id}>
+                    <TableRow key={q.id} className={selectedQuestions.includes(q.id) ? 'bg-teal-50' : ''}>
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          checked={selectedQuestions.includes(q.id)}
+                          onChange={() => toggleSelectQuestion(q.id)}
+                          className="w-4 h-4 rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+                        />
+                      </TableCell>
                       <TableCell>{i + 1}</TableCell>
                       <TableCell className="max-w-md"><p className="line-clamp-2 text-sm">{q.question_title}</p></TableCell>
                       <TableCell>{q.topic_title || '-'}</TableCell>
