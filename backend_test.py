@@ -7,7 +7,7 @@ import time
 from datetime import datetime
 
 # Base URL from environment
-BASE_URL = "https://unishaala-edu.preview.emergentagent.com"
+BASE_URL = "https://edu-platform-demo-3.preview.emergentagent.com"
 API_BASE = f"{BASE_URL}/api"
 
 # Test credentials

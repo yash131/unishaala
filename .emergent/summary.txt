@@ -1,0 +1,151 @@
+<analysis>
+**original_problem_statement**: The user wants to build a full-stack educational platform called Unishaala. The platform requires a user-facing website and an admin panel.
+
+**PRODUCT REQUIREMENTS**:
+1.  **Admin Panel**:
+    *   Implement CRUD functionality for Exams (e.g., GATE, CAT, UPSC).
+    *   Implement a cascading workflow for question management:
+        1.  Select an Exam.
+        2.  Select a Test Type (Mock Test, Practice Questions, Previous Year Questions).
+        3.  Select a specific test instance.
+        4.  Upload questions via CSV for that test.
+    *   Allow setting a price for mock tests.
+    *   Provide a bulk delete option for questions within a test.
+    *   Rename the Question Bank to Practice Questions.
+2.  **User Panel**:
+    *   Display exams and their corresponding tests.
+    *   Ensure tests (mock tests, practice questions, etc.) are correctly sandboxed and only appear under the correct parent exam.
+    *   Only show tests that are published, active, and contain questions.
+3.  **Authentication**: Standard user login/signup and a secure admin area.
+4.  **Payments**: Integrate Razorpay (currently mocked).
+
+**User's preferred language**: English
+
+**what currently exists?**
+A full-stack Next.js application with a MongoDB database. It has a functional user authentication system.
+- **Frontend**: A user-facing site where users can see a list of exams and the mock tests available for each exam.
+- **Admin Panel**: A comprehensive dashboard at  with tabs for:
+    - **Mock Tests**: View, create, publish/unpublish, and filter mock tests. Mock tests can be associated with an Exam.
+    - **Questions**: A multi-step UI to manage questions. Admins first select an exam, then a mock test, and can then upload questions via CSV, view existing questions, and perform bulk deletions.
+- **Backend**: API endpoints to support all CRUD operations for exams, mock tests, and questions.
+
+**Last working item**:
+- **Last item agent was working**: The agent received a new set of feature requests from the user and was about to begin implementation. The requests are:
+    1. Rename Question Bank to Practice Questions.
+    2. Add functionality to set prices for mock tests/exams.
+    3. Implement full CRUD (Add/Edit/Delete) for Exams in the admin panel.
+    4. Introduce a Test Type selector (Mock Test, Practice Questions, Previous Year Questions) when managing tests.
+- **Status**: NOT STARTED
+- **Agent Testing Done**: N
+- **Which testing method agent to use?**: both
+- **User Testing Done**: N
+
+**All Pending/In progress Issue list**:
+There are no pending bugs or issues. All pending work consists of new feature requests.
+
+**In progress Task List**:
+There are no tasks currently in progress.
+
+**Upcoming and Future Tasks**
+- **Upcoming Tasks**:
+    - **Task 1 (P0)**: Implement full CRUD functionality for Exams in the admin panel. This will require a new UI section (likely a new tab) and corresponding API endpoints. (File to modify: , ).
+    - **Task 2 (P0)**: Introduce a Test Type concept. This involves:
+        - Modifying the  model/collection to include a  field (e.g., 'Mock Test', 'Practice Questions', 'Previous Year Questions').
+        - Adding a dropdown in the admin panel to select the test type when creating/editing a test.
+        - Updating the user-facing pages to potentially display or filter by these types.
+    - **Task 3 (P1)**: Rename Question Bank to Practice Questions across the admin panel UI. (File to modify: ).
+    - **Task 4 (P1)**: Implement or verify the functionality to set a price for mock tests and potentially exams. (File to modify: , ).
+- **Future Tasks**:
+    - **Task 5 (P2)**: Integrate the live Razorpay payment gateway once the user provides API keys.
+
+**Completed work in this session**
+- **List of all completed tasks with file and method name**:
+    - **Bug Fix: Mock Test Visibility**: Fixed a critical bug where published mock tests did not appear on the user panel. The root cause was a case-mismatch in the  field ('Active' vs 'active'). The fix involved making the API filter case-insensitive and normalizing the data on save. (Files: , ).
+    - **Admin Panel UX Enhancement**: Implemented a cascading dropdown flow for question management. Admins now select an Exam, then a Mock Test, before uploading a CSV. This prevents incorrect question association. (File: ).
+    - **Feature: Bulk Question Deletion**: Added functionality to the admin panel to select multiple questions via checkboxes and delete them in a single action. This included a new API action and frontend state management. (Files: , ).
+    - **Feature: Exam-Specific Test Filtering**: Ensured that the user-facing exam pages only display mock tests associated with that specific exam (e.g., the '/exams/gate' page only shows GATE mock tests). (File: ).
+
+- **Recently completed**:
+    - Implemented bulk delete for questions with a Delete Selected button.
+    - Fixed user-facing API to filter mock tests by exam.
+    - Verified the complete admin flow for question management with screenshots.
+
+**Earlier issues found/mentioned but not fixed**
+- No issues were mentioned by the user and subsequently missed by the agent in this session.
+
+**Known issue recurrence from previous fork**
+- None.
+
+**Code Architecture**
+
+
+**Key Technical Concepts**
+- **Frontend**: Next.js 14 (App Router), React, Tailwind CSS, shadcn/ui
+- **Backend**: Next.js API Routes (in a single monolithic file)
+- **Database**: MongoDB
+- **Authentication**: Custom implementation (details in )
+
+**key DB schema**
+- **exams**: 
+- **mock_tests**: 
+- **questions**: 
+
+**changes in tech stack**
+- The project uses MongoDB, not PostgreSQL and Prisma as was incorrectly stated in the initial handover summary.
+
+**All files of reference**
+1.  : A very large file containing all UI and client-side logic for the entire admin panel. It's the primary file for all upcoming UI feature requests.
+2.  : A monolithic API route that handles logic for exams, mock tests, questions, auth, and more. This file will need to be modified for all upcoming backend tasks and is a prime candidate for refactoring.
+3.  : The user-facing page that displays tests for a given exam.
+
+**Areas that need refactoring**
+- **Monolithic API ()**: This is a critical issue. The file is unmaintainable and goes against Next.js best practices. It should be broken down into separate route handlers for each resource (e.g., , , ).
+- **Monolithic Admin Page ()**: This file has also become very large. The logic for the Mock Tests tab and Questions tab should be extracted into their own components to improve readability and maintainability.
+
+**key api endpoints**
+- ****: Fetches all exams.
+- ****: Fetches details for one exam and its associated mock tests (this now correctly filters by exam).
+- ****: A multi-purpose endpoint.
+    - : Saves a batch of questions.
+    - : Deletes a list of questions by their IDs.
+- ****: Creates or updates a mock test.
+- ****: Toggles the  status of a mock test.
+
+**Critical Info for New Agent**
+- **Refactoring is Needed**: The current monolithic API file () and Admin page () are not sustainable. Before adding more features, consider a small refactoring step to break the API into separate files. This will make future development much easier.
+- **Implement New Features**: The immediate priority is to implement the 4 new features requested by the user in their last message (CRUD for Exams, Test Types, Rename Question Bank, and Price Setting).
+- **Tech Stack**: The stack is **Next.js + MongoDB**. Do not look for Prisma or PostgreSQL.
+
+**documents created in this job**
+- None.
+
+**Last 10 User Messages and any pending HUMAN messages**
+1.   **User Request**: 1. i have marked red circle in the image just change the name from question bank to practice question 2. set an option for i can set the price of any mock test or any exam 3. and give the option for editing the exam like to add any exam or to delete 4. and give the option to add the this practice question and previous year questions with the mock test like when we select the exam as well there must option to select between this three test
+2.   **User Request**: Ensure mock tests are sandboxed to their respective exams and add a bulk delete option for questions.
+3.   **User Request**: Described the desired cascading dropdown flow for the admin panel (Select Exam -> Select Mock Test -> Upload CSV).
+4.   **User Request**: Re-stated the core problem that saved questions for a mock test were not making the test appear on the user panel.
+5.   **User Request**: User provided credentials and confirmed the admin login issue.
+
+**Project Health Check:**
+- **Broken**: None. The main features are now working as requested.
+- **Mocked**:
+    - Payment Integration (Razorpay).
+
+**3rd Party Integrations**
+- **MongoDB**: Database for the application.
+
+**Testing status**
+- **Testing agent used after significant changes**: YES, the backend testing agent was used successfully after the major bug fix.
+- **Troubleshoot agent used after agent stuck in loop**: NO
+- **Test files created**: None.
+- **Known regressions**: None.
+
+**Credentials to test flow:**
+- **Admin Login**:
+    - Email: 
+    - Password: 
+
+**What agent forgot to execute**
+- The agent successfully addressed all user requests from the current session. All pending work is from the very last user message and has not yet been started.
+
+</analysis>
