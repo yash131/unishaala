@@ -1333,7 +1333,7 @@ export default function AdminPage() {
         const res = await fetch('/api/admin/stats');
         const d = await res.json();
         if (d.success) setStats(d.data);
-      } else if (activeTab === 'mock-tests') {
+      } else if (activeTab === 'tests') {
         // Fetch both exams and mock tests
         const [examsRes, testsRes] = await Promise.all([
           fetch('/api/admin/exams'),
@@ -1353,8 +1353,12 @@ export default function AdminPage() {
         const testsData = await testsRes.json();
         if (examsData.success) setData(p => ({ ...p, exams: examsData.data }));
         if (testsData.success) setData(p => ({ ...p, mockTests: testsData.data }));
+      } else if (activeTab === 'exams') {
+        const res = await fetch('/api/admin/exams');
+        const d = await res.json();
+        if (d.success) setData(p => ({ ...p, exams: d.data }));
       } else {
-        const endpoints = { exams: '/api/admin/exams', jobs: '/api/admin/jobs', colleges: '/api/admin/colleges', users: '/api/admin/users', testimonials: '/api/admin/testimonials', contacts: '/api/admin/contacts' };
+        const endpoints = { jobs: '/api/admin/jobs', colleges: '/api/admin/colleges', users: '/api/admin/users', testimonials: '/api/admin/testimonials', contacts: '/api/admin/contacts' };
         const endpoint = endpoints[activeTab];
         if (endpoint) {
           const res = await fetch(endpoint);
@@ -1403,9 +1407,9 @@ export default function AdminPage() {
         </header>
         <main className="p-8">
           {activeTab === 'dashboard' && <DashboardTab stats={stats} />}
-          {activeTab === 'mock-tests' && <MockTestsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
+          {activeTab === 'exams' && <ExamsTab exams={data.exams} onRefresh={fetchData} />}
+          {activeTab === 'tests' && <TestsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'questions' && <QuestionsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
-          {activeTab === 'exams' && <CRUDTable title="Exams" data={data.exams} columns={[{ key: 'name', label: 'Name' }, { key: 'category', label: 'Category' }, { key: 'status', label: 'Status', render: v => <Badge className={v === 'Active' ? 'bg-green-500' : 'bg-gray-500'}>{v}</Badge> }]} onDelete={id => handleDelete('exams', id)} loading={loading} />}
           {activeTab === 'jobs' && <CRUDTable title="Jobs" data={data.jobs} columns={[{ key: 'title', label: 'Title' }, { key: 'organization', label: 'Org' }, { key: 'vacancies', label: 'Vacancies' }, { key: 'status', label: 'Status', render: v => <Badge className={v === 'Active' ? 'bg-green-500' : 'bg-gray-500'}>{v}</Badge> }]} onDelete={id => handleDelete('jobs', id)} loading={loading} />}
           {activeTab === 'colleges' && <CRUDTable title="Colleges" data={data.colleges} columns={[{ key: 'name', label: 'Name' }, { key: 'location', label: 'Location' }, { key: 'ranking', label: 'Rank' }]} onDelete={id => handleDelete('colleges', id)} loading={loading} />}
           {activeTab === 'users' && <CRUDTable title="Users" data={data.users} columns={[{ key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'role', label: 'Role', render: v => <Badge>{v}</Badge> }]} loading={loading} />}
