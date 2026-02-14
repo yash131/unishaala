@@ -630,9 +630,10 @@ function TestsTab({ mockTests, exams, onRefresh }) {
   );
 }
 
-// Questions Tab with Exam -> Mock Test -> CSV flow
+// Questions Tab with Exam -> Test Type -> Test -> CSV flow
 function QuestionsTab({ mockTests, exams, onRefresh }) {
   const [selectedExamId, setSelectedExamId] = useState('');
+  const [selectedTestType, setSelectedTestType] = useState('');
   const [selectedTestId, setSelectedTestId] = useState('');
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -648,19 +649,30 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
   const [selectedQuestions, setSelectedQuestions] = useState([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Filter mock tests by selected exam
-  const filteredMockTests = selectedExamId 
-    ? mockTests.filter(t => t.examId === selectedExamId)
-    : [];
+  // Filter mock tests by selected exam and test type
+  const filteredMockTests = mockTests.filter(t => {
+    const matchesExam = !selectedExamId || t.examId === selectedExamId;
+    const matchesType = !selectedTestType || t.testType === selectedTestType;
+    return matchesExam && matchesType;
+  });
 
-  // Reset test selection when exam changes
+  // Reset subsequent selections when parent changes
   useEffect(() => {
+    setSelectedTestType('');
     setSelectedTestId('');
     setQuestions([]);
     setPreviewData([]);
     setShowPreview(false);
     setSelectedQuestions([]);
   }, [selectedExamId]);
+
+  useEffect(() => {
+    setSelectedTestId('');
+    setQuestions([]);
+    setPreviewData([]);
+    setShowPreview(false);
+    setSelectedQuestions([]);
+  }, [selectedTestType]);
 
   // Fetch questions when test is selected
   useEffect(() => {
@@ -686,8 +698,9 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
 
   const selectedExam = exams.find(e => e.id === selectedExamId);
   const selectedTest = mockTests.find(t => t.id === selectedTestId);
+  const selectedTypeInfo = TEST_TYPES.find(t => t.value === selectedTestType);
 
-  // Filter questions by search - defined early so it can be used in other functions
+  // Filter questions by search
   const filteredQuestions = questions.filter(q => 
     q.question_title?.toLowerCase().includes(search.toLowerCase()) ||
     q.topic_title?.toLowerCase().includes(search.toLowerCase())
@@ -774,7 +787,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
     a.click();
   };
 
-  // Parse CSV and show preview (DO NOT SAVE)
+  // Parse CSV and show preview
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -855,7 +868,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Save questions (Draft or Publish)
+  // Save questions
   const saveQuestions = async (publish = false) => {
     if (!selectedTestId || previewData.length === 0) return;
     
@@ -956,12 +969,51 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
         </CardContent>
       </Card>
 
-      {/* Step 2: Select Mock Test (only if exam selected) */}
+      {/* Step 2: Select Test Type (only if exam selected) */}
       {selectedExamId && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <ClipboardList className="w-5 h-5 text-blue-600" /> Step 2: Select Mock Test
+              <ClipboardList className="w-5 h-5 text-purple-600" /> Step 2: Select Test Type
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedTestType} onValueChange={setSelectedTestType}>
+              <SelectTrigger className="w-full md:w-96">
+                <SelectValue placeholder="Choose test type..." />
+              </SelectTrigger>
+              <SelectContent>
+                {TEST_TYPES.map(t => (
+                  <SelectItem key={t.value} value={t.value}>
+                    <span className="flex items-center gap-2">
+                      <span>{t.icon}</span> {t.label}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            {selectedTypeInfo && (
+              <div className="mt-4 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                <div className="flex items-center gap-4">
+                  <span className="text-2xl">{selectedTypeInfo.icon}</span>
+                  <div>
+                    <p className="font-semibold text-purple-800">{selectedTypeInfo.label}</p>
+                    <p className="text-sm text-purple-600">Timed test with answers shown after submission</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 3: Select Test (only if test type selected) */}
+      {selectedExamId && selectedTestType && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-blue-600" /> Step 3: Select Test
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -969,7 +1021,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
               <>
                 <Select value={selectedTestId} onValueChange={setSelectedTestId}>
                   <SelectTrigger className="w-full md:w-96">
-                    <SelectValue placeholder="Choose a mock test..." />
+                    <SelectValue placeholder="Choose a test..." />
                   </SelectTrigger>
                   <SelectContent>
                     {filteredMockTests.map(t => (
@@ -996,20 +1048,20 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
             ) : (
               <div className="p-6 text-center bg-gray-50 rounded-lg">
                 <ClipboardList className="w-12 h-12 text-gray-400 mx-auto mb-3" />
-                <p className="text-gray-500 mb-4">No mock tests found for {selectedExam?.name}</p>
-                <p className="text-sm text-gray-400">Create a mock test first in the "Mock Tests" tab</p>
+                <p className="text-gray-500 mb-4">No {selectedTypeInfo?.label || 'tests'} found for {selectedExam?.name}</p>
+                <p className="text-sm text-gray-400">Create a test first in the "Tests" tab</p>
               </div>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* Step 3: Upload CSV (only if test selected) */}
+      {/* Step 4: Upload CSV (only if test selected) */}
       {selectedTestId && !showPreview && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Upload className="w-5 h-5 text-purple-600" /> Step 3: Upload CSV
+              <Upload className="w-5 h-5 text-orange-600" /> Step 4: Upload CSV
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1192,7 +1244,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
                     </TableRow>
                   ))}
                   {filteredQuestions.length === 0 && (
-                    <TableRow><TableCell colSpan={6} className="text-center py-8 text-gray-500">No questions yet. Upload a CSV to add questions.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center py-8 text-gray-500">No questions yet. Upload a CSV to add questions.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
