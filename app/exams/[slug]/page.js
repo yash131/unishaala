@@ -22,7 +22,8 @@ import {
   Lock,
   Download,
   CheckCircle,
-  ArrowLeft
+  ArrowLeft,
+  History
 } from 'lucide-react';
 
 function Navbar() {
@@ -77,7 +78,12 @@ export default function ExamDetailPage() {
   }, [params.slug]);
 
   const handleStartTest = (test) => {
-    if (!test.isFree && test.price > 0) {
+    // Check if exam requires purchase
+    const examPrice = data?.exam?.price || 0;
+    if (examPrice > 0) {
+      setSelectedTest({ ...test, examPrice, isExamPurchase: true });
+      setShowUnlockModal(true);
+    } else if (!test.isFree && test.price > 0) {
       setSelectedTest(test);
       setShowUnlockModal(true);
     } else {
@@ -110,6 +116,55 @@ export default function ExamDetailPage() {
 
   const { exam, mockTests, previousPapers, topperNotes, questionBankCount } = data;
 
+  // Group tests by type
+  const mockTestsOnly = mockTests?.filter(t => !t.testType || t.testType === 'mock_test') || [];
+  const practiceQuestions = mockTests?.filter(t => t.testType === 'practice_questions') || [];
+  const previousYearTests = mockTests?.filter(t => t.testType === 'previous_year') || [];
+
+  const renderTestCard = (test) => (
+    <Card key={test.id} className="card-hover">
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
+            {test.testType === 'practice_questions' ? (
+              <BookOpen className="w-6 h-6 text-teal-600" />
+            ) : test.testType === 'previous_year' ? (
+              <History className="w-6 h-6 text-purple-600" />
+            ) : (
+              <ClipboardList className="w-6 h-6 text-teal-600" />
+            )}
+          </div>
+          {exam.price > 0 ? (
+            <Badge className="bg-amber-100 text-amber-700">Premium</Badge>
+          ) : test.isFree ? (
+            <Badge className="bg-green-100 text-green-700">FREE</Badge>
+          ) : (
+            <Badge className="bg-rose-100 text-rose-700">₹{test.price}</Badge>
+          )}
+        </div>
+        <h3 className="font-bold text-gray-900 mb-2">{test.title}</h3>
+        <p className="text-sm text-gray-500 mb-4 line-clamp-2">{test.description}</p>
+        <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
+          <span className="flex items-center gap-1">
+            <Clock className="w-4 h-4" /> {test.duration} min
+          </span>
+          <span>{test.questionCount || test.totalQuestions} Qs</span>
+          <span>{test.totalMarks} Marks</span>
+        </div>
+        <Button 
+          className="w-full bg-teal-600 hover:bg-teal-700"
+          onClick={() => handleStartTest(test)}
+        >
+          {exam.price > 0 || (!test.isFree && test.price > 0) ? (
+            <><Lock className="w-4 h-4 mr-2" /> Unlock & Start</>
+          ) : (
+            <><Play className="w-4 h-4 mr-2" /> Start Test</>
+          )}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -125,14 +180,18 @@ export default function ExamDetailPage() {
             <div className="w-20 h-20 bg-teal-100 rounded-2xl flex items-center justify-center text-4xl">
               {exam.icon}
             </div>
-            <div>
+            <div className="flex-1">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{exam.name}</h1>
               <p className="text-lg text-teal-600 font-medium mb-2">{exam.fullName}</p>
               <p className="text-gray-600 max-w-2xl">{exam.description}</p>
-              <div className="flex items-center gap-6 mt-4">
+              <div className="flex items-center gap-6 mt-4 flex-wrap">
                 <Badge className="bg-teal-100 text-teal-700">{exam.category}</Badge>
-                <span className="text-sm text-gray-600">{exam.totalTests} Mock Tests</span>
-                <span className="text-sm text-gray-600">{exam.totalQuestions} Questions</span>
+                <span className="text-sm text-gray-600">{mockTests?.length || 0} Tests Available</span>
+                {exam.price > 0 && (
+                  <Badge className="bg-amber-100 text-amber-700 text-lg px-3 py-1">
+                    Full Access: ₹{exam.price}
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
@@ -146,11 +205,11 @@ export default function ExamDetailPage() {
             <TabsTrigger value="mock-tests" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
               <ClipboardList className="w-4 h-4 mr-2" /> Mock Tests
             </TabsTrigger>
-            <TabsTrigger value="question-bank" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
-              <BookOpen className="w-4 h-4 mr-2" /> Question Bank
+            <TabsTrigger value="practice-questions" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
+              <BookOpen className="w-4 h-4 mr-2" /> Practice Questions
             </TabsTrigger>
             <TabsTrigger value="previous-papers" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
-              <FileText className="w-4 h-4 mr-2" /> Previous Papers
+              <History className="w-4 h-4 mr-2" /> Previous Year
             </TabsTrigger>
             <TabsTrigger value="topper-notes" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
               <Trophy className="w-4 h-4 mr-2" /> Topper Notes
@@ -160,67 +219,34 @@ export default function ExamDetailPage() {
           {/* Mock Tests Tab */}
           <TabsContent value="mock-tests">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {mockTests?.length > 0 ? mockTests.map((test) => (
-                <Card key={test.id} className="card-hover">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
-                        <ClipboardList className="w-6 h-6 text-teal-600" />
-                      </div>
-                      {test.isFree ? (
-                        <Badge className="bg-green-100 text-green-700">FREE</Badge>
-                      ) : (
-                        <Badge className="bg-rose-100 text-rose-700">₹{test.price}</Badge>
-                      )}
-                    </div>
-                    <h3 className="font-bold text-gray-900 mb-2">{test.title}</h3>
-                    <p className="text-sm text-gray-500 mb-4 line-clamp-2">{test.description}</p>
-                    <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
-                      <span className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" /> {test.duration} min
-                      </span>
-                      <span>{test.totalQuestions} Qs</span>
-                      <span>{test.totalMarks} Marks</span>
-                    </div>
-                    <Button 
-                      className="w-full bg-teal-600 hover:bg-teal-700"
-                      onClick={() => handleStartTest(test)}
-                    >
-                      {test.isFree ? (
-                        <><Play className="w-4 h-4 mr-2" /> Start Test</>
-                      ) : (
-                        <><Lock className="w-4 h-4 mr-2" /> Unlock & Start</>
-                      )}
-                    </Button>
-                  </CardContent>
-                </Card>
-              )) : (
+              {mockTestsOnly.length > 0 ? mockTestsOnly.map(renderTestCard) : (
                 <p className="text-gray-500 col-span-3 text-center py-8">No mock tests available yet</p>
               )}
             </div>
           </TabsContent>
 
-          {/* Question Bank Tab */}
-          <TabsContent value="question-bank">
-            <Card>
-              <CardContent className="p-8 text-center">
-                <div className="w-20 h-20 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <BookOpen className="w-10 h-10 text-teal-600" />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Question Bank</h3>
-                <p className="text-gray-600 mb-4">{questionBankCount || 0} questions available</p>
-                <p className="text-gray-500 mb-6">Practice topic-wise questions with detailed solutions</p>
-                <Button className="bg-teal-600 hover:bg-teal-700">
-                  Start Practice
-                </Button>
-              </CardContent>
-            </Card>
+          {/* Practice Questions Tab */}
+          <TabsContent value="practice-questions">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {practiceQuestions.length > 0 ? practiceQuestions.map(renderTestCard) : (
+                <Card className="col-span-3">
+                  <CardContent className="p-8 text-center">
+                    <div className="w-20 h-20 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <BookOpen className="w-10 h-10 text-teal-600" />
+                    </div>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Practice Questions</h3>
+                    <p className="text-gray-600 mb-4">Topic-wise practice questions coming soon</p>
+                    <p className="text-gray-500 mb-6">Practice with detailed solutions and explanations</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </TabsContent>
 
-          {/* Previous Papers Tab */}
+          {/* Previous Year Papers Tab */}
           <TabsContent value="previous-papers">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {previousPapers?.length > 0 ? previousPapers.map((paper) => (
+              {previousYearTests.length > 0 ? previousYearTests.map(renderTestCard) : previousPapers?.length > 0 ? previousPapers.map((paper) => (
                 <Card key={paper.id} className="card-hover">
                   <CardContent className="p-6">
                     <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
@@ -237,9 +263,9 @@ export default function ExamDetailPage() {
                 <Card className="col-span-3">
                   <CardContent className="p-8 text-center">
                     <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <FileText className="w-10 h-10 text-gray-400" />
+                      <History className="w-10 h-10 text-gray-400" />
                     </div>
-                    <p className="text-gray-500">Previous papers will be available soon</p>
+                    <p className="text-gray-500">Previous year papers will be available soon</p>
                   </CardContent>
                 </Card>
               )}
@@ -282,29 +308,45 @@ export default function ExamDetailPage() {
       <Dialog open={showUnlockModal} onOpenChange={setShowUnlockModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Unlock This Test</DialogTitle>
+            <DialogTitle className="text-2xl">
+              {selectedTest?.isExamPurchase ? 'Unlock Full Exam Access' : 'Unlock This Test'}
+            </DialogTitle>
             <DialogDescription>
-              Get full access to this premium mock test
+              {selectedTest?.isExamPurchase 
+                ? 'Get access to all tests in this exam' 
+                : 'Get full access to this premium test'}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             {selectedTest && (
               <div className="space-y-4">
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-900">{selectedTest.title}</h4>
-                  <p className="text-sm text-gray-500 mt-1">{selectedTest.description}</p>
+                  <h4 className="font-semibold text-gray-900">
+                    {selectedTest.isExamPurchase ? exam.name : selectedTest.title}
+                  </h4>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {selectedTest.isExamPurchase 
+                      ? `Full access to all Mock Tests, Practice Questions & Previous Year Papers` 
+                      : selectedTest.description}
+                  </p>
                 </div>
-                <div className="flex items-center justify-between py-2 border-b">
-                  <span className="text-gray-600">Duration</span>
-                  <span className="font-medium">{selectedTest.duration} minutes</span>
-                </div>
-                <div className="flex items-center justify-between py-2 border-b">
-                  <span className="text-gray-600">Questions</span>
-                  <span className="font-medium">{selectedTest.totalQuestions}</span>
-                </div>
+                {!selectedTest.isExamPurchase && (
+                  <>
+                    <div className="flex items-center justify-between py-2 border-b">
+                      <span className="text-gray-600">Duration</span>
+                      <span className="font-medium">{selectedTest.duration} minutes</span>
+                    </div>
+                    <div className="flex items-center justify-between py-2 border-b">
+                      <span className="text-gray-600">Questions</span>
+                      <span className="font-medium">{selectedTest.questionCount || selectedTest.totalQuestions}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex items-center justify-between py-2">
                   <span className="text-gray-600 font-semibold">Price</span>
-                  <span className="text-2xl font-bold text-teal-600">₹{selectedTest.price}</span>
+                  <span className="text-2xl font-bold text-teal-600">
+                    ₹{selectedTest.isExamPurchase ? exam.price : selectedTest.price}
+                  </span>
                 </div>
                 <ul className="space-y-2 text-sm text-gray-600">
                   <li className="flex items-center gap-2">
@@ -316,12 +358,17 @@ export default function ExamDetailPage() {
                   <li className="flex items-center gap-2">
                     <CheckCircle className="w-4 h-4 text-green-500" /> Unlimited Attempts
                   </li>
+                  {selectedTest.isExamPurchase && (
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-500" /> Access to ALL test types
+                    </li>
+                  )}
                 </ul>
                 <Button 
                   className="w-full bg-rose-500 hover:bg-rose-600 text-lg py-6"
                   onClick={handlePayment}
                 >
-                  Pay ₹{selectedTest.price} & Start Test
+                  Pay ₹{selectedTest.isExamPurchase ? exam.price : selectedTest.price} & Start
                 </Button>
               </div>
             )}
