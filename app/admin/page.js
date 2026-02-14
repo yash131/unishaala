@@ -135,26 +135,262 @@ function DashboardTab({ stats }) {
   );
 }
 
-// Mock Tests Tab
-function MockTestsTab({ mockTests, exams, onRefresh }) {
+// Exams Management Tab with full CRUD
+function ExamsTab({ exams, onRefresh }) {
+  const [search, setSearch] = useState('');
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingExam, setEditingExam] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '', fullName: '', description: '', category: 'Engineering', icon: '📚', price: 0, status: 'Active'
+  });
+
+  const categories = ['Engineering', 'Medical', 'Management', 'Civil Services', 'Banking', 'Teaching', 'Others'];
+  const icons = ['📚', '🎓', '💼', '🏛️', '🏦', '📖', '⚙️', '💻', '🔬', '📊', '🧪', '🏥'];
+
+  const filteredExams = exams.filter(e => 
+    e.name?.toLowerCase().includes(search.toLowerCase()) ||
+    e.fullName?.toLowerCase().includes(search.toLowerCase())
+  );
+
+  const handleSave = async () => {
+    if (!formData.name || !formData.fullName) {
+      toast.error('Name and Full Name are required');
+      return;
+    }
+    setLoading(true);
+    try {
+      const url = editingExam ? `/api/admin/exams/${editingExam.id}` : '/api/admin/exams';
+      const method = editingExam ? 'PUT' : 'POST';
+      
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formData)
+      });
+      const result = await res.json();
+      
+      if (result.success) {
+        toast.success(editingExam ? 'Exam updated!' : 'Exam created!');
+        setShowAddDialog(false);
+        setEditingExam(null);
+        setFormData({ name: '', fullName: '', description: '', category: 'Engineering', icon: '📚', price: 0, status: 'Active' });
+        onRefresh();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (e) {
+      toast.error('Failed to save');
+    }
+    setLoading(false);
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this exam? This will NOT delete associated tests.')) return;
+    try {
+      await fetch(`/api/admin/exams/${id}`, { method: 'DELETE' });
+      toast.success('Exam deleted');
+      onRefresh();
+    } catch (e) {
+      toast.error('Failed to delete');
+    }
+  };
+
+  const openEditDialog = (exam) => {
+    setEditingExam(exam);
+    setFormData({
+      name: exam.name || '',
+      fullName: exam.fullName || '',
+      description: exam.description || '',
+      category: exam.category || 'Engineering',
+      icon: exam.icon || '📚',
+      price: exam.price || 0,
+      status: exam.status || 'Active'
+    });
+    setShowAddDialog(true);
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Exams Management</h2>
+        <div className="flex gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input placeholder="Search exams..." className="pl-10 w-64" value={search} onChange={e => setSearch(e.target.value)} />
+          </div>
+          <Button onClick={() => { setEditingExam(null); setFormData({ name: '', fullName: '', description: '', category: 'Engineering', icon: '📚', price: 0, status: 'Active' }); setShowAddDialog(true); }} className="bg-teal-600 hover:bg-teal-700">
+            <Plus className="w-4 h-4 mr-2" /> Add Exam
+          </Button>
+        </div>
+      </div>
+
+      {/* Info Banner */}
+      <Card className="mb-6 bg-blue-50 border-blue-200">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-3">
+            <IndianRupee className="w-5 h-5 text-blue-600" />
+            <p className="text-sm text-blue-800">
+              <strong>Exam Pricing:</strong> Set a price for each exam. When users purchase an exam, they get full access to all tests (Mock Tests, Practice Questions, Previous Year Questions) under that exam.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Icon</TableHead>
+              <TableHead>Name</TableHead>
+              <TableHead>Full Name</TableHead>
+              <TableHead>Category</TableHead>
+              <TableHead>Price</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredExams.map(exam => (
+              <TableRow key={exam.id}>
+                <TableCell className="text-2xl">{exam.icon}</TableCell>
+                <TableCell className="font-medium">{exam.name}</TableCell>
+                <TableCell className="text-gray-600">{exam.fullName}</TableCell>
+                <TableCell><Badge variant="outline">{exam.category}</Badge></TableCell>
+                <TableCell>
+                  {exam.price > 0 ? (
+                    <span className="font-semibold text-green-600">₹{exam.price}</span>
+                  ) : (
+                    <span className="text-gray-400">Free</span>
+                  )}
+                </TableCell>
+                <TableCell><Badge className={exam.status === 'Active' ? 'bg-green-500' : 'bg-gray-500'}>{exam.status}</Badge></TableCell>
+                <TableCell className="text-right">
+                  <Button variant="ghost" size="sm" onClick={() => openEditDialog(exam)}>
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" className="text-red-500" onClick={() => handleDelete(exam.id)}>
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+            {filteredExams.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-8 text-gray-500">No exams found</TableCell></TableRow>}
+          </TableBody>
+        </Table>
+      </Card>
+
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>{editingExam ? 'Edit' : 'Add'} Exam</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-4 gap-4">
+              <div className="col-span-1">
+                <Label>Icon</Label>
+                <Select value={formData.icon} onValueChange={v => setFormData({ ...formData, icon: v })}>
+                  <SelectTrigger>
+                    <SelectValue>{formData.icon}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {icons.map(icon => (
+                      <SelectItem key={icon} value={icon}>{icon}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-3">
+                <Label>Short Name *</Label>
+                <Input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., GATE, CAT, UPSC" />
+              </div>
+            </div>
+            <div>
+              <Label>Full Name *</Label>
+              <Input value={formData.fullName} onChange={e => setFormData({ ...formData, fullName: e.target.value })} placeholder="e.g., Graduate Aptitude Test in Engineering" />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Brief description about this exam" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Category</Label>
+                <Select value={formData.category} onValueChange={v => setFormData({ ...formData, category: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {categories.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select value={formData.status} onValueChange={v => setFormData({ ...formData, status: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label className="flex items-center gap-2">
+                <IndianRupee className="w-4 h-4" /> Exam Price (₹)
+              </Label>
+              <Input 
+                type="number" 
+                value={formData.price} 
+                onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) || 0 })} 
+                placeholder="0 for free access"
+              />
+              <p className="text-xs text-gray-500 mt-1">Users who purchase this exam get access to all tests under it</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={loading} className="bg-teal-600 hover:bg-teal-700">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Tests Tab (replaces Mock Tests Tab) - with Test Type selection
+function TestsTab({ mockTests, exams, onRefresh }) {
   const [search, setSearch] = useState('');
   const [filterExamId, setFilterExamId] = useState('');
+  const [filterType, setFilterType] = useState('');
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [editingTest, setEditingTest] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: ''
+    title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', testType: 'mock_test'
   });
 
   const filteredTests = mockTests.filter(t => {
     const matchesSearch = t.title?.toLowerCase().includes(search.toLowerCase());
     const matchesExam = !filterExamId || t.examId === filterExamId;
-    return matchesSearch && matchesExam;
+    const matchesType = !filterType || t.testType === filterType;
+    return matchesSearch && matchesExam && matchesType;
   });
 
   const getExamName = (examId) => {
     const exam = exams?.find(e => e.id === examId);
     return exam ? exam.name : '-';
+  };
+
+  const getTestTypeLabel = (type) => {
+    const found = TEST_TYPES.find(t => t.value === type);
+    return found ? found.label : 'Mock Test';
+  };
+
+  const getTestTypeIcon = (type) => {
+    const found = TEST_TYPES.find(t => t.value === type);
+    return found ? found.icon : '📝';
   };
 
   const handleSave = async () => {
@@ -164,6 +400,10 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
     }
     if (!formData.examId && !editingTest) {
       toast.error('Please select an exam');
+      return;
+    }
+    if (!formData.testType) {
+      toast.error('Please select a test type');
       return;
     }
     setLoading(true);
@@ -182,7 +422,7 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
         toast.success(editingTest ? 'Test updated!' : 'Test created!');
         setShowAddDialog(false);
         setEditingTest(null);
-        setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '' });
+        setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', testType: 'mock_test' });
         onRefresh();
       } else {
         toast.error(result.error);
@@ -221,11 +461,11 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Mock Tests</h2>
-        <div className="flex gap-4">
+        <h2 className="text-2xl font-bold">Tests Management</h2>
+        <div className="flex gap-4 flex-wrap">
           {/* Filter by Exam */}
           <Select value={filterExamId || "all"} onValueChange={(v) => setFilterExamId(v === "all" ? "" : v)}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-40">
               <SelectValue placeholder="All Exams" />
             </SelectTrigger>
             <SelectContent>
@@ -237,11 +477,25 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
               ))}
             </SelectContent>
           </Select>
+          {/* Filter by Type */}
+          <Select value={filterType || "all"} onValueChange={(v) => setFilterType(v === "all" ? "" : v)}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {TEST_TYPES.map(t => (
+                <SelectItem key={t.value} value={t.value}>
+                  {t.icon} {t.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <Input placeholder="Search..." className="pl-10 w-64" value={search} onChange={e => setSearch(e.target.value)} />
+            <Input placeholder="Search..." className="pl-10 w-48" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <Button onClick={() => { setEditingTest(null); setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '' }); setShowAddDialog(true); }} className="bg-teal-600 hover:bg-teal-700">
+          <Button onClick={() => { setEditingTest(null); setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', testType: 'mock_test' }); setShowAddDialog(true); }} className="bg-teal-600 hover:bg-teal-700">
             <Plus className="w-4 h-4 mr-2" /> Add Test
           </Button>
         </div>
@@ -251,6 +505,7 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Type</TableHead>
               <TableHead>Exam</TableHead>
               <TableHead>Title</TableHead>
               <TableHead>Duration</TableHead>
@@ -264,6 +519,12 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
             {filteredTests.map(test => (
               <TableRow key={test.id}>
                 <TableCell>
+                  <span className="flex items-center gap-1">
+                    <span>{getTestTypeIcon(test.testType)}</span>
+                    <span className="text-xs text-gray-500">{getTestTypeLabel(test.testType)}</span>
+                  </span>
+                </TableCell>
+                <TableCell>
                   <Badge variant="outline">{getExamName(test.examId)}</Badge>
                 </TableCell>
                 <TableCell className="font-medium">{test.title}</TableCell>
@@ -276,7 +537,7 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
                   </Button>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="sm" onClick={() => { setEditingTest(test); setFormData({ title: test.title, description: test.description || '', duration: test.duration, isFree: test.isFree ?? true, price: test.price || 0, status: test.status, examId: test.examId || '' }); setShowAddDialog(true); }}>
+                  <Button variant="ghost" size="sm" onClick={() => { setEditingTest(test); setFormData({ title: test.title, description: test.description || '', duration: test.duration, isFree: test.isFree ?? true, price: test.price || 0, status: test.status, examId: test.examId || '', testType: test.testType || 'mock_test' }); setShowAddDialog(true); }}>
                     <Edit className="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="sm" className="text-red-500" onClick={() => handleDelete(test.id)}>
@@ -285,16 +546,16 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
                 </TableCell>
               </TableRow>
             ))}
-            {filteredTests.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-8 text-gray-500">No tests found</TableCell></TableRow>}
+            {filteredTests.length === 0 && <TableRow><TableCell colSpan={8} className="text-center py-8 text-gray-500">No tests found</TableCell></TableRow>}
           </TableBody>
         </Table>
       </Card>
 
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>{editingTest ? 'Edit' : 'Add'} Mock Test</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{editingTest ? 'Edit' : 'Add'} Test</DialogTitle></DialogHeader>
           <div className="space-y-4 py-4">
-            {/* Exam Selection - Required for new tests */}
+            {/* Exam Selection */}
             <div>
               <Label>Exam *</Label>
               <Select value={formData.examId} onValueChange={v => setFormData({ ...formData, examId: v })}>
@@ -309,6 +570,23 @@ function MockTestsTab({ mockTests, exams, onRefresh }) {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+            {/* Test Type Selection */}
+            <div>
+              <Label>Test Type *</Label>
+              <Select value={formData.testType} onValueChange={v => setFormData({ ...formData, testType: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Test Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TEST_TYPES.map(t => (
+                    <SelectItem key={t.value} value={t.value}>
+                      {t.icon} {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 mt-1">All test types have same behavior: timed, answers shown after submission</p>
             </div>
             <div>
               <Label>Title *</Label>
