@@ -42,17 +42,26 @@ import {
   ChevronLeft,
   ChevronRight,
   GraduationCap,
-  AlertTriangle
+  AlertTriangle,
+  History,
+  IndianRupee
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Test Types constant
+const TEST_TYPES = [
+  { value: 'mock_test', label: 'Mock Test', icon: '📝' },
+  { value: 'practice_questions', label: 'Practice Questions', icon: '📚' },
+  { value: 'previous_year', label: 'Previous Year Questions', icon: '📜' }
+];
 
 // Sidebar
 function AdminSidebar({ activeTab, setActiveTab }) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { id: 'mock-tests', label: 'Mock Tests', icon: <ClipboardList className="w-5 h-5" /> },
-    { id: 'questions', label: 'Questions', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'exams', label: 'Exams', icon: <GraduationCap className="w-5 h-5" /> },
+    { id: 'tests', label: 'Tests', icon: <ClipboardList className="w-5 h-5" /> },
+    { id: 'questions', label: 'Questions', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'jobs', label: 'Jobs', icon: <Briefcase className="w-5 h-5" /> },
     { id: 'colleges', label: 'Colleges', icon: <Building className="w-5 h-5" /> },
     { id: 'users', label: 'Users', icon: <Users className="w-5 h-5" /> },
