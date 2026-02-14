@@ -917,8 +917,16 @@ export async function POST(request) {
       if (path === '/admin/exams') {
         const examData = {
           id: uuidv4(),
-          ...body,
+          name: body.name,
+          fullName: body.fullName || body.name,
+          description: body.description || '',
+          category: body.category || 'Engineering',
+          icon: body.icon || '📚',
+          price: parseInt(body.price) || 0,
+          status: body.status || 'Active',
           slug: body.name.toLowerCase().replace(/\s+/g, '-'),
+          totalTests: 0,
+          totalQuestions: 0,
           createdAt: new Date(),
           updatedAt: new Date()
         };
