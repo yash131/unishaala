@@ -23,7 +23,7 @@ class UnishaalaTester:
         self.auth_token = None
         self.admin_user = {
             "email": "admin@unishaala.com", 
-            "password": "password"
+            "password": "admin123"
         }
         self.created_exam_id = None
         self.created_test_ids = []
