@@ -42,7 +42,6 @@ class UnishaalaTester:
         """Make HTTP request with error handling"""
         try:
             url = f"{API_BASE}{endpoint}"
-            print(f"DEBUG: Making {method} request to {url}")
             
             # Include auth cookie if available
             if self.auth_token:
@@ -51,7 +50,6 @@ class UnishaalaTester:
                 # Cookie is automatically handled by session
                 
             response = self.session.request(method, url, json=data, headers=headers, timeout=30)
-            print(f"DEBUG: Response status: {response.status_code}")
             return response
         except Exception as e:
             self.log_error(f"Request failed: {str(e)}")
