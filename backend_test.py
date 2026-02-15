@@ -133,11 +133,13 @@ class UnishaalAuthTest:
         
         try:
             import time
-            unique_email = f"test{int(time.time())}@example.com"
+            timestamp = int(time.time())
+            unique_email = f"test{timestamp}@example.com"
+            unique_phone = f"+919876{str(timestamp)[-6:]}"  # Use last 6 digits of timestamp
             response = self.session.post(f"{API_URL}/auth/signup", json={
                 "name": "Test User",
                 "email": unique_email,
-                "phone": "+919876543210",
+                "phone": unique_phone,
                 "password": "test123",
                 "phoneVerified": True
             })
