@@ -446,13 +446,23 @@ class UnishaalaTester:
             
             if not response:
                 self.log_test("GET /api/leaderboard/invalid-exam failed - No response", False)
+                print(f"DEBUG: No response object returned")
                 return False
                 
+            print(f"DEBUG: Response status code: {response.status_code}")
+            print(f"DEBUG: Response content: {response.text[:200]}")
+            
             if response.status_code != 404:
                 self.log_test(f"GET /api/leaderboard/invalid-exam should return 404, got {response.status_code}", False)
                 return False
                 
-            data = response.json()
+            try:
+                data = response.json()
+                print(f"DEBUG: Response JSON: {data}")
+            except:
+                self.log_test("Could not parse response as JSON", False)
+                return False
+                
             if data.get('success'):
                 self.log_test("Invalid exam should not return success", False)
                 return False
