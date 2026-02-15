@@ -458,18 +458,21 @@ export default function ExamDetailPage() {
       {/* Tabs Section */}
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="mock-tests" className="w-full">
-          <TabsList className="grid w-full grid-cols-4 mb-8 bg-white shadow rounded-lg h-14">
+          <TabsList className="grid w-full grid-cols-5 mb-8 bg-white shadow rounded-lg h-14">
             <TabsTrigger value="mock-tests" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
               <ClipboardList className="w-4 h-4 mr-2" /> Mock Tests
             </TabsTrigger>
             <TabsTrigger value="practice-questions" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
-              <BookOpen className="w-4 h-4 mr-2" /> Practice Questions
+              <BookOpen className="w-4 h-4 mr-2" /> Practice
             </TabsTrigger>
             <TabsTrigger value="previous-papers" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
               <History className="w-4 h-4 mr-2" /> Previous Year
             </TabsTrigger>
+            <TabsTrigger value="leaderboard" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
+              <Trophy className="w-4 h-4 mr-2" /> Leaderboard
+            </TabsTrigger>
             <TabsTrigger value="topper-notes" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
-              <Trophy className="w-4 h-4 mr-2" /> Topper Notes
+              <Award className="w-4 h-4 mr-2" /> Toppers
             </TabsTrigger>
           </TabsList>
 
