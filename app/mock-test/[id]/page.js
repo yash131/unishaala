@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Logo } from '@/components/Logo';
 import {
   GraduationCap,
@@ -20,9 +20,93 @@ import {
   CheckCircle,
   AlertCircle,
   Play,
-  List
+  List,
+  AlertTriangle,
+  Shield,
+  Maximize,
+  Monitor,
+  Ban
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Proctoring Warning Modal Component
+function WarningModal({ isOpen, warningCount, onClose }) {
+  const isLastWarning = warningCount >= 2;
+  
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="sm:max-w-md border-2 border-red-500">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-red-600">
+            <AlertTriangle className="w-6 h-6" />
+            Warning {warningCount}/3
+          </DialogTitle>
+          <DialogDescription>
+            Tab switching or window change detected!
+          </DialogDescription>
+        </DialogHeader>
+        <div className="py-4">
+          <div className={`p-4 rounded-lg ${isLastWarning ? 'bg-red-100' : 'bg-orange-100'}`}>
+            <p className={`font-semibold ${isLastWarning ? 'text-red-700' : 'text-orange-700'}`}>
+              {isLastWarning 
+                ? '⚠️ FINAL WARNING! One more switch will AUTO-SUBMIT your exam!'
+                : 'Please stay on the exam window. Do not switch tabs or minimize the browser.'}
+            </p>
+          </div>
+          <div className="mt-4 space-y-2 text-sm text-gray-600">
+            <p className="flex items-center gap-2">
+              <Ban className="w-4 h-4 text-red-500" />
+              Switching tabs is not allowed during exam
+            </p>
+            <p className="flex items-center gap-2">
+              <Ban className="w-4 h-4 text-red-500" />
+              Minimizing the window is not allowed
+            </p>
+            <p className="flex items-center gap-2">
+              <Ban className="w-4 h-4 text-red-500" />
+              Exiting fullscreen is not allowed
+            </p>
+          </div>
+          <div className="mt-4 p-3 bg-gray-100 rounded-lg text-center">
+            <span className="text-lg font-bold text-gray-700">
+              Warnings Remaining: {3 - warningCount}
+            </span>
+          </div>
+        </div>
+        <Button onClick={onClose} className="w-full bg-teal-600 hover:bg-teal-700">
+          Return to Exam
+        </Button>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Auto Submit Warning Modal
+function AutoSubmitModal({ isOpen }) {
+  return (
+    <Dialog open={isOpen}>
+      <DialogContent className="sm:max-w-md border-2 border-red-500">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-red-600">
+            <AlertTriangle className="w-6 h-6" />
+            Exam Auto-Submitted
+          </DialogTitle>
+        </DialogHeader>
+        <div className="py-4 text-center">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-10 h-10 text-red-600" />
+          </div>
+          <p className="text-gray-700 font-medium">
+            Your exam has been automatically submitted due to multiple tab switches.
+          </p>
+          <p className="text-gray-500 text-sm mt-2">
+            Redirecting to results page...
+          </p>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function MockTestPage() {
   const params = useParams();
@@ -38,6 +122,13 @@ export default function MockTestPage() {
   const [attemptId, setAttemptId] = useState(null);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [showQuestionNav, setShowQuestionNav] = useState(false);
+  
+  // Proctoring State
+  const [warningCount, setWarningCount] = useState(0);
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [showAutoSubmitModal, setShowAutoSubmitModal] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   useEffect(() => {
     async function fetchTest() {
@@ -59,6 +150,7 @@ export default function MockTestPage() {
     }
   }, [params.id]);
 
+  // Timer Effect
   useEffect(() => {
     let timer;
     if (started && timeLeft > 0) {
@@ -75,6 +167,153 @@ export default function MockTestPage() {
     return () => clearInterval(timer);
   }, [started, timeLeft]);
 
+  // Handle tab/window violations
+  const handleViolation = useCallback(() => {
+    if (isSubmittingRef.current) return;
+    
+    const newWarningCount = warningCount + 1;
+    setWarningCount(newWarningCount);
+    
+    if (newWarningCount >= 3) {
+      // Auto-submit on 3rd violation
+      isSubmittingRef.current = true;
+      setShowAutoSubmitModal(true);
+      setTimeout(() => {
+        handleSubmit(true);
+      }, 2000);
+    } else {
+      setShowWarningModal(true);
+      toast.error(`Warning ${newWarningCount}/3: Stay on the exam window!`);
+    }
+  }, [warningCount]);
+
+  // Proctoring Effects - Only active when test is started
+  useEffect(() => {
+    if (!started) return;
+
+    // Tab visibility change detection
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        handleViolation();
+      }
+    };
+
+    // Window blur detection
+    const handleWindowBlur = () => {
+      // Small delay to avoid false positives
+      setTimeout(() => {
+        if (!document.hasFocus()) {
+          handleViolation();
+        }
+      }, 100);
+    };
+
+    // Fullscreen change detection
+    const handleFullscreenChange = () => {
+      const isCurrentlyFullscreen = !!document.fullscreenElement;
+      setIsFullscreen(isCurrentlyFullscreen);
+      
+      if (!isCurrentlyFullscreen && started && !isSubmittingRef.current) {
+        handleViolation();
+      }
+    };
+
+    // Disable right-click
+    const handleContextMenu = (e) => {
+      e.preventDefault();
+      toast.error('Right-click is disabled during exam');
+      return false;
+    };
+
+    // Disable copy-paste and other shortcuts
+    const handleKeyDown = (e) => {
+      // Block Ctrl+C, Ctrl+V, Ctrl+X, Ctrl+A, Ctrl+P, F12
+      if (
+        (e.ctrlKey && ['c', 'v', 'x', 'a', 'p', 's', 'u'].includes(e.key.toLowerCase())) ||
+        e.key === 'F12' ||
+        (e.ctrlKey && e.shiftKey && ['i', 'j', 'c'].includes(e.key.toLowerCase()))
+      ) {
+        e.preventDefault();
+        toast.error('This shortcut is disabled during exam');
+        return false;
+      }
+      
+      // Block PrintScreen
+      if (e.key === 'PrintScreen') {
+        e.preventDefault();
+        toast.error('Screenshot is disabled during exam');
+        return false;
+      }
+    };
+
+    // Disable text selection
+    const handleSelectStart = (e) => {
+      e.preventDefault();
+      return false;
+    };
+
+    // Prevent page unload without confirmation
+    const handleBeforeUnload = (e) => {
+      if (!isSubmittingRef.current) {
+        e.preventDefault();
+        e.returnValue = 'Your exam is in progress. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+
+    // Add event listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('blur', handleWindowBlur);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('contextmenu', handleContextMenu);
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('selectstart', handleSelectStart);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // Disable copy event
+    document.addEventListener('copy', (e) => {
+      e.preventDefault();
+      toast.error('Copy is disabled during exam');
+    });
+
+    // Disable paste event
+    document.addEventListener('paste', (e) => {
+      e.preventDefault();
+      toast.error('Paste is disabled during exam');
+    });
+
+    // Cleanup
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('blur', handleWindowBlur);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      document.removeEventListener('contextmenu', handleContextMenu);
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('selectstart', handleSelectStart);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [started, handleViolation]);
+
+  // Enter fullscreen mode
+  const enterFullscreen = async () => {
+    try {
+      const elem = document.documentElement;
+      if (elem.requestFullscreen) {
+        await elem.requestFullscreen();
+      } else if (elem.webkitRequestFullscreen) {
+        await elem.webkitRequestFullscreen();
+      } else if (elem.msRequestFullscreen) {
+        await elem.msRequestFullscreen();
+      }
+      setIsFullscreen(true);
+      return true;
+    } catch (error) {
+      console.error('Fullscreen error:', error);
+      toast.error('Please allow fullscreen mode to start the exam');
+      return false;
+    }
+  };
+
   const formatTime = (seconds) => {
     const hrs = Math.floor(seconds / 3600);
     const mins = Math.floor((seconds % 3600) / 60);
@@ -84,6 +323,13 @@ export default function MockTestPage() {
 
   const handleStartTest = async () => {
     try {
+      // Enter fullscreen first
+      const fullscreenOk = await enterFullscreen();
+      if (!fullscreenOk) {
+        toast.error('Fullscreen mode is required to start the exam');
+        return;
+      }
+
       const response = await fetch('/api/start-test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -103,7 +349,13 @@ export default function MockTestPage() {
         }
         
         setStarted(true);
+        toast.success('Exam started! Stay in fullscreen mode.');
       } else {
+        // Exit fullscreen if test start fails
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+        
         if (result.requirePayment) {
           toast.error('Please purchase this test to continue');
         } else {
@@ -113,6 +365,9 @@ export default function MockTestPage() {
       }
     } catch (error) {
       toast.error('Failed to start test');
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
     }
   };
 
@@ -125,8 +380,15 @@ export default function MockTestPage() {
     setFlagged({ ...flagged, [qId]: !flagged[qId] });
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (isAutoSubmit = false) => {
+    isSubmittingRef.current = true;
+    
     try {
+      // Exit fullscreen
+      if (document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen();
+      }
+
       const response = await fetch('/api/submit-test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -136,13 +398,19 @@ export default function MockTestPage() {
       const result = await response.json();
 
       if (result.success) {
-        toast.success('Test submitted successfully!');
+        if (isAutoSubmit) {
+          toast.error('Exam auto-submitted due to violations');
+        } else {
+          toast.success('Test submitted successfully!');
+        }
         router.push(`/test-result/${attemptId}`);
       } else {
         toast.error('Failed to submit test');
+        isSubmittingRef.current = false;
       }
     } catch (error) {
       toast.error('Failed to submit test');
+      isSubmittingRef.current = false;
     }
   };
 
@@ -199,7 +467,7 @@ export default function MockTestPage() {
                   </div>
                 </div>
 
-                <ul className="space-y-3 mb-8">
+                <ul className="space-y-3 mb-6">
                   <li className="flex items-start gap-2">
                     <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
                     <span className="text-gray-600">Each question carries equal marks</span>
@@ -222,11 +490,36 @@ export default function MockTestPage() {
                   </li>
                 </ul>
 
+                {/* Proctoring Rules Section */}
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                  <h4 className="font-bold text-red-700 flex items-center gap-2 mb-3">
+                    <Shield className="w-5 h-5" /> Exam Proctoring Rules
+                  </h4>
+                  <ul className="space-y-2 text-sm text-red-700">
+                    <li className="flex items-start gap-2">
+                      <Maximize className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span>Exam will open in <strong>fullscreen mode</strong>. Exiting fullscreen = 1 warning</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Monitor className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span><strong>Tab switching</strong> or minimizing window = 1 warning</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Ban className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span><strong>Copy-paste & right-click</strong> are disabled during exam</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                      <span><strong>After 3 warnings</strong>, your exam will be <strong>AUTO-SUBMITTED</strong></span>
+                    </li>
+                  </ul>
+                </div>
+
                 <Button 
                   className="w-full h-14 bg-teal-600 hover:bg-teal-700 text-lg"
                   onClick={handleStartTest}
                 >
-                  <Play className="w-5 h-5 mr-2" /> Start Test
+                  <Play className="w-5 h-5 mr-2" /> Start Test (Enter Fullscreen)
                 </Button>
               </CardContent>
             </Card>
@@ -242,7 +535,17 @@ export default function MockTestPage() {
   const flaggedCount = Object.values(flagged).filter(Boolean).length;
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col">
+    <div className="min-h-screen bg-gray-100 flex flex-col select-none">
+      {/* Warning Indicator */}
+      {warningCount > 0 && (
+        <div className={`py-2 px-4 text-center text-white font-medium ${
+          warningCount >= 2 ? 'bg-red-600' : 'bg-orange-500'
+        }`}>
+          <AlertTriangle className="w-4 h-4 inline mr-2" />
+          Warnings: {warningCount}/3 - {warningCount >= 2 ? 'FINAL WARNING! Next switch = Auto Submit' : 'Stay on exam window'}
+        </div>
+      )}
+      
       {/* Test Header */}
       <header className="bg-white shadow-md sticky top-0 z-50">
         <div className="container mx-auto px-4">
@@ -254,6 +557,11 @@ export default function MockTestPage() {
                 className="h-8 w-auto object-contain"
               />
               <span className="font-semibold text-gray-900 hidden md:block">{test.title}</span>
+              {/* Proctoring Status */}
+              <Badge className={`hidden md:flex ${isFullscreen ? 'bg-green-500' : 'bg-red-500'}`}>
+                <Shield className="w-3 h-3 mr-1" />
+                {isFullscreen ? 'Secured' : 'Not Fullscreen'}
+              </Badge>
             </div>
 
             <div className="flex items-center gap-6">
@@ -312,7 +620,7 @@ export default function MockTestPage() {
                   <>
                     <div className="mb-6">
                       <p className="text-lg text-gray-900 leading-relaxed">
-                        {currentQ.questionText}
+                        {currentQ.questionText || currentQ.question_title}
                       </p>
                     </div>
 
@@ -414,6 +722,19 @@ export default function MockTestPage() {
                 <p className="text-xs text-gray-500 mt-2 text-center">
                   {answeredCount}/{questions.length} answered
                 </p>
+                
+                {/* Warning Status in Side Panel */}
+                {warningCount > 0 && (
+                  <div className={`mt-4 p-3 rounded-lg text-center ${
+                    warningCount >= 2 ? 'bg-red-100' : 'bg-orange-100'
+                  }`}>
+                    <p className={`text-sm font-bold ${
+                      warningCount >= 2 ? 'text-red-700' : 'text-orange-700'
+                    }`}>
+                      ⚠️ Warnings: {warningCount}/3
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -456,7 +777,7 @@ export default function MockTestPage() {
               </Button>
               <Button 
                 className="flex-1 bg-teal-600 hover:bg-teal-700"
-                onClick={handleSubmit}
+                onClick={() => handleSubmit(false)}
               >
                 Submit Test
               </Button>
@@ -464,6 +785,20 @@ export default function MockTestPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Warning Modal */}
+      <WarningModal 
+        isOpen={showWarningModal} 
+        warningCount={warningCount}
+        onClose={() => {
+          setShowWarningModal(false);
+          // Try to re-enter fullscreen after warning
+          enterFullscreen();
+        }}
+      />
+
+      {/* Auto Submit Modal */}
+      <AutoSubmitModal isOpen={showAutoSubmitModal} />
     </div>
   );
 }
