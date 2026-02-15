@@ -20,6 +20,10 @@ API_BASE = f"{BASE_URL}/api"
 class UnishaalaTester:
     def __init__(self):
         self.session = requests.Session()
+        self.session.verify = False  # Disable SSL verification for testing
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
         self.auth_token = None
         self.admin_user = {
             "email": "admin@unishaala.com", 
