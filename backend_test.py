@@ -491,20 +491,22 @@ class UnishaalaTester:
             # Test 3: GET /api/my-rank/gate (Auth required - should fail without auth first)
             print("\n--- Test 3a: My Rank without Authentication ---")
             
-            # Temporarily clear auth token
+            # Temporarily clear auth token AND session cookies
             temp_token = self.auth_token
             self.auth_token = None
+            self.session.cookies.clear()  # Clear all cookies from session
             
             response = self.make_request('GET', '/my-rank/gate')
             
             if not response:
                 self.log_test("GET /api/my-rank/gate failed - No response", False)
-                # Restore token
+                # Restore token and cookies
                 self.auth_token = temp_token
                 return False
                 
             if response.status_code != 401:
                 self.log_test(f"GET /api/my-rank/gate should return 401 without auth, got {response.status_code}", False)
+                print(f"DEBUG: Response content: {response.text[:200]}")
                 # Restore token
                 self.auth_token = temp_token
                 return False
@@ -518,7 +520,7 @@ class UnishaalaTester:
                 
             self.log_test("✅ GET /api/my-rank/gate correctly returned 401 without authentication")
             
-            # Restore auth token
+            # Restore auth token (but keep cookies cleared - will need to re-login)
             self.auth_token = temp_token
             
             # Test 3b: GET /api/my-rank/gate (Auth required - with valid auth)
