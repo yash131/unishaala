@@ -530,6 +530,12 @@ class UnishaalaTester:
                 self.log_test("No auth token available for my-rank test", False)
                 return False
                 
+            # Since we cleared cookies, we need to re-authenticate the session
+            login_response = self.make_request('POST', '/auth/login', self.admin_user)
+            if not login_response or login_response.status_code != 200:
+                self.log_test("Failed to re-authenticate for my-rank test", False)
+                return False
+                
             response = self.make_request('GET', '/my-rank/gate')
             
             if not response:
