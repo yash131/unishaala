@@ -51,8 +51,11 @@ class UnishaalaTester:
                 
             response = self.session.request(method, url, json=data, headers=headers, timeout=30)
             return response
+        except requests.exceptions.RequestException as e:
+            self.log_error(f"Request failed for {method} {endpoint}: {str(e)}")
+            return None
         except Exception as e:
-            self.log_error(f"Request failed: {str(e)}")
+            self.log_error(f"Unexpected error for {method} {endpoint}: {str(e)}")
             return None
     
     def test_authentication(self):
