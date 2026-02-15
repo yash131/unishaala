@@ -372,6 +372,231 @@ class UnishaalaTester:
             self.log_test(f"User-facing API test failed: {str(e)}", False)
             return False
     
+    def test_leaderboard_system(self):
+        """Test the dynamic ranking/leaderboard system APIs"""
+        print("\n=== LEADERBOARD SYSTEM TESTS ===")
+        
+        try:
+            # Test 1: GET /api/leaderboard/gate (Public endpoint - no auth needed)
+            print("\n--- Test 1: Public Leaderboard for GATE ---")
+            response = self.make_request('GET', '/leaderboard/gate')
+            
+            if not response:
+                self.log_test("GET /api/leaderboard/gate failed - No response", False)
+                return False
+                
+            if response.status_code != 200:
+                self.log_test(f"GET /api/leaderboard/gate failed - Status: {response.status_code}", False)
+                return False
+                
+            data = response.json()
+            if not data.get('success'):
+                self.log_test(f"GET /api/leaderboard/gate failed - {data.get('error', 'Unknown error')}", False)
+                return False
+                
+            leaderboard_data = data.get('data', {})
+            exam_info = leaderboard_data.get('exam', {})
+            leaderboard = leaderboard_data.get('leaderboard', [])
+            total_participants = leaderboard_data.get('totalParticipants', 0)
+            
+            # Validate exam info
+            if not exam_info.get('name') or not exam_info.get('slug'):
+                self.log_test("Missing exam info in leaderboard response", False)
+                return False
+                
+            self.log_test(f"✅ GET /api/leaderboard/gate successful - Exam: {exam_info.get('name')}")
+            self.log_test(f"   Leaderboard entries: {len(leaderboard)}, Total participants: {total_participants}")
+            
+            # Validate leaderboard structure
+            if leaderboard:
+                first_entry = leaderboard[0]
+                required_fields = ['rank', 'name', 'bestScore', 'totalMarks', 'accuracy', 'attempts']
+                
+                missing_fields = []
+                for field in required_fields:
+                    if field not in first_entry:
+                        missing_fields.append(field)
+                        
+                if missing_fields:
+                    self.log_test(f"Missing leaderboard fields: {', '.join(missing_fields)}", False)
+                    return False
+                    
+                self.log_test(f"   Top entry: {first_entry.get('name')} - Score: {first_entry.get('bestScore')}, Rank: {first_entry.get('rank')}")
+                
+                # Verify ranking order (scores should be descending)
+                if len(leaderboard) > 1:
+                    for i in range(len(leaderboard) - 1):
+                        current_score = leaderboard[i].get('bestScore', 0)
+                        next_score = leaderboard[i + 1].get('bestScore', 0)
+                        
+                        if current_score < next_score:
+                            self.log_test("Leaderboard ranking order incorrect - scores not in descending order", False)
+                            return False
+                            
+                    self.log_test("   Verified rankings are in correct descending order by score")
+            else:
+                self.log_test("   No leaderboard entries found (this may be normal for testing)")
+                
+            # Test 2: GET /api/leaderboard/invalid-exam (Should return 404)
+            print("\n--- Test 2: Invalid Exam Leaderboard ---")
+            response = self.make_request('GET', '/leaderboard/invalid-exam-xyz')
+            
+            if not response:
+                self.log_test("GET /api/leaderboard/invalid-exam failed - No response", False)
+                return False
+                
+            if response.status_code != 404:
+                self.log_test(f"GET /api/leaderboard/invalid-exam should return 404, got {response.status_code}", False)
+                return False
+                
+            data = response.json()
+            if data.get('success'):
+                self.log_test("Invalid exam should not return success", False)
+                return False
+                
+            self.log_test("✅ GET /api/leaderboard/invalid-exam correctly returned 404 error")
+            
+            # Test 3: GET /api/my-rank/gate (Auth required - should fail without auth first)
+            print("\n--- Test 3a: My Rank without Authentication ---")
+            
+            # Temporarily clear auth token
+            temp_token = self.auth_token
+            self.auth_token = None
+            
+            response = self.make_request('GET', '/my-rank/gate')
+            
+            if not response:
+                self.log_test("GET /api/my-rank/gate failed - No response", False)
+                # Restore token
+                self.auth_token = temp_token
+                return False
+                
+            if response.status_code != 401:
+                self.log_test(f"GET /api/my-rank/gate should return 401 without auth, got {response.status_code}", False)
+                # Restore token
+                self.auth_token = temp_token
+                return False
+                
+            data = response.json()
+            if data.get('success'):
+                self.log_test("My rank without auth should not return success", False)
+                # Restore token
+                self.auth_token = temp_token
+                return False
+                
+            self.log_test("✅ GET /api/my-rank/gate correctly returned 401 without authentication")
+            
+            # Restore auth token
+            self.auth_token = temp_token
+            
+            # Test 3b: GET /api/my-rank/gate (Auth required - with valid auth)
+            print("\n--- Test 3b: My Rank with Authentication ---")
+            
+            if not self.auth_token:
+                self.log_test("No auth token available for my-rank test", False)
+                return False
+                
+            response = self.make_request('GET', '/my-rank/gate')
+            
+            if not response:
+                self.log_test("GET /api/my-rank/gate failed - No response", False)
+                return False
+                
+            if response.status_code != 200:
+                self.log_test(f"GET /api/my-rank/gate failed - Status: {response.status_code}", False)
+                return False
+                
+            data = response.json()
+            if not data.get('success'):
+                self.log_test(f"GET /api/my-rank/gate failed - {data.get('error', 'Unknown error')}", False)
+                return False
+                
+            rank_data = data.get('data', {})
+            
+            # Check if user has attempts or not
+            if 'message' in rank_data and rank_data.get('message') == 'No attempts yet':
+                self.log_test("✅ GET /api/my-rank/gate successful - User has no attempts yet")
+                self.log_test(f"   Response data: {rank_data}")
+                
+                # Verify expected fields for no attempts
+                expected_fields = ['rank', 'bestScore', 'totalParticipants']
+                for field in expected_fields:
+                    if field not in rank_data:
+                        self.log_test(f"Missing field '{field}' in no-attempts response", False)
+                        return False
+                        
+            else:
+                # User has attempts - verify rank data structure
+                required_fields = ['rank', 'bestScore', 'totalParticipants', 'percentile']
+                
+                missing_fields = []
+                for field in required_fields:
+                    if field not in rank_data:
+                        missing_fields.append(field)
+                        
+                if missing_fields:
+                    self.log_test(f"Missing rank data fields: {', '.join(missing_fields)}", False)
+                    return False
+                    
+                rank = rank_data.get('rank')
+                best_score = rank_data.get('bestScore')
+                total_participants = rank_data.get('totalParticipants')
+                percentile = rank_data.get('percentile')
+                
+                self.log_test(f"✅ GET /api/my-rank/gate successful - Rank: {rank}, Score: {best_score}")
+                self.log_test(f"   Total Participants: {total_participants}, Percentile: {percentile}")
+                
+                # Validate data types and ranges
+                if not isinstance(rank, int) or rank < 1:
+                    self.log_test(f"Invalid rank value: {rank}", False)
+                    return False
+                    
+                if not isinstance(best_score, (int, float)) or best_score < 0:
+                    self.log_test(f"Invalid bestScore value: {best_score}", False)
+                    return False
+                    
+                if not isinstance(total_participants, int) or total_participants < 1:
+                    self.log_test(f"Invalid totalParticipants value: {total_participants}", False)
+                    return False
+                    
+                if not isinstance(percentile, (int, float)) or percentile < 0 or percentile > 100:
+                    self.log_test(f"Invalid percentile value: {percentile}", False)
+                    return False
+                    
+                self.log_test("   Verified all rank data fields have valid values and types")
+            
+            # Test 4: Verify rank calculation consistency
+            print("\n--- Test 4: Rank Calculation Consistency ---")
+            
+            # Compare leaderboard data with my-rank data if user has attempts
+            if 'message' not in rank_data:
+                user_rank = rank_data.get('rank')
+                leaderboard_total = leaderboard_data.get('totalParticipants')
+                myrank_total = rank_data.get('totalParticipants')
+                
+                if leaderboard_total != myrank_total:
+                    self.log_test(f"Participant count mismatch - Leaderboard: {leaderboard_total}, My-rank: {myrank_total}", False)
+                    return False
+                    
+                self.log_test(f"✅ Participant count consistent between leaderboard ({leaderboard_total}) and my-rank ({myrank_total})")
+                
+                # Verify percentile calculation makes sense
+                expected_percentile = round(((myrank_total - user_rank) / myrank_total) * 100)
+                actual_percentile = rank_data.get('percentile')
+                
+                # Allow small rounding differences
+                if abs(expected_percentile - actual_percentile) > 2:
+                    self.log_test(f"Percentile calculation issue - Expected ~{expected_percentile}, Got {actual_percentile}", False)
+                    return False
+                    
+                self.log_test(f"✅ Percentile calculation verified - {actual_percentile}% is reasonable for rank {user_rank}/{myrank_total}")
+            
+            return True
+            
+        except Exception as e:
+            self.log_test(f"Leaderboard system test failed: {str(e)}", False)
+            return False
+
     def cleanup_test_data(self):
         """Clean up test data created during testing"""
         print("\n=== CLEANUP TEST DATA ===")
