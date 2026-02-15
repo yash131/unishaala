@@ -721,6 +721,164 @@ export async function POST(request) {
       return response;
     }
 
+    // Send Phone OTP via Twilio
+    if (path === '/auth/send-otp') {
+      const { phone } = body;
+      
+      if (!phone) {
+        return jsonResponse({ success: false, error: 'Phone number is required' }, 400);
+      }
+
+      try {
+        const twilio = require('twilio');
+        const client = twilio(
+          process.env.TWILIO_ACCOUNT_SID,
+          process.env.TWILIO_AUTH_TOKEN
+        );
+
+        const verification = await client.verify.v2
+          .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+          .verifications.create({ to: phone, channel: 'sms' });
+
+        return jsonResponse({
+          success: true,
+          message: 'OTP sent successfully',
+          data: { status: verification.status }
+        });
+      } catch (error) {
+        console.error('Twilio error:', error);
+        return jsonResponse({ success: false, error: 'Failed to send OTP. Please check phone number.' }, 400);
+      }
+    }
+
+    // Verify Phone OTP via Twilio
+    if (path === '/auth/verify-phone-otp') {
+      const { phone, code } = body;
+      
+      if (!phone || !code) {
+        return jsonResponse({ success: false, error: 'Phone and OTP code are required' }, 400);
+      }
+
+      try {
+        const twilio = require('twilio');
+        const client = twilio(
+          process.env.TWILIO_ACCOUNT_SID,
+          process.env.TWILIO_AUTH_TOKEN
+        );
+
+        const verificationCheck = await client.verify.v2
+          .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+          .verificationChecks.create({ to: phone, code: code });
+
+        if (verificationCheck.status === 'approved') {
+          return jsonResponse({
+            success: true,
+            message: 'Phone verified successfully',
+            data: { verified: true }
+          });
+        } else {
+          return jsonResponse({ success: false, error: 'Invalid OTP' }, 400);
+        }
+      } catch (error) {
+        console.error('Twilio verification error:', error);
+        return jsonResponse({ success: false, error: 'Verification failed' }, 400);
+      }
+    }
+
+    // Google OAuth Callback
+    if (path === '/auth/google-callback') {
+      const { sessionId } = body;
+      
+      if (!sessionId) {
+        return jsonResponse({ success: false, error: 'Session ID is required' }, 400);
+      }
+
+      try {
+        // Exchange session_id for user data from Emergent Auth
+        const authResponse = await fetch('https://demobackend.emergentagent.com/auth/v1/env/oauth/session-data', {
+          method: 'GET',
+          headers: {
+            'X-Session-ID': sessionId
+          }
+        });
+
+        if (!authResponse.ok) {
+          return jsonResponse({ success: false, error: 'Invalid session' }, 401);
+        }
+
+        const authData = await authResponse.json();
+        const { email, name, picture, session_token } = authData;
+
+        // Check if user exists or create new one
+        const users = await getCollection('users');
+        let user = await users.findOne({ email });
+
+        if (!user) {
+          // Create new user from Google auth
+          user = {
+            id: uuidv4(),
+            name: name || email.split('@')[0],
+            email,
+            phone: '',
+            password: '', // Google users don't have password
+            role: 'USER',
+            isVerified: true,
+            phoneVerified: false,
+            picture: picture || '',
+            authProvider: 'google',
+            createdAt: new Date(),
+            updatedAt: new Date()
+          };
+          await users.insertOne(user);
+        } else {
+          // Update existing user with Google data
+          await users.updateOne(
+            { email },
+            { 
+              $set: { 
+                name: name || user.name,
+                picture: picture || user.picture,
+                isVerified: true,
+                updatedAt: new Date()
+              } 
+            }
+          );
+          user = await users.findOne({ email });
+        }
+
+        // Create our own token
+        const token = createToken({ userId: user.id, email: user.email, role: user.role });
+        
+        const response = jsonResponse({
+          success: true,
+          message: 'Login successful',
+          data: {
+            token,
+            user: {
+              id: user.id,
+              name: user.name,
+              email: user.email,
+              role: user.role,
+              picture: user.picture
+            }
+          }
+        });
+
+        response.cookies.set('auth_token', token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'none',
+          path: '/',
+          maxAge: 7 * 24 * 60 * 60
+        });
+
+        return response;
+      } catch (error) {
+        console.error('Google auth error:', error);
+        return jsonResponse({ success: false, error: 'Authentication failed' }, 500);
+      }
+    }
+
     // Contact Form
     if (path === '/contact') {
       const { name, email, phone, subject, message } = body;
