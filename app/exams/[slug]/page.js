@@ -283,31 +283,6 @@ function LeaderboardTab({ examSlug }) {
   );
 }
 
-function Navbar() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          <Logo size="default" showText={false} />
-          <div className="hidden md:flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="outline" className="border-teal-600 text-teal-600">Login</Button>
-            </Link>
-            <Link href="/signup">
-              <Button className="bg-rose-500 hover:bg-rose-600">Sign Up</Button>
-            </Link>
-          </div>
-          <button className="md:hidden p-2" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-        </div>
-      </div>
-    </nav>
-  );
-}
-
 export default function ExamDetailPage() {
   const params = useParams();
   const [data, setData] = useState(null);
