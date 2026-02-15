@@ -170,6 +170,73 @@ export default function TestResultPage() {
           </CardContent>
         </Card>
 
+        {/* Dynamic Ranking Card */}
+        {rankInfo && (
+          <Card className="mb-8 shadow-lg border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-4">
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                    rankInfo.rank <= 3 
+                      ? 'bg-gradient-to-br from-yellow-400 to-yellow-600' 
+                      : 'bg-gradient-to-br from-purple-500 to-indigo-600'
+                  }`}>
+                    {getRankIcon(rankInfo.rank)}
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      🏆 Your Rank: #{rankInfo.rank}
+                    </h3>
+                    <p className="text-gray-600">
+                      Out of {rankInfo.totalParticipants} participants in {rankInfo.examName}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-6">
+                  <div className="text-center">
+                    <div className="flex items-center gap-1 text-purple-600">
+                      <Target className="w-5 h-5" />
+                      <span className="text-2xl font-bold">{rankInfo.bestScore}</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Best Score</p>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="flex items-center gap-1 text-green-600">
+                      <TrendingUp className="w-5 h-5" />
+                      <span className="text-2xl font-bold">Top {100 - rankInfo.percentile}%</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Percentile</p>
+                  </div>
+                  
+                  <div className="text-center">
+                    <div className="flex items-center gap-1 text-blue-600">
+                      <Users className="w-5 h-5" />
+                      <span className="text-2xl font-bold">{rankInfo.attempts}</span>
+                    </div>
+                    <p className="text-xs text-gray-500">Attempts</p>
+                  </div>
+                </div>
+                
+                <Link href={`/exams/${rankInfo.examSlug}?tab=leaderboard`}>
+                  <Button className="bg-purple-600 hover:bg-purple-700">
+                    <Trophy className="w-4 h-4 mr-2" /> View Full Leaderboard
+                  </Button>
+                </Link>
+              </div>
+              
+              {rankInfo.rank <= 10 && (
+                <div className="mt-4 p-3 bg-yellow-100 rounded-lg text-center">
+                  <span className="text-yellow-800 font-medium">
+                    🎉 Congratulations! You're in the Top 10!
+                  </span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         {/* Detailed Analysis */}
         <Tabs defaultValue="solutions" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-8 bg-white shadow rounded-lg h-14">
