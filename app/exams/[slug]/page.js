@@ -507,6 +507,11 @@ export default function ExamDetailPage() {
             </div>
           </TabsContent>
 
+          {/* Leaderboard Tab */}
+          <TabsContent value="leaderboard">
+            <LeaderboardTab examSlug={params.slug} />
+          </TabsContent>
+
           {/* Topper Notes Tab */}
           <TabsContent value="topper-notes">
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
