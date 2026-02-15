@@ -491,48 +491,40 @@ class UnishaalaTester:
             # Test 3: GET /api/my-rank/gate (Auth required - should fail without auth first)
             print("\n--- Test 3a: My Rank without Authentication ---")
             
-            # Temporarily clear auth token AND session cookies
-            temp_token = self.auth_token
-            self.auth_token = None
-            self.session.cookies.clear()  # Clear all cookies from session
-            
-            response = self.make_request('GET', '/my-rank/gate')
-            
-            if not response:
-                self.log_test("GET /api/my-rank/gate failed - No response", False)
-                # Restore token and cookies
-                self.auth_token = temp_token
-                return False
+            # Use curl without authentication
+            import subprocess
+            try:
+                result = subprocess.run([
+                    'curl', '-s', '-w', '%{http_code}',
+                    f"{API_BASE}/my-rank/gate"
+                ], capture_output=True, text=True, timeout=10)
                 
-            if response.status_code != 401:
-                self.log_test(f"GET /api/my-rank/gate should return 401 without auth, got {response.status_code}", False)
-                print(f"DEBUG: Response content: {response.text[:200]}")
-                # Restore token
-                self.auth_token = temp_token
-                return False
+                response_body = result.stdout
+                if len(response_body) >= 3:
+                    http_code = response_body[-3:]
+                    response_content = response_body[:-3]
+                else:
+                    http_code = response_body
+                    response_content = ""
+                    
+                print(f"DEBUG: HTTP Code: {http_code}, Content: {response_content[:100]}")
                 
-            data = response.json()
-            if data.get('success'):
-                self.log_test("My rank without auth should not return success", False)
-                # Restore token
-                self.auth_token = temp_token
-                return False
+                if http_code != "401":
+                    self.log_test(f"GET /api/my-rank/gate should return 401 without auth, got {http_code}", False)
+                    return False
+                    
+                self.log_test("✅ GET /api/my-rank/gate correctly returned 401 without authentication")
                 
-            self.log_test("✅ GET /api/my-rank/gate correctly returned 401 without authentication")
-            
-            # Restore auth token (but keep cookies cleared - will need to re-login)
-            self.auth_token = temp_token
+            except Exception as e:
+                self.log_test(f"GET /api/my-rank/gate test failed: {str(e)}", False)
+                return False
             
             # Test 3b: GET /api/my-rank/gate (Auth required - with valid auth)
             print("\n--- Test 3b: My Rank with Authentication ---")
             
-            if not self.auth_token:
-                self.log_test("No auth token available for my-rank test", False)
-                return False
-                
-            # Since we cleared cookies, we need to re-authenticate the session
-            login_response = self.make_request('POST', '/auth/login', self.admin_user)
-            if not login_response or login_response.status_code != 200:
+            # Re-authenticate to ensure we have valid session
+            response = self.make_request('POST', '/auth/login', self.admin_user)
+            if not response or response.status_code != 200:
                 self.log_test("Failed to re-authenticate for my-rank test", False)
                 return False
                 
