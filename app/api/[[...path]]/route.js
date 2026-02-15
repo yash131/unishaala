@@ -115,6 +115,216 @@ export async function GET(request) {
       });
     }
 
+    // Leaderboard for an exam - PUBLIC endpoint
+    if (path.startsWith('/leaderboard/')) {
+      const slug = path.split('/leaderboard/')[1];
+      const exams = await getCollection('exams');
+      const exam = await exams.findOne({ slug });
+      
+      if (!exam) {
+        return jsonResponse({ success: false, error: 'Exam not found' }, 404);
+      }
+
+      const mockTests = await getCollection('mock_tests');
+      const attempts = await getCollection('test_attempts');
+      const users = await getCollection('users');
+
+      // Get all mock test IDs for this exam
+      const examMockTests = await mockTests.find({ examId: exam.id }).toArray();
+      const mockTestIds = examMockTests.map(t => t.id);
+
+      if (mockTestIds.length === 0) {
+        return jsonResponse({
+          success: true,
+          data: {
+            exam: { name: exam.name, slug: exam.slug, icon: exam.icon },
+            leaderboard: [],
+            totalParticipants: 0
+          }
+        });
+      }
+
+      // Aggregate: Get best score per user across all tests in this exam
+      const pipeline = [
+        // Match completed attempts for this exam's tests
+        {
+          $match: {
+            mockTestId: { $in: mockTestIds },
+            status: 'COMPLETED'
+          }
+        },
+        // Group by userId to get best score and stats
+        {
+          $group: {
+            _id: '$userId',
+            bestScore: { $max: '$score' },
+            totalMarks: { $first: '$totalMarks' },
+            attempts: { $sum: 1 },
+            lastAttempt: { $max: '$endTime' },
+            bestCorrect: { $max: '$correct' },
+            bestIncorrect: { $min: '$incorrect' }
+          }
+        },
+        // Sort by best score descending
+        {
+          $sort: { bestScore: -1, lastAttempt: 1 }
+        },
+        // Limit to top 100
+        {
+          $limit: 100
+        }
+      ];
+
+      const leaderboardData = await attempts.aggregate(pipeline).toArray();
+
+      // Get user details for each entry
+      const userIds = leaderboardData.map(entry => entry._id);
+      const userList = await users.find({ id: { $in: userIds } }).toArray();
+      const userMap = {};
+      userList.forEach(u => {
+        userMap[u.id] = { name: u.name, email: u.email };
+      });
+
+      // Build final leaderboard with ranks
+      const leaderboard = leaderboardData.map((entry, index) => {
+        const user = userMap[entry._id] || { name: 'Anonymous' };
+        const accuracy = entry.totalMarks > 0 
+          ? Math.round((entry.bestScore / entry.totalMarks) * 100) 
+          : 0;
+        
+        return {
+          rank: index + 1,
+          userId: entry._id,
+          name: user.name,
+          bestScore: Math.round(entry.bestScore * 100) / 100,
+          totalMarks: entry.totalMarks,
+          accuracy,
+          attempts: entry.attempts,
+          correct: entry.bestCorrect || 0,
+          incorrect: entry.bestIncorrect || 0,
+          lastAttempt: entry.lastAttempt
+        };
+      });
+
+      // Get total unique participants
+      const totalParticipants = await attempts.distinct('userId', {
+        mockTestId: { $in: mockTestIds },
+        status: 'COMPLETED'
+      });
+
+      return jsonResponse({
+        success: true,
+        data: {
+          exam: { name: exam.name, slug: exam.slug, icon: exam.icon, fullName: exam.fullName },
+          leaderboard,
+          totalParticipants: totalParticipants.length
+        }
+      });
+    }
+
+    // Get user's rank for an exam
+    if (path.startsWith('/my-rank/')) {
+      const slug = path.split('/my-rank/')[1];
+      const user = await getAuthUser(request);
+      
+      if (!user) {
+        return jsonResponse({ success: false, error: 'Please login to see your rank' }, 401);
+      }
+
+      const exams = await getCollection('exams');
+      const exam = await exams.findOne({ slug });
+      
+      if (!exam) {
+        return jsonResponse({ success: false, error: 'Exam not found' }, 404);
+      }
+
+      const mockTests = await getCollection('mock_tests');
+      const attempts = await getCollection('test_attempts');
+
+      // Get all mock test IDs for this exam
+      const examMockTests = await mockTests.find({ examId: exam.id }).toArray();
+      const mockTestIds = examMockTests.map(t => t.id);
+
+      if (mockTestIds.length === 0) {
+        return jsonResponse({
+          success: true,
+          data: { rank: null, bestScore: 0, totalParticipants: 0 }
+        });
+      }
+
+      // Get user's best score
+      const userBest = await attempts.aggregate([
+        {
+          $match: {
+            mockTestId: { $in: mockTestIds },
+            userId: user.id,
+            status: 'COMPLETED'
+          }
+        },
+        {
+          $group: {
+            _id: '$userId',
+            bestScore: { $max: '$score' },
+            totalMarks: { $first: '$totalMarks' },
+            attempts: { $sum: 1 }
+          }
+        }
+      ]).toArray();
+
+      if (userBest.length === 0) {
+        return jsonResponse({
+          success: true,
+          data: { rank: null, bestScore: 0, totalParticipants: 0, message: 'No attempts yet' }
+        });
+      }
+
+      const userScore = userBest[0].bestScore;
+
+      // Count how many users have higher score
+      const higherScores = await attempts.aggregate([
+        {
+          $match: {
+            mockTestId: { $in: mockTestIds },
+            status: 'COMPLETED'
+          }
+        },
+        {
+          $group: {
+            _id: '$userId',
+            bestScore: { $max: '$score' }
+          }
+        },
+        {
+          $match: {
+            bestScore: { $gt: userScore }
+          }
+        },
+        {
+          $count: 'count'
+        }
+      ]).toArray();
+
+      const rank = (higherScores[0]?.count || 0) + 1;
+
+      // Get total participants
+      const totalParticipants = await attempts.distinct('userId', {
+        mockTestId: { $in: mockTestIds },
+        status: 'COMPLETED'
+      });
+
+      return jsonResponse({
+        success: true,
+        data: {
+          rank,
+          bestScore: Math.round(userScore * 100) / 100,
+          totalMarks: userBest[0].totalMarks,
+          attempts: userBest[0].attempts,
+          totalParticipants: totalParticipants.length,
+          percentile: Math.round(((totalParticipants.length - rank) / totalParticipants.length) * 100)
+        }
+      });
+    }
+
     // Get Mock Test by ID (for users - only published)
     if (path.startsWith('/mock-test/')) {
       const testId = path.split('/mock-test/')[1];
