@@ -585,10 +585,14 @@ export async function POST(request) {
 
     // User Registration
     if (path === '/auth/signup') {
-      const { name, email, phone, password } = body;
+      const { name, email, phone, password, phoneVerified } = body;
       
       if (!name || !email || !password) {
         return jsonResponse({ success: false, error: 'Name, email and password are required' }, 400);
+      }
+
+      if (!phone) {
+        return jsonResponse({ success: false, error: 'Phone number is required' }, 400);
       }
 
       const users = await getCollection('users');
@@ -598,8 +602,13 @@ export async function POST(request) {
         return jsonResponse({ success: false, error: 'Email already registered' }, 400);
       }
 
+      // Check if phone already registered
+      const existingPhone = await users.findOne({ phone });
+      if (existingPhone) {
+        return jsonResponse({ success: false, error: 'Phone number already registered' }, 400);
+      }
+
       const hashedPassword = await hashPassword(password);
-      const otp = generateOTP();
       
       const newUser = {
         id: uuidv4(),
@@ -608,19 +617,18 @@ export async function POST(request) {
         phone: phone || '',
         password: hashedPassword,
         role: 'USER',
-        isVerified: false,
-        otp,
-        otpExpiry: new Date(Date.now() + 10 * 60 * 1000),
+        isVerified: phoneVerified === true, // Verified if phone OTP was verified
+        phoneVerified: phoneVerified === true,
+        authProvider: 'local',
         createdAt: new Date(),
         updatedAt: new Date()
       };
 
       await users.insertOne(newUser);
-      console.log(`OTP for ${email}: ${otp}`);
 
       return jsonResponse({
         success: true,
-        message: 'Registration successful. Please verify OTP.',
+        message: 'Registration successful.',
         data: { userId: newUser.id, email }
       });
     }
