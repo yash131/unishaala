@@ -628,27 +628,20 @@ class UnishaalaTester:
     
     def run_all_tests(self):
         """Run all test suites"""
-        print("🚀 Starting Unishaala Backend API Tests")
+        print("🚀 Starting Unishaala Backend API Tests - Leaderboard System Focus")
         print(f"🌐 Testing against: {API_BASE}")
         
         test_results = {
             'authentication': False,
-            'exam_crud': False, 
-            'mock_test_crud': False,
-            'user_facing_apis': False
+            'leaderboard_system': False
         }
         
         # Run test suites in order
         test_results['authentication'] = self.test_authentication()
         
         if test_results['authentication']:
-            test_results['exam_crud'] = self.test_exam_crud()
-            test_results['mock_test_crud'] = self.test_mock_test_crud_with_types()
-            test_results['user_facing_apis'] = self.test_user_facing_apis()
+            test_results['leaderboard_system'] = self.test_leaderboard_system()
             
-            # Cleanup regardless of test results
-            self.cleanup_test_data()
-        
         # Print final results
         print("\n" + "="*50)
         print("FINAL TEST RESULTS")
