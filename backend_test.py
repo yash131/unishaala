@@ -132,9 +132,11 @@ class UnishaalAuthTest:
         print("\n=== TEST 5: User Signup with Phone Verification ===")
         
         try:
+            import time
+            unique_email = f"test{int(time.time())}@example.com"
             response = self.session.post(f"{API_URL}/auth/signup", json={
                 "name": "Test User",
-                "email": "test@example.com",
+                "email": unique_email,
                 "phone": "+919876543210",
                 "password": "test123",
                 "phoneVerified": True
