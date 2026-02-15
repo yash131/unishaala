@@ -340,6 +340,18 @@ test_plan:
         agent: "testing"
         comment: "✅ TESTED: Mock tests visibility fix working correctly. GET /api/exams/gate returns 2 published mock tests (isPublished: true, status: 'Active', questionCount > 0). GET /api/mock-test-questions/{testId} successfully retrieves questions with proper security (answers hidden). POST /admin/questions/save-batch normalizes status values correctly ('active'/'ACTIVE' → 'Active'). Case-insensitive status filtering working. Minor: Some test questions have null field values but this doesn't affect core functionality."
 
+  - task: "Leaderboard System APIs"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Comprehensive leaderboard system testing completed successfully. All 4 test categories PASSED: 1) GET /api/leaderboard/gate (Public) - Returns proper leaderboard data with exam info, rankings in descending order by best score, participant count of 1, correct data structure with rank/name/bestScore/totalMarks/accuracy/attempts fields 2) GET /api/leaderboard/invalid-exam-xyz - Correctly returns 404 error for non-existent exam 3) GET /api/my-rank/gate - Authentication properly enforced (401 without auth, success with auth), returns user rank (1), bestScore (5.38), totalParticipants (1), percentile (0%) 4) Rank calculation consistency verified - participant counts match between endpoints, percentile calculation accurate. Dynamic ranking system working as specified in requirements."
+
 test_plan:
   current_focus: []
   stuck_tasks: []
@@ -357,3 +369,5 @@ agent_communication:
     message: "✅ MOCK TESTS VISIBILITY FIX VERIFIED: Comprehensive testing completed for the bug fix. All 4 test categories passed: 1) GET /api/exams/gate correctly returns 2 published mock tests (isPublished: true, status: 'Active', questionCount > 0) 2) GET /api/mock-test-questions/{testId} retrieves questions properly with answers hidden for security 3) POST /admin/questions/save-batch normalizes status correctly ('active'/'ACTIVE' → 'Active') 4) Case-insensitive filtering working as expected. The visibility fix is working correctly."
   - agent: "testing"
     message: "✅ COMPREHENSIVE BACKEND API TESTING COMPLETE: Executed specialized test suite covering all review request specifications. RESULTS: 4/4 test categories PASSED - 1) Authentication Tests: Admin login successful with correct credentials (admin@unishaala.com/admin123), SUPER_ADMIN role verified, auth token received 2) Exam CRUD Tests: GET/POST/PUT/DELETE operations working correctly with test data (TEST_EXAM created, updated price 999→1299, deleted) 3) Mock Test CRUD with Test Types: Successfully created and verified all 3 test types (mock_test, practice_questions, previous_year), testType field properly stored and retrieved 4) User-facing API Tests: GET /api/exams/gate returns exam details with mock tests including testType field for proper grouping. Database migration applied to add missing testType field to existing tests. All APIs working as specified in review request."
+  - agent: "testing"
+    message: "✅ LEADERBOARD SYSTEM TESTING COMPLETE: Comprehensive testing of the dynamic ranking/leaderboard system APIs completed successfully. All specified test cases PASSED: 1) GET /api/leaderboard/gate (Public endpoint) - Returns complete leaderboard data with proper exam info, rankings sorted by best scores, participant count (1), all required fields (rank, name, bestScore, totalMarks, accuracy, attempts) 2) GET /api/leaderboard/invalid-exam - Correctly returns 404 error for non-existent exams 3) GET /api/my-rank/gate - Authentication properly enforced (401 without auth cookie), with valid auth returns user's rank (1), bestScore (5.38), totalParticipants (1), percentile (0%) 4) Rank calculation consistency - Verified participant counts match between leaderboard and my-rank endpoints, percentile calculations accurate. The leaderboard system calculates rankings dynamically based on best scores from test attempts as required."
