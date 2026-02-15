@@ -20,7 +20,12 @@ import {
   FileText,
   ArrowLeft,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Medal,
+  Crown,
+  Users,
+  TrendingUp,
+  Target
 } from 'lucide-react';
 
 export default function TestResultPage() {
@@ -28,6 +33,7 @@ export default function TestResultPage() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [expandedQuestion, setExpandedQuestion] = useState(null);
+  const [rankInfo, setRankInfo] = useState(null);
 
   useEffect(() => {
     async function fetchResult() {
@@ -36,6 +42,8 @@ export default function TestResultPage() {
         const data = await response.json();
         if (data.success) {
           setResult(data.data);
+          // Fetch rank info after getting result
+          fetchRankInfo(data.data.attempt);
         }
       } catch (error) {
         console.error('Error fetching result:', error);
@@ -47,6 +55,45 @@ export default function TestResultPage() {
       fetchResult();
     }
   }, [params.id]);
+
+  const fetchRankInfo = async (attempt) => {
+    try {
+      // First get the mock test to find the exam
+      const testRes = await fetch(`/api/mock-test/${attempt.mockTestId}`);
+      const testData = await testRes.json();
+      
+      if (testData.success && testData.data.examId) {
+        // Get exam slug from examId
+        const examsRes = await fetch('/api/exams');
+        const examsData = await examsRes.json();
+        
+        if (examsData.success) {
+          const exam = examsData.data.find(e => e.id === testData.data.examId);
+          if (exam) {
+            // Fetch user's rank
+            const rankRes = await fetch(`/api/my-rank/${exam.slug}`);
+            const rankData = await rankRes.json();
+            if (rankData.success && rankData.data.rank) {
+              setRankInfo({
+                ...rankData.data,
+                examName: exam.name,
+                examSlug: exam.slug
+              });
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Failed to fetch rank:', e);
+    }
+  };
+
+  const getRankIcon = (rank) => {
+    if (rank === 1) return <Crown className="w-8 h-8 text-yellow-500" />;
+    if (rank === 2) return <Medal className="w-8 h-8 text-gray-400" />;
+    if (rank === 3) return <Medal className="w-8 h-8 text-amber-600" />;
+    return <Trophy className="w-8 h-8 text-teal-600" />;
+  };
 
   if (loading) {
     return (
