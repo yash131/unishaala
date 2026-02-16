@@ -162,11 +162,11 @@ function HeroSection() {
             </div>
           </div>
           <div className="relative">
-            <div className="bg-teal-100 rounded-3xl p-8">
+            <div className="bg-teal-100 rounded-3xl p-4 overflow-hidden">
               <img 
-                src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600" 
-                alt="Students studying" 
-                className="rounded-2xl shadow-xl w-full"
+                src="https://customer-assets.emergentagent.com/job_7acc3893-d2c4-4511-8e86-2a2521e5fe9d/artifacts/harwama0_banner_%20finsl.png" 
+                alt="UPPSC Full Length Test - Unishaala" 
+                className="rounded-2xl shadow-xl w-full object-cover"
               />
             </div>
             <div className="absolute -bottom-4 -left-4 bg-white rounded-xl shadow-lg p-4">
