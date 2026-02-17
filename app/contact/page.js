@@ -7,9 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Logo } from '@/components/Logo';
+import { MainNavbar } from '@/components/MainNavbar';
 import {
-  GraduationCap,
   Mail,
   Phone,
   MapPin,
@@ -19,26 +18,6 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-function Navbar() {
-  return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          <Logo size="default" showText={false} />
-          <div className="hidden md:flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="outline" className="border-teal-600 text-teal-600">Login</Button>
-            </Link>
-            <Link href="/signup">
-              <Button className="bg-rose-500 hover:bg-rose-600">Sign Up</Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-    </nav>
-  );
-}
 
 export default function ContactPage() {
   const [loading, setLoading] = useState(false);
