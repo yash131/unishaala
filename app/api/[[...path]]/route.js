@@ -1308,7 +1308,12 @@ export async function POST(request) {
 
       const { transactionId, refundAmount } = body;
       const transactions = await getCollection('transactions');
-      const transaction = await transactions.findOne({ transactionId });
+      const transaction = await transactions.findOne({ 
+        $or: [
+          { transactionId },
+          { merchantTxnNo: transactionId }
+        ]
+      });
 
       if (!transaction) {
         return jsonResponse({ success: false, error: 'Transaction not found' }, 404);
@@ -1317,21 +1322,29 @@ export async function POST(request) {
       try {
         // Call ICICI Refund API
         const crypto = require('crypto');
-        const refundTxnId = `REF${Date.now()}`;
+        const refundTxnNo = `REF${Date.now()}`;
+        const originalTxnNo = transaction.merchantTxnNo || transaction.transactionId;
         
         const refundData = {
           merchantId: process.env.ICICI_MID,
-          aggregatorId: process.env.ICICI_AGG_ID,
-          command: 'refund',
-          merchantTxnRefNumber: refundTxnId,
-          originalMerchantTxnRefNumber: transactionId,
-          amount: (refundAmount || transaction.amount).toFixed(2)
+          aggregatorID: process.env.ICICI_AGG_ID,
+          merchantTxnNo: refundTxnNo,
+          originalTxnNo: originalTxnNo,
+          amount: (refundAmount || transaction.amount).toFixed(2),
+          transactionType: 'REFUND'
         };
 
-        const refundChecksum = crypto.createHash('sha256')
-          .update(`${refundData.merchantId}|${refundData.originalMerchantTxnRefNumber}|${refundData.amount}|${process.env.ICICI_KEY}`)
+        // Generate secureHash for refund
+        const sortedKeys = Object.keys(refundData).sort();
+        let plainHashText = '';
+        sortedKeys.forEach(key => {
+          plainHashText += refundData[key];
+        });
+        
+        const refundChecksum = crypto.createHmac('sha256', process.env.ICICI_KEY)
+          .update(plainHashText)
           .digest('hex');
-        refundData.checksum = refundChecksum;
+        refundData.secureHash = refundChecksum;
 
         const refundResponse = await fetch(process.env.ICICI_COMMAND_API, {
           method: 'POST',
@@ -1340,14 +1353,15 @@ export async function POST(request) {
         });
 
         const refundResult = await refundResponse.json();
+        const isRefundSuccess = refundResult.responseCode === '000' || refundResult.txnStatus === 'SUC';
 
         // Update transaction
         await transactions.updateOne(
-          { transactionId },
+          { _id: transaction._id },
           {
             $set: {
-              refundStatus: refundResult.txnStatus === 'SUCCESS' ? 'PROCESSED' : 'FAILED',
-              refundTransactionId: refundTxnId,
+              refundStatus: isRefundSuccess ? 'PROCESSED' : 'FAILED',
+              refundTransactionId: refundTxnNo,
               refundAmount: parseFloat(refundAmount || transaction.amount),
               refundResponse: refundResult,
               refundProcessedAt: new Date(),
@@ -1357,7 +1371,8 @@ export async function POST(request) {
         );
 
         return jsonResponse({
-          success: refundResult.txnStatus === 'SUCCESS',
+          success: isRefundSuccess,
+          message: isRefundSuccess ? 'Refund processed successfully' : 'Refund failed',
           data: refundResult
         });
       } catch (error) {
