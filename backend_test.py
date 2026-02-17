@@ -111,28 +111,36 @@ class UnishaalAuthPaymentTest:
             print(f"❌ FAIL: Exception during test - {str(e)}")
             return False
     
-    def test_phone_otp_send(self):
-        """Test 3: Phone OTP Send API"""
-        print("\n=== TEST 3: Phone OTP Send API ===")
+    def test_admin_stats_api(self):
+        """Test 3: Admin Stats API"""
+        print("\n=== TEST 3: Admin Stats API ===")
+        
+        if not self.admin_token:
+            print("❌ FAIL: No admin token available - admin login test must pass first")
+            return False
         
         try:
-            response = self.session.post(f"{API_URL}/auth/send-otp", json={
-                "phone": "+919876543210"
-            })
+            # Use cookie-based auth since that's how the API works
+            response = self.session.get(f"{API_URL}/admin/stats")
             
             print(f"Status Code: {response.status_code}")
             data = response.json()
             print(f"Response: {json.dumps(data, indent=2)}")
             
-            # Accept both success (valid Twilio setup) and error (invalid number for testing)
             if response.status_code == 200 and data.get('success'):
-                print("✅ PASS: OTP send API working - Twilio integration successful")
-                return True
-            elif response.status_code == 400 and 'check phone number' in data.get('error', '').lower():
-                print("✅ PASS: OTP send API working - Expected Twilio error for test number")
-                return True
+                stats_data = data.get('data', {})
+                required_stats = ['totalUsers', 'totalExams', 'totalMockTests', 'totalQuestions', 'totalJobs', 'totalRevenue']
+                has_all_stats = all(stat in stats_data for stat in required_stats)
+                
+                if has_all_stats:
+                    print("✅ PASS: Admin stats API working - returns dashboard stats with all required fields")
+                    return True
+                else:
+                    missing_stats = [stat for stat in required_stats if stat not in stats_data]
+                    print(f"❌ FAIL: Missing stats fields: {missing_stats}")
+                    return False
             else:
-                print(f"❌ FAIL: Unexpected response - {data}")
+                print(f"❌ FAIL: Admin stats API failed - {data.get('error', 'Unknown error')}")
                 return False
                 
         except Exception as e:
