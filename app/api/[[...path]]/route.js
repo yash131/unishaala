@@ -927,10 +927,15 @@ export async function POST(request) {
         return jsonResponse({ success: false, error: 'Invalid amount' }, 400);
       }
 
-      // Generate unique transaction ID - alphanumeric only, max 30 chars as per ICICI docs
+      // Generate unique transaction ID - alphanumeric only (lowercase letters + numbers)
+      // Format: timestamp (last 10 digits) + random alphanumeric (6 chars)
       const timestamp = Date.now().toString().slice(-10);
-      const random = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const merchantTxnNo = `UNI${timestamp}${random}`; // e.g., UNI7329268895ABC123
+      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+      let random = '';
+      for (let i = 0; i < 6; i++) {
+        random += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      const merchantTxnNo = timestamp + random; // e.g., "7329268895abc123" (16 chars)
 
       // Get exam/test details
       let itemName = 'Test Purchase';
