@@ -1026,7 +1026,7 @@ export async function POST(request) {
       // Build request payload
       const paymentData = {
         merchantId: merchantId,
-        aggregatorID: process.env.ICICI_AGG_ID,
+        aggregatorID: aggregatorID,
         merchantTxnNo: merchantTxnNo,
         amount: amountStr,
         currencyCode: currencyCode,
