@@ -62,6 +62,7 @@ function AdminSidebar({ activeTab, setActiveTab }) {
     { id: 'exams', label: 'Exams', icon: <GraduationCap className="w-5 h-5" /> },
     { id: 'tests', label: 'Tests', icon: <ClipboardList className="w-5 h-5" /> },
     { id: 'questions', label: 'Questions', icon: <BookOpen className="w-5 h-5" /> },
+    { id: 'transactions', label: 'Transactions', icon: <CreditCard className="w-5 h-5" /> },
     { id: 'jobs', label: 'Jobs', icon: <Briefcase className="w-5 h-5" /> },
     { id: 'colleges', label: 'Colleges', icon: <Building className="w-5 h-5" /> },
     { id: 'users', label: 'Users', icon: <Users className="w-5 h-5" /> },
