@@ -927,8 +927,10 @@ export async function POST(request) {
         return jsonResponse({ success: false, error: 'Invalid amount' }, 400);
       }
 
-      // Generate unique transaction ID
-      const merchantTxnNo = `TXN${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+      // Generate unique transaction ID - alphanumeric only, max 30 chars as per ICICI docs
+      const timestamp = Date.now().toString().slice(-10);
+      const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const merchantTxnNo = `UNI${timestamp}${random}`; // e.g., UNI7329268895ABC123
 
       // Get exam/test details
       let itemName = 'Test Purchase';
