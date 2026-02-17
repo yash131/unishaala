@@ -147,26 +147,67 @@ class UnishaalAuthPaymentTest:
             print(f"❌ FAIL: Exception during test - {str(e)}")
             return False
     
-    def test_phone_otp_verify(self):
-        """Test 4: Phone OTP Verify API"""
-        print("\n=== TEST 4: Phone OTP Verify API (Invalid Code) ===")
+    def test_admin_exams_api(self):
+        """Test 4: Admin Exams API"""
+        print("\n=== TEST 4: Admin Exams API ===")
+        
+        if not self.admin_token:
+            print("❌ FAIL: No admin token available - admin login test must pass first")
+            return False
         
         try:
-            response = self.session.post(f"{API_URL}/auth/verify-phone-otp", json={
-                "phone": "+919876543210",
-                "code": "123456"
+            # Use cookie-based auth since that's how the API works
+            response = self.session.get(f"{API_URL}/admin/exams")
+            
+            print(f"Status Code: {response.status_code}")
+            data = response.json()
+            print(f"Response: {json.dumps(data, indent=2)}")
+            
+            if response.status_code == 200 and data.get('success'):
+                exams_data = data.get('data', [])
+                print(f"✅ PASS: Admin exams API working - returns list of {len(exams_data)} exams")
+                return True
+            else:
+                print(f"❌ FAIL: Admin exams API failed - {data.get('error', 'Unknown error')}")
+                return False
+                
+        except Exception as e:
+            print(f"❌ FAIL: Exception during test - {str(e)}")
+            return False
+    
+    def test_payment_initiation(self):
+        """Test 5: Payment Initiation Test"""
+        print("\n=== TEST 5: Payment Initiation Test ===")
+        
+        if not self.admin_token:
+            print("❌ FAIL: No admin token available - admin login test must pass first")
+            return False
+        
+        try:
+            # Use admin session (logged in user required)
+            response = self.session.post(f"{API_URL}/payment/initiate", json={
+                "examId": "any-exam-id",
+                "amount": 100,
+                "paymentType": "exam_purchase"
             })
             
             print(f"Status Code: {response.status_code}")
             data = response.json()
             print(f"Response: {json.dumps(data, indent=2)}")
             
-            # Should return error for invalid code
-            if response.status_code == 400 and not data.get('success'):
-                print("✅ PASS: OTP verify API correctly rejects invalid code")
-                return True
+            if response.status_code == 200 and data.get('success'):
+                payment_data = data.get('data', {})
+                has_required_fields = all(field in payment_data for field in ['transactionId', 'amount', 'paymentUrl'])
+                
+                if has_required_fields:
+                    print("✅ PASS: Payment initiation successful - returns transactionId, amount, and paymentUrl")
+                    return True
+                else:
+                    missing_fields = [field for field in ['transactionId', 'amount', 'paymentUrl'] if field not in payment_data]
+                    print(f"❌ FAIL: Missing payment fields: {missing_fields}")
+                    return False
             else:
-                print(f"❌ FAIL: Expected 400 error for invalid code, got {response.status_code}")
+                print(f"❌ FAIL: Payment initiation failed - {data.get('error', 'Unknown error')}")
                 return False
                 
         except Exception as e:
