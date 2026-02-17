@@ -35,7 +35,7 @@ export default function AboutPage() {
 
   return (
     <div className="min-h-screen bg-white">
-      <Navbar />
+      <MainNavbar />
 
       {/* Hero Section */}
       <div className="pt-20 bg-gradient-to-b from-teal-50 to-white">
