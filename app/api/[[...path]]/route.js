@@ -910,6 +910,407 @@ export async function POST(request) {
       return jsonResponse({ success: true, message: 'Message sent successfully' });
     }
 
+    // ============================================
+    // ICICI Orange PG Payment Gateway Integration
+    // ============================================
+
+    // Initiate Payment - ICICI Orange PG
+    if (path === '/payment/initiate') {
+      const user = await getAuthUser(request);
+      if (!user) {
+        return jsonResponse({ success: false, error: 'Please login to make payment' }, 401);
+      }
+
+      const { examId, mockTestId, amount, paymentType } = body;
+      
+      if (!amount || amount <= 0) {
+        return jsonResponse({ success: false, error: 'Invalid amount' }, 400);
+      }
+
+      // Generate unique transaction ID
+      const transactionId = `TXN${Date.now()}${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+      const orderId = `ORD${Date.now()}`;
+
+      // Get exam/test details
+      let itemName = 'Test Purchase';
+      let itemId = mockTestId || examId;
+      
+      if (examId) {
+        const exams = await getCollection('exams');
+        const exam = await exams.findOne({ id: examId });
+        if (exam) itemName = `${exam.name} - Full Access`;
+      } else if (mockTestId) {
+        const mockTests = await getCollection('mock_tests');
+        const test = await mockTests.findOne({ id: mockTestId });
+        if (test) itemName = test.title;
+      }
+
+      // Create transaction record
+      const transactions = await getCollection('transactions');
+      const transaction = {
+        id: uuidv4(),
+        transactionId,
+        orderId,
+        userId: user.id,
+        userName: user.name,
+        userEmail: user.email,
+        userPhone: user.phone || '',
+        examId: examId || null,
+        mockTestId: mockTestId || null,
+        paymentType: paymentType || 'exam_purchase',
+        itemName,
+        amount: parseFloat(amount),
+        currency: 'INR',
+        status: 'PENDING',
+        paymentMethod: null,
+        gatewayResponse: null,
+        iciciTransactionId: null,
+        refundStatus: null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+
+      await transactions.insertOne(transaction);
+
+      // Prepare ICICI Orange PG request
+      const crypto = require('crypto');
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+      
+      // ICICI Orange PG payload
+      const paymentData = {
+        merchantId: process.env.ICICI_MID,
+        aggregatorId: process.env.ICICI_AGG_ID,
+        merchantTxnRefNumber: transactionId,
+        amount: amount.toFixed(2),
+        currencyCode: 'INR',
+        payMode: 'ALL', // All payment modes: CC, DC, NB, UPI, WALLET
+        customerName: user.name,
+        customerMobile: user.phone || '9999999999',
+        customerEmail: user.email,
+        txnDate: new Date().toISOString().split('T')[0].replace(/-/g, ''),
+        successUrl: `${baseUrl}/api/payment/callback`,
+        failUrl: `${baseUrl}/api/payment/callback`,
+        cancelUrl: `${baseUrl}/api/payment/callback`,
+        udf1: user.id,
+        udf2: itemId,
+        udf3: paymentType || 'exam_purchase',
+        udf4: '',
+        udf5: ''
+      };
+
+      // Create checksum/hash
+      const dataToHash = `${paymentData.merchantId}|${paymentData.merchantTxnRefNumber}|${paymentData.amount}|${paymentData.customerEmail}|${paymentData.customerMobile}|${process.env.ICICI_KEY}`;
+      const checksum = crypto.createHash('sha256').update(dataToHash).digest('hex');
+      paymentData.checksum = checksum;
+
+      return jsonResponse({
+        success: true,
+        data: {
+          transactionId,
+          orderId,
+          amount: parseFloat(amount),
+          paymentUrl: process.env.ICICI_SALE_API,
+          paymentData,
+          // For frontend form submission
+          formFields: {
+            ...paymentData,
+            checksum
+          }
+        }
+      });
+    }
+
+    // Payment Callback - Handle ICICI Orange PG Response
+    if (path === '/payment/callback') {
+      const transactions = await getCollection('transactions');
+      
+      // ICICI sends response in body
+      const {
+        merchantTxnRefNumber,
+        iciciTransactionId,
+        txnStatus,
+        txnMsg,
+        amount,
+        payMode,
+        bankTransactionId,
+        udf1, // userId
+        udf2, // itemId (examId or mockTestId)
+        udf3, // paymentType
+        checksum: responseChecksum
+      } = body;
+
+      // Find transaction
+      const transaction = await transactions.findOne({ transactionId: merchantTxnRefNumber });
+      
+      if (!transaction) {
+        return jsonResponse({ success: false, error: 'Transaction not found' }, 404);
+      }
+
+      // Verify checksum (security validation)
+      const crypto = require('crypto');
+      const expectedChecksum = crypto.createHash('sha256')
+        .update(`${merchantTxnRefNumber}|${txnStatus}|${amount}|${process.env.ICICI_KEY}`)
+        .digest('hex');
+
+      // Update transaction status
+      const isSuccess = txnStatus === 'SUCCESS' || txnStatus === 'Ok';
+      const status = isSuccess ? 'SUCCESS' : (txnStatus === 'PENDING' ? 'PENDING' : 'FAILED');
+
+      await transactions.updateOne(
+        { transactionId: merchantTxnRefNumber },
+        {
+          $set: {
+            status,
+            iciciTransactionId: iciciTransactionId || bankTransactionId,
+            paymentMethod: payMode,
+            gatewayResponse: {
+              txnStatus,
+              txnMsg,
+              bankTransactionId,
+              responseAt: new Date()
+            },
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      // Redirect to appropriate page
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+      const redirectUrl = isSuccess 
+        ? `${baseUrl}/payment/success?txn=${merchantTxnRefNumber}`
+        : `${baseUrl}/payment/failed?txn=${merchantTxnRefNumber}&reason=${encodeURIComponent(txnMsg || 'Payment failed')}`;
+
+      return NextResponse.redirect(redirectUrl);
+    }
+
+    // Check Payment Status
+    if (path === '/payment/status') {
+      const user = await getAuthUser(request);
+      const { transactionId } = body;
+
+      const transactions = await getCollection('transactions');
+      const transaction = await transactions.findOne({ transactionId });
+
+      if (!transaction) {
+        return jsonResponse({ success: false, error: 'Transaction not found' }, 404);
+      }
+
+      // If user is checking their own transaction or admin
+      if (transaction.userId !== user?.id && user?.role !== 'SUPER_ADMIN' && user?.role !== 'ADMIN') {
+        return jsonResponse({ success: false, error: 'Unauthorized' }, 403);
+      }
+
+      return jsonResponse({
+        success: true,
+        data: {
+          transactionId: transaction.transactionId,
+          orderId: transaction.orderId,
+          status: transaction.status,
+          amount: transaction.amount,
+          itemName: transaction.itemName,
+          paymentMethod: transaction.paymentMethod,
+          createdAt: transaction.createdAt
+        }
+      });
+    }
+
+    // Verify Payment (for exam access check)
+    if (path === '/payment/verify-access') {
+      const user = await getAuthUser(request);
+      if (!user) {
+        return jsonResponse({ success: false, error: 'Please login' }, 401);
+      }
+
+      const { examId, mockTestId } = body;
+      const transactions = await getCollection('transactions');
+
+      // Check for successful payment
+      const query = {
+        userId: user.id,
+        status: 'SUCCESS'
+      };
+
+      if (examId) {
+        query.examId = examId;
+      } else if (mockTestId) {
+        query.$or = [
+          { mockTestId },
+          { examId: { $exists: true, $ne: null } } // Check if exam purchase covers this test
+        ];
+      }
+
+      const hasPurchased = await transactions.findOne(query);
+
+      // If exam purchase, also check if mockTestId belongs to that exam
+      if (!hasPurchased && mockTestId) {
+        const mockTests = await getCollection('mock_tests');
+        const test = await mockTests.findOne({ id: mockTestId });
+        if (test?.examId) {
+          const examPurchase = await transactions.findOne({
+            userId: user.id,
+            examId: test.examId,
+            status: 'SUCCESS'
+          });
+          if (examPurchase) {
+            return jsonResponse({ success: true, data: { hasAccess: true, purchaseType: 'exam' } });
+          }
+        }
+      }
+
+      return jsonResponse({
+        success: true,
+        data: {
+          hasAccess: !!hasPurchased,
+          purchaseType: hasPurchased?.examId ? 'exam' : (hasPurchased?.mockTestId ? 'test' : null)
+        }
+      });
+    }
+
+    // Request Refund
+    if (path === '/payment/refund') {
+      const user = await getAuthUser(request);
+      if (!user) {
+        return jsonResponse({ success: false, error: 'Please login' }, 401);
+      }
+
+      const { transactionId, reason } = body;
+      const transactions = await getCollection('transactions');
+      const transaction = await transactions.findOne({ transactionId, userId: user.id });
+
+      if (!transaction) {
+        return jsonResponse({ success: false, error: 'Transaction not found' }, 404);
+      }
+
+      if (transaction.status !== 'SUCCESS') {
+        return jsonResponse({ success: false, error: 'Only successful payments can be refunded' }, 400);
+      }
+
+      if (transaction.refundStatus === 'REQUESTED' || transaction.refundStatus === 'PROCESSED') {
+        return jsonResponse({ success: false, error: 'Refund already requested' }, 400);
+      }
+
+      // Update with refund request
+      await transactions.updateOne(
+        { transactionId },
+        {
+          $set: {
+            refundStatus: 'REQUESTED',
+            refundReason: reason,
+            refundRequestedAt: new Date(),
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      return jsonResponse({
+        success: true,
+        message: 'Refund request submitted. We will process it within 5-7 business days.'
+      });
+    }
+
+    // Admin: Process Refund via ICICI API
+    if (path === '/admin/payment/process-refund') {
+      const user = await getAuthUser(request);
+      if (!user || (user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN')) {
+        return jsonResponse({ success: false, error: 'Unauthorized' }, 403);
+      }
+
+      const { transactionId, refundAmount } = body;
+      const transactions = await getCollection('transactions');
+      const transaction = await transactions.findOne({ transactionId });
+
+      if (!transaction) {
+        return jsonResponse({ success: false, error: 'Transaction not found' }, 404);
+      }
+
+      try {
+        // Call ICICI Refund API
+        const crypto = require('crypto');
+        const refundTxnId = `REF${Date.now()}`;
+        
+        const refundData = {
+          merchantId: process.env.ICICI_MID,
+          aggregatorId: process.env.ICICI_AGG_ID,
+          command: 'refund',
+          merchantTxnRefNumber: refundTxnId,
+          originalMerchantTxnRefNumber: transactionId,
+          amount: (refundAmount || transaction.amount).toFixed(2)
+        };
+
+        const refundChecksum = crypto.createHash('sha256')
+          .update(`${refundData.merchantId}|${refundData.originalMerchantTxnRefNumber}|${refundData.amount}|${process.env.ICICI_KEY}`)
+          .digest('hex');
+        refundData.checksum = refundChecksum;
+
+        const refundResponse = await fetch(process.env.ICICI_COMMAND_API, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(refundData)
+        });
+
+        const refundResult = await refundResponse.json();
+
+        // Update transaction
+        await transactions.updateOne(
+          { transactionId },
+          {
+            $set: {
+              refundStatus: refundResult.txnStatus === 'SUCCESS' ? 'PROCESSED' : 'FAILED',
+              refundTransactionId: refundTxnId,
+              refundAmount: parseFloat(refundAmount || transaction.amount),
+              refundResponse: refundResult,
+              refundProcessedAt: new Date(),
+              updatedAt: new Date()
+            }
+          }
+        );
+
+        return jsonResponse({
+          success: refundResult.txnStatus === 'SUCCESS',
+          data: refundResult
+        });
+      } catch (error) {
+        console.error('Refund error:', error);
+        return jsonResponse({ success: false, error: 'Refund processing failed' }, 500);
+      }
+    }
+
+    // Admin: Get All Transactions
+    if (path === '/admin/transactions') {
+      const user = await getAuthUser(request);
+      if (!user || (user.role !== 'SUPER_ADMIN' && user.role !== 'ADMIN')) {
+        return jsonResponse({ success: false, error: 'Unauthorized' }, 403);
+      }
+
+      const transactions = await getCollection('transactions');
+      const allTransactions = await transactions.find({})
+        .sort({ createdAt: -1 })
+        .limit(500)
+        .toArray();
+
+      // Calculate stats
+      const stats = {
+        total: allTransactions.length,
+        successful: allTransactions.filter(t => t.status === 'SUCCESS').length,
+        failed: allTransactions.filter(t => t.status === 'FAILED').length,
+        pending: allTransactions.filter(t => t.status === 'PENDING').length,
+        totalRevenue: allTransactions
+          .filter(t => t.status === 'SUCCESS')
+          .reduce((sum, t) => sum + (t.amount || 0), 0),
+        refundRequests: allTransactions.filter(t => t.refundStatus === 'REQUESTED').length
+      };
+
+      return jsonResponse({
+        success: true,
+        data: allTransactions,
+        stats
+      });
+    }
+
+    // ============================================
+    // End of Payment Gateway Integration
+    // ============================================
+
     // Start Mock Test
     if (path === '/start-test') {
       const user = await getAuthUser(request);
