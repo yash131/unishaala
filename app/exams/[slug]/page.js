@@ -348,24 +348,11 @@ export default function ExamDetailPage() {
 
       const result = await response.json();
 
-      if (result.success) {
-        // Create and submit form to ICICI Orange PG
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = result.data.paymentUrl;
-        
-        Object.entries(result.data.formFields).forEach(([key, value]) => {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = key;
-          input.value = value;
-          form.appendChild(input);
-        });
-        
-        document.body.appendChild(form);
-        form.submit();
+      if (result.success && result.data.paymentUrl) {
+        // Redirect to ICICI payment page
+        window.location.href = result.data.paymentUrl;
       } else {
-        alert(result.error || 'Failed to initiate payment');
+        alert(result.error || 'Failed to initiate payment. Please try again.');
       }
     } catch (error) {
       console.error('Payment error:', error);
