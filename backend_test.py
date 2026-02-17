@@ -120,9 +120,6 @@ class UnishaalAuthPaymentTest:
             return False
         
         try:
-            # Debug: Check cookies being sent
-            print(f"Cookies in session: {dict(self.session.cookies)}")
-            
             # Use cookie-based auth since that's how the API works
             response = self.session.get(f"{API_URL}/admin/stats")
             
