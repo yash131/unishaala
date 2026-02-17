@@ -249,16 +249,14 @@ class UnishaalAuthPaymentTest:
         # Test 1: Admin Login
         results.append(("Admin Login Test", self.test_admin_login()))
         
-        # Test 2: User Login (create if needed)
-        results.append(("User Login Test (create test user if needed)", self.test_user_signup_and_login()))
-        
-        # Test 3: Admin Stats API
+        # Test 3 & 4: Admin APIs (run immediately after admin login, before user login overwrites cookie)
         results.append(("Admin Stats API", self.test_admin_stats_api()))
-        
-        # Test 4: Admin Exams API
         results.append(("Admin Exams API", self.test_admin_exams_api()))
         
-        # Test 5: Payment Initiation Test
+        # Test 2: User Login (create if needed) - this will overwrite auth_token cookie
+        results.append(("User Login Test (create test user if needed)", self.test_user_signup_and_login()))
+        
+        # Test 5: Payment Initiation Test (user must be logged in)
         results.append(("Payment Initiation Test", self.test_payment_initiation()))
         
         # Test 6: Logout Test
