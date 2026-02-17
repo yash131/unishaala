@@ -55,25 +55,56 @@ class UnishaalAuthPaymentTest:
             print(f"❌ FAIL: Exception during test - {str(e)}")
             return False
     
-    def test_admin_login_old_password(self):
-        """Test 2: Admin Login with Old Password (should FAIL)"""
-        print("\n=== TEST 2: Admin Login with Old Password (should FAIL) ===")
+    def test_user_signup_and_login(self):
+        """Test 2: User Login Test (create test user if needed)"""
+        print("\n=== TEST 2: User Login Test (Create and Login) ===")
+        
+        # First create the test user
+        timestamp = int(time.time())
+        unique_phone = f"+919876{str(timestamp)[-6:]}"  # Use timestamp to avoid duplicates
         
         try:
-            response = self.session.post(f"{API_URL}/auth/login", json={
-                "email": "admin@unishaala.com",
-                "password": "admin123"
+            # Create test user
+            response = self.session.post(f"{API_URL}/auth/signup", json={
+                "name": "Test User",
+                "email": "test@test.com",
+                "phone": unique_phone,
+                "password": "test123",
+                "phoneVerified": True
             })
             
-            print(f"Status Code: {response.status_code}")
-            data = response.json()
-            print(f"Response: {json.dumps(data, indent=2)}")
+            print(f"Signup Status Code: {response.status_code}")
+            signup_data = response.json()
+            print(f"Signup Response: {json.dumps(signup_data, indent=2)}")
             
-            if response.status_code == 401 and data.get('error') == 'Invalid credentials':
-                print("✅ PASS: Old password correctly rejected with 401 'Invalid credentials'")
-                return True
+            # Note: If user already exists, that's fine - continue with login
+            if response.status_code == 400 and "already registered" in signup_data.get('error', ''):
+                print("User already exists, proceeding to login...")
+            elif response.status_code != 200 or not signup_data.get('success'):
+                print(f"⚠️ User creation failed: {signup_data.get('error', 'Unknown error')}")
+            
+            # Now test login
+            login_response = self.session.post(f"{API_URL}/auth/login", json={
+                "email": "test@test.com",
+                "password": "test123"
+            })
+            
+            print(f"Login Status Code: {login_response.status_code}")
+            login_data = login_response.json()
+            print(f"Login Response: {json.dumps(login_data, indent=2)}")
+            
+            if login_response.status_code == 200 and login_data.get('success'):
+                user_data = login_data.get('data', {}).get('user', {})
+                if user_data.get('role') == 'USER':
+                    print("✅ PASS: User login successful with role 'USER'")
+                    self.user_token = login_data.get('data', {}).get('token')
+                    self.test_user_data = user_data
+                    return True
+                else:
+                    print(f"❌ FAIL: Wrong role - expected USER, got {user_data.get('role')}")
+                    return False
             else:
-                print(f"❌ FAIL: Expected 401 'Invalid credentials', got {response.status_code} with error: {data.get('error')}")
+                print(f"❌ FAIL: User login failed - {login_data.get('error', 'Unknown error')}")
                 return False
                 
         except Exception as e:
