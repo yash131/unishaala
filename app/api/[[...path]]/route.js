@@ -1171,7 +1171,12 @@ export async function POST(request) {
       const { transactionId } = body;
 
       const transactions = await getCollection('transactions');
-      const transaction = await transactions.findOne({ transactionId });
+      const transaction = await transactions.findOne({ 
+        $or: [
+          { transactionId },
+          { merchantTxnNo: transactionId }
+        ]
+      });
 
       if (!transaction) {
         return jsonResponse({ success: false, error: 'Transaction not found' }, 404);
@@ -1185,8 +1190,7 @@ export async function POST(request) {
       return jsonResponse({
         success: true,
         data: {
-          transactionId: transaction.transactionId,
-          orderId: transaction.orderId,
+          transactionId: transaction.merchantTxnNo || transaction.transactionId,
           status: transaction.status,
           amount: transaction.amount,
           itemName: transaction.itemName,
