@@ -1261,7 +1261,12 @@ export async function POST(request) {
 
       const { transactionId, reason } = body;
       const transactions = await getCollection('transactions');
-      const transaction = await transactions.findOne({ transactionId, userId: user.id });
+      const transaction = await transactions.findOne({ 
+        $or: [
+          { transactionId, userId: user.id },
+          { merchantTxnNo: transactionId, userId: user.id }
+        ]
+      });
 
       if (!transaction) {
         return jsonResponse({ success: false, error: 'Transaction not found' }, 404);
@@ -1277,7 +1282,7 @@ export async function POST(request) {
 
       // Update with refund request
       await transactions.updateOne(
-        { transactionId },
+        { _id: transaction._id },
         {
           $set: {
             refundStatus: 'REQUESTED',
