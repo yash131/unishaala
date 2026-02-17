@@ -401,7 +401,7 @@ export default function ExamDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
+      <MainNavbar />
 
       {/* Hero Section */}
       <div className="pt-20 bg-gradient-to-b from-teal-50 to-white">
