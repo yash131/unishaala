@@ -324,10 +324,53 @@ export default function ExamDetailPage() {
   };
 
   const handlePayment = async () => {
-    // Mock payment - redirect to test after "payment"
-    setShowUnlockModal(false);
-    alert('Payment feature will be enabled soon. For now, redirecting to test...');
-    window.location.href = `/mock-test/${selectedTest.id}`;
+    // Check if user is logged in
+    const userData = localStorage.getItem('user');
+    if (!userData) {
+      alert('Please login to make payment');
+      window.location.href = '/login';
+      return;
+    }
+
+    try {
+      const amount = selectedTest?.isExamPurchase ? exam.price : selectedTest?.price;
+      
+      const response = await fetch('/api/payment/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          examId: selectedTest?.isExamPurchase ? exam.id : null,
+          mockTestId: selectedTest?.isExamPurchase ? null : selectedTest?.id,
+          amount: amount,
+          paymentType: selectedTest?.isExamPurchase ? 'exam_purchase' : 'test_purchase'
+        })
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Create and submit form to ICICI Orange PG
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = result.data.paymentUrl;
+        
+        Object.entries(result.data.formFields).forEach(([key, value]) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = value;
+          form.appendChild(input);
+        });
+        
+        document.body.appendChild(form);
+        form.submit();
+      } else {
+        alert(result.error || 'Failed to initiate payment');
+      }
+    } catch (error) {
+      console.error('Payment error:', error);
+      alert('Payment initiation failed. Please try again.');
+    }
   };
 
   if (loading) {
