@@ -1008,12 +1008,13 @@ export async function POST(request) {
       const payType = '0'; // 0 = All payment modes
       const returnURL = `${baseUrl}/api/payment/callback`;
       const transactionType = 'SALE';
+      const aggregatorID = process.env.ICICI_AGG_ID;
 
-      // Generate secureHash - EXACT order as per ICICI documentation:
-      // addlParam1 + addlParam2 + amount + currencyCode + customerEmailID + 
+      // Generate secureHash - EXACT order as per ICICI Step Wise Document (alphabetically sorted):
+      // addlParam1 + addlParam2 + aggregatorID + amount + currencyCode + customerEmailID + 
       // customerMobileNo + customerName + merchantId + merchantTxnNo + 
       // payType + returnURL + transactionType + txnDate
-      const hashText = addlParam1 + addlParam2 + amountStr + currencyCode + 
+      const hashText = addlParam1 + addlParam2 + aggregatorID + amountStr + currencyCode + 
         customerEmailID + customerMobileNo + customerName + merchantId + 
         merchantTxnNo + payType + returnURL + transactionType + txnDate;
       
