@@ -7,69 +7,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Logo } from '@/components/Logo';
+import { MainNavbar } from '@/components/MainNavbar';
 import {
-  GraduationCap,
   Search,
-  Menu,
-  X,
   FileText,
   Users,
   ArrowRight,
   Filter
 } from 'lucide-react';
-
-function Navbar() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-
-  const navLinks = [
-    { href: '/', label: 'Home' },
-    { href: '/exams', label: 'Exams' },
-    { href: '/jobs', label: 'Jobs' },
-    { href: '/rank-predictor', label: 'Rank Predictor' },
-    { href: '/about', label: 'About' },
-    { href: '/contact', label: 'Contact' }
-  ];
-
-  return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white shadow-md">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          <Logo size="default" showText={false} />
-
-          <div className="hidden md:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`font-medium transition-colors ${link.href === '/exams' ? 'text-teal-600' : 'text-gray-700 hover:text-teal-600'}`}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-
-          <div className="hidden md:flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="outline" className="border-teal-600 text-teal-600 hover:bg-teal-50">
-                Login
-              </Button>
-            </Link>
-            <Link href="/signup">
-              <Button className="bg-rose-500 hover:bg-rose-600 text-white">
-                Sign Up
-              </Button>
-            </Link>
-          </div>
-
-          <button className="md:hidden p-2" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-        </div>
-      </div>
-    </nav>
-  );
-}
 
 export default function ExamsPage() {
   const [exams, setExams] = useState([]);
