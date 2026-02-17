@@ -182,12 +182,12 @@ class UnishaalAuthPaymentTest:
         """Test 5: Payment Initiation Test"""
         print("\n=== TEST 5: Payment Initiation Test ===")
         
-        if not self.admin_token:
-            print("❌ FAIL: No admin token available - admin login test must pass first")
+        if not self.user_token:
+            print("❌ FAIL: No user token available - user login test must pass first")
             return False
         
         try:
-            # Use admin session (logged in user required)
+            # Use user session (logged in user required, not necessarily admin)
             response = self.session.post(f"{API_URL}/payment/initiate", json={
                 "examId": "any-exam-id",
                 "amount": 100,
