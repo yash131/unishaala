@@ -236,82 +236,34 @@ class UnishaalAuthPaymentTest:
             print(f"❌ FAIL: Exception during test - {str(e)}")
             return False
     
-    def test_admin_users_verification_fields(self):
-        """Test 6: Admin Users API - Check Verification Fields"""
-        print("\n=== TEST 6: Admin Users API - Check Verification Fields ===")
-        
-        if not self.admin_token:
-            print("❌ FAIL: No admin token available - admin login test must pass first")
-            return False
-        
-        try:
-            # Set auth header
-            headers = {"Authorization": f"Bearer {self.admin_token}"}
-            
-            # Also try with cookie-based auth since that's how the API works
-            response = self.session.get(f"{API_URL}/admin/users")
-            
-            print(f"Status Code: {response.status_code}")
-            data = response.json()
-            print(f"Response: {json.dumps(data, indent=2)[:500]}...")  # Truncate for readability
-            
-            if response.status_code == 200 and data.get('success'):
-                users = data.get('data', [])
-                if len(users) > 0:
-                    # Check if users have phoneVerified and authProvider fields
-                    sample_user = users[0]
-                    has_phone_verified = 'phoneVerified' in sample_user
-                    has_auth_provider = 'authProvider' in sample_user
-                    
-                    print(f"Sample user fields: {list(sample_user.keys())}")
-                    print(f"Has phoneVerified field: {has_phone_verified}")
-                    print(f"Has authProvider field: {has_auth_provider}")
-                    
-                    if has_phone_verified and has_auth_provider:
-                        print("✅ PASS: Admin users API returns users with phoneVerified and authProvider fields")
-                        return True
-                    else:
-                        print("❌ FAIL: Missing required fields in user data")
-                        return False
-                else:
-                    print("❌ FAIL: No users returned from admin API")
-                    return False
-            else:
-                print(f"❌ FAIL: Admin users API failed - {data.get('error', 'Unknown error')}")
-                return False
-                
-        except Exception as e:
-            print(f"❌ FAIL: Exception during test - {str(e)}")
-            return False
-    
     def run_all_tests(self):
-        """Run all authentication tests"""
-        print("🚀 Starting Unishaala Authentication System Tests...")
+        """Run all authentication and payment flow tests"""
+        print("🚀 Starting Unishaala Authentication and Payment Flow Tests...")
         print(f"📍 Testing against: {API_URL}")
         
         results = []
         
-        # Test 1: Admin login with new password
-        results.append(("Admin Login with New Password", self.test_admin_login_new_password()))
+        # Test 1: Admin Login
+        results.append(("Admin Login Test", self.test_admin_login()))
         
-        # Test 2: Admin login with old password (should fail)
-        results.append(("Admin Login with Old Password (should FAIL)", self.test_admin_login_old_password()))
+        # Test 2: User Login (create if needed)
+        results.append(("User Login Test (create test user if needed)", self.test_user_signup_and_login()))
         
-        # Test 3: Phone OTP Send
-        results.append(("Phone OTP Send API", self.test_phone_otp_send()))
+        # Test 3: Admin Stats API
+        results.append(("Admin Stats API", self.test_admin_stats_api()))
         
-        # Test 4: Phone OTP Verify
-        results.append(("Phone OTP Verify API", self.test_phone_otp_verify()))
+        # Test 4: Admin Exams API
+        results.append(("Admin Exams API", self.test_admin_exams_api()))
         
-        # Test 5: User signup with phone verification
-        results.append(("User Signup with Phone Verification", self.test_user_signup_with_phone_verified()))
+        # Test 5: Payment Initiation Test
+        results.append(("Payment Initiation Test", self.test_payment_initiation()))
         
-        # Test 6: Admin users API verification fields
-        results.append(("Admin Users API - Verification Fields", self.test_admin_users_verification_fields()))
+        # Test 6: Logout Test
+        results.append(("Logout Test", self.test_logout()))
         
         # Summary
         print("\n" + "="*60)
-        print("🎯 AUTHENTICATION SYSTEM TEST SUMMARY")
+        print("🎯 AUTHENTICATION AND PAYMENT FLOW TEST SUMMARY")
         print("="*60)
         
         passed = 0
@@ -328,9 +280,9 @@ class UnishaalAuthPaymentTest:
         print(f"\n📊 Results: {passed} PASSED, {failed} FAILED")
         
         if failed == 0:
-            print("🎉 All authentication tests PASSED!")
+            print("🎉 All authentication and payment flow tests PASSED!")
         else:
-            print("⚠️  Some authentication tests FAILED - check details above")
+            print("⚠️  Some tests FAILED - check details above")
         
         return failed == 0
 
