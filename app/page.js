@@ -464,7 +464,7 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen">
-      <Navbar />
+      <MainNavbar />
       <HeroSection />
       <ExamNotifications notifications={data.notifications} />
       <PopularExams exams={data.exams} />
