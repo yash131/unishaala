@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get base URL from environment
-BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://edu-platform-demo-3.preview.emergentagent.com')
+BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://unishaala-preview.preview.emergentagent.com')
 API_URL = f"{BASE_URL}/api"
 
 class UnishaalAuthPaymentTest:
