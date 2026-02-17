@@ -928,8 +928,7 @@ export async function POST(request) {
       }
 
       // Generate unique transaction ID
-      const transactionId = `TXN${Date.now()}${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-      const orderId = `ORD${Date.now()}`;
+      const merchantTxnNo = `TXN${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
 
       // Get exam/test details
       let itemName = 'Test Purchase';
@@ -949,8 +948,8 @@ export async function POST(request) {
       const transactions = await getCollection('transactions');
       const transaction = {
         id: uuidv4(),
-        transactionId,
-        orderId,
+        transactionId: merchantTxnNo,
+        merchantTxnNo,
         userId: user.id,
         userName: user.name,
         userEmail: user.email,
@@ -972,103 +971,186 @@ export async function POST(request) {
 
       await transactions.insertOne(transaction);
 
-      // Prepare ICICI Orange PG request
+      // Prepare ICICI Orange PG request - JSON format as per documentation
       const crypto = require('crypto');
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
       
-      // ICICI Orange PG payload
+      // Format date as YYYYMMDDHHMMSS
+      const now = new Date();
+      const txnDate = now.getFullYear().toString() +
+        String(now.getMonth() + 1).padStart(2, '0') +
+        String(now.getDate()).padStart(2, '0') +
+        String(now.getHours()).padStart(2, '0') +
+        String(now.getMinutes()).padStart(2, '0') +
+        String(now.getSeconds()).padStart(2, '0');
+
+      // Format phone number - remove + and ensure 91 prefix
+      let phoneNumber = (user.phone || '9999999999').replace(/\+/g, '');
+      if (!phoneNumber.startsWith('91') && phoneNumber.length === 10) {
+        phoneNumber = '91' + phoneNumber;
+      }
+
+      // ICICI Orange PG payload - exactly as per documentation
       const paymentData = {
         merchantId: process.env.ICICI_MID,
-        aggregatorId: process.env.ICICI_AGG_ID,
-        merchantTxnRefNumber: transactionId,
-        amount: amount.toFixed(2),
-        currencyCode: 'INR',
-        payMode: 'ALL', // All payment modes: CC, DC, NB, UPI, WALLET
+        aggregatorID: process.env.ICICI_AGG_ID,
+        merchantTxnNo: merchantTxnNo,
+        amount: parseFloat(amount).toFixed(2),
+        currencyCode: '356', // INR numeric code
+        payType: '0', // All payment modes
+        customerEmailID: user.email,
+        transactionType: 'SALE',
+        returnURL: `${baseUrl}/api/payment/callback`,
+        txnDate: txnDate,
+        customerMobileNo: phoneNumber,
         customerName: user.name,
-        customerMobile: user.phone || '9999999999',
-        customerEmail: user.email,
-        txnDate: new Date().toISOString().split('T')[0].replace(/-/g, ''),
-        successUrl: `${baseUrl}/api/payment/callback`,
-        failUrl: `${baseUrl}/api/payment/callback`,
-        cancelUrl: `${baseUrl}/api/payment/callback`,
-        udf1: user.id,
-        udf2: itemId,
-        udf3: paymentType || 'exam_purchase',
-        udf4: '',
-        udf5: ''
+        addlParam1: user.id, // Store userId
+        addlParam2: itemId || '' // Store itemId
       };
 
-      // Create checksum/hash
-      const dataToHash = `${paymentData.merchantId}|${paymentData.merchantTxnRefNumber}|${paymentData.amount}|${paymentData.customerEmail}|${paymentData.customerMobile}|${process.env.ICICI_KEY}`;
-      const checksum = crypto.createHash('sha256').update(dataToHash).digest('hex');
-      paymentData.checksum = checksum;
-
-      return jsonResponse({
-        success: true,
-        data: {
-          transactionId,
-          orderId,
-          amount: parseFloat(amount),
-          paymentUrl: process.env.ICICI_SALE_API,
-          paymentData,
-          // For frontend form submission
-          formFields: {
-            ...paymentData,
-            checksum
-          }
-        }
+      // Generate secureHash - as per ICICI documentation
+      // Step 1: Sort keys alphabetically
+      const sortedKeys = Object.keys(paymentData).sort();
+      
+      // Step 2: Concatenate values of sorted keys
+      let plainHashText = '';
+      sortedKeys.forEach(key => {
+        plainHashText += paymentData[key];
       });
+      
+      // Step 3: Generate HMAC-SHA256 hash
+      const secureHash = crypto.createHmac('sha256', process.env.ICICI_KEY)
+        .update(plainHashText)
+        .digest('hex');
+      
+      paymentData.secureHash = secureHash;
+
+      console.log('ICICI Payment Request:', JSON.stringify(paymentData, null, 2));
+      console.log('Plain Hash Text:', plainHashText);
+
+      try {
+        // Make POST request to ICICI initiateSale API
+        const iciciResponse = await fetch(process.env.ICICI_SALE_API, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(paymentData)
+        });
+
+        const iciciResult = await iciciResponse.json();
+        console.log('ICICI Response:', JSON.stringify(iciciResult, null, 2));
+
+        if (iciciResult.responseCode === 'R1000' && iciciResult.redirectURI) {
+          // Success - construct payment URL
+          const paymentUrl = `${iciciResult.redirectURI}?tranCtx=${iciciResult.tranCtx}`;
+          
+          // Update transaction with ICICI response
+          await transactions.updateOne(
+            { merchantTxnNo },
+            {
+              $set: {
+                gatewayResponse: iciciResult,
+                tranCtx: iciciResult.tranCtx,
+                updatedAt: new Date()
+              }
+            }
+          );
+
+          return jsonResponse({
+            success: true,
+            data: {
+              transactionId: merchantTxnNo,
+              amount: parseFloat(amount),
+              paymentUrl: paymentUrl,
+              tranCtx: iciciResult.tranCtx
+            }
+          });
+        } else {
+          // Error from ICICI
+          await transactions.updateOne(
+            { merchantTxnNo },
+            {
+              $set: {
+                status: 'FAILED',
+                gatewayResponse: iciciResult,
+                updatedAt: new Date()
+              }
+            }
+          );
+
+          return jsonResponse({
+            success: false,
+            error: iciciResult.respDescription || 'Payment initiation failed',
+            data: iciciResult
+          }, 400);
+        }
+      } catch (error) {
+        console.error('ICICI API Error:', error);
+        
+        await transactions.updateOne(
+          { merchantTxnNo },
+          {
+            $set: {
+              status: 'FAILED',
+              gatewayResponse: { error: error.message },
+              updatedAt: new Date()
+            }
+          }
+        );
+
+        return jsonResponse({
+          success: false,
+          error: 'Payment gateway connection failed'
+        }, 500);
+      }
     }
 
-    // Payment Callback - Handle ICICI Orange PG Response
+    // Payment Callback - Handle ICICI Orange PG Response (POST from ICICI)
     if (path === '/payment/callback') {
       const transactions = await getCollection('transactions');
       
+      console.log('Payment Callback Body:', JSON.stringify(body, null, 2));
+      
       // ICICI sends response in body
       const {
-        merchantTxnRefNumber,
-        iciciTransactionId,
+        merchantTxnNo,
+        txnID,
         txnStatus,
-        txnMsg,
+        txnResponseCode,
+        txnRespDescription,
         amount,
-        payMode,
-        bankTransactionId,
-        udf1, // userId
-        udf2, // itemId (examId or mockTestId)
-        udf3, // paymentType
-        checksum: responseChecksum
+        paymentMode,
+        txnAuthID,
+        addlParam1, // userId
+        addlParam2, // itemId
+        secureHash: responseSecureHash
       } = body;
 
       // Find transaction
-      const transaction = await transactions.findOne({ transactionId: merchantTxnRefNumber });
+      const transaction = await transactions.findOne({ merchantTxnNo });
       
       if (!transaction) {
-        return jsonResponse({ success: false, error: 'Transaction not found' }, 404);
+        console.error('Transaction not found:', merchantTxnNo);
+        // Redirect to failed page
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+        return NextResponse.redirect(`${baseUrl}/payment/failed?reason=Transaction%20not%20found`);
       }
 
-      // Verify checksum (security validation)
-      const crypto = require('crypto');
-      const expectedChecksum = crypto.createHash('sha256')
-        .update(`${merchantTxnRefNumber}|${txnStatus}|${amount}|${process.env.ICICI_KEY}`)
-        .digest('hex');
+      // Determine status
+      const isSuccess = txnStatus === 'SUC' || txnResponseCode === '0000';
+      const status = isSuccess ? 'SUCCESS' : (txnStatus === 'PEN' ? 'PENDING' : 'FAILED');
 
       // Update transaction status
-      const isSuccess = txnStatus === 'SUCCESS' || txnStatus === 'Ok';
-      const status = isSuccess ? 'SUCCESS' : (txnStatus === 'PENDING' ? 'PENDING' : 'FAILED');
-
       await transactions.updateOne(
-        { transactionId: merchantTxnRefNumber },
+        { merchantTxnNo },
         {
           $set: {
             status,
-            iciciTransactionId: iciciTransactionId || bankTransactionId,
-            paymentMethod: payMode,
-            gatewayResponse: {
-              txnStatus,
-              txnMsg,
-              bankTransactionId,
-              responseAt: new Date()
-            },
+            iciciTransactionId: txnID,
+            txnAuthID,
+            paymentMethod: paymentMode,
+            gatewayResponse: body,
             updatedAt: new Date()
           }
         }
@@ -1077,8 +1159,8 @@ export async function POST(request) {
       // Redirect to appropriate page
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
       const redirectUrl = isSuccess 
-        ? `${baseUrl}/payment/success?txn=${merchantTxnRefNumber}`
-        : `${baseUrl}/payment/failed?txn=${merchantTxnRefNumber}&reason=${encodeURIComponent(txnMsg || 'Payment failed')}`;
+        ? `${baseUrl}/payment/success?txn=${merchantTxnNo}`
+        : `${baseUrl}/payment/failed?txn=${merchantTxnNo}&reason=${encodeURIComponent(txnRespDescription || 'Payment failed')}`;
 
       return NextResponse.redirect(redirectUrl);
     }
