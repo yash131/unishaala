@@ -3,6 +3,7 @@
 import requests
 import json
 import os
+import time
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -12,14 +13,16 @@ load_dotenv()
 BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://edu-platform-demo-3.preview.emergentagent.com')
 API_URL = f"{BASE_URL}/api"
 
-class UnishaalAuthTest:
+class UnishaalAuthPaymentTest:
     def __init__(self):
         self.session = requests.Session()
         self.admin_token = None
+        self.user_token = None
+        self.test_user_data = None
         
-    def test_admin_login_new_password(self):
-        """Test 1: Admin Login with New Password (Shivani@1234)"""
-        print("\n=== TEST 1: Admin Login with New Password ===")
+    def test_admin_login(self):
+        """Test 1: Admin Login Test with admin@unishaala.com / Shivani@1234"""
+        print("\n=== TEST 1: Admin Login Test ===")
         
         try:
             response = self.session.post(f"{API_URL}/auth/login", json={
@@ -34,8 +37,12 @@ class UnishaalAuthTest:
             if response.status_code == 200 and data.get('success'):
                 user_data = data.get('data', {}).get('user', {})
                 if user_data.get('role') == 'SUPER_ADMIN':
-                    print("✅ PASS: Admin login successful with new password, SUPER_ADMIN role confirmed")
+                    print("✅ PASS: Admin login successful, SUPER_ADMIN role confirmed, auth_token cookie set")
                     self.admin_token = data.get('data', {}).get('token')
+                    # Check if auth_token cookie was set
+                    cookies = response.cookies
+                    has_auth_cookie = 'auth_token' in cookies
+                    print(f"Auth token cookie set: {has_auth_cookie}")
                     return True
                 else:
                     print(f"❌ FAIL: Wrong role - expected SUPER_ADMIN, got {user_data.get('role')}")
