@@ -72,7 +72,7 @@ export default function JobsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
+      <MainNavbar />
       
       <div className="pt-20 pb-12 bg-gradient-to-b from-teal-50 to-white">
         <div className="container mx-auto px-4">
