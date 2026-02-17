@@ -45,6 +45,29 @@ function Navbar() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Check for logged-in user
+  const [user, setUser] = useState(null);
+  
+  useEffect(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        localStorage.removeItem('user');
+      }
+    }
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (e) {}
+    localStorage.removeItem('user');
+    setUser(null);
+    window.location.href = '/';
+  };
+
   const navLinks = [
     { href: '/', label: 'Home' },
     { href: '/exams', label: 'Exams' },
@@ -73,16 +96,38 @@ function Navbar() {
           </div>
 
           <div className="hidden md:flex items-center gap-4">
-            <Link href="/login">
-              <Button variant="outline" className="border-teal-600 text-teal-600 hover:bg-teal-50">
-                Login
-              </Button>
-            </Link>
-            <Link href="/signup">
-              <Button className="bg-rose-500 hover:bg-rose-600 text-white">
-                Sign Up
-              </Button>
-            </Link>
+            {user ? (
+              <>
+                <span className="text-gray-600">Hi, {user.name?.split(' ')[0]}</span>
+                {(user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') && (
+                  <Link href="/admin">
+                    <Button variant="outline" className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                      Admin Panel
+                    </Button>
+                  </Link>
+                )}
+                <Button 
+                  variant="ghost" 
+                  className="text-gray-600 hover:text-red-600"
+                  onClick={handleLogout}
+                >
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="outline" className="border-teal-600 text-teal-600 hover:bg-teal-50">
+                    Login
+                  </Button>
+                </Link>
+                <Link href="/signup">
+                  <Button className="bg-rose-500 hover:bg-rose-600 text-white">
+                    Sign Up
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
 
           <button 
@@ -106,12 +151,25 @@ function Navbar() {
               </Link>
             ))}
             <div className="flex gap-2 mt-4">
-              <Link href="/login" className="flex-1">
-                <Button variant="outline" className="w-full border-teal-600 text-teal-600">Login</Button>
-              </Link>
-              <Link href="/signup" className="flex-1">
-                <Button className="w-full bg-rose-500 hover:bg-rose-600">Sign Up</Button>
-              </Link>
+              {user ? (
+                <>
+                  {(user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') && (
+                    <Link href="/admin" className="flex-1">
+                      <Button variant="outline" className="w-full border-teal-600 text-teal-600">Admin</Button>
+                    </Link>
+                  )}
+                  <Button className="flex-1 bg-gray-200 text-gray-700" onClick={handleLogout}>Logout</Button>
+                </>
+              ) : (
+                <>
+                  <Link href="/login" className="flex-1">
+                    <Button variant="outline" className="w-full border-teal-600 text-teal-600">Login</Button>
+                  </Link>
+                  <Link href="/signup" className="flex-1">
+                    <Button className="w-full bg-rose-500 hover:bg-rose-600">Sign Up</Button>
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         )}
