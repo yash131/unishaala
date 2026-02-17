@@ -927,15 +927,10 @@ export async function POST(request) {
         return jsonResponse({ success: false, error: 'Invalid amount' }, 400);
       }
 
-      // Generate unique transaction ID - alphanumeric only (lowercase letters + numbers)
-      // Format: timestamp (last 10 digits) + random alphanumeric (6 chars)
-      const timestamp = Date.now().toString().slice(-10);
-      const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
-      let random = '';
-      for (let i = 0; i < 6; i++) {
-        random += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      const merchantTxnNo = timestamp + random; // e.g., "7329268895abc123" (16 chars)
+      // Generate unique transaction ID - alphanumeric only (12 digits as per sample)
+      const timestamp = Date.now().toString().slice(-8);
+      const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const merchantTxnNo = timestamp + random; // e.g., "329637391234" (12 chars)
 
       // Get exam/test details
       let itemName = 'Test Purchase';
@@ -978,7 +973,7 @@ export async function POST(request) {
 
       await transactions.insertOne(transaction);
 
-      // Prepare ICICI Orange PG request - JSON format as per documentation
+      // Prepare ICICI Orange PG request
       const crypto = require('crypto');
       const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
       
@@ -991,49 +986,64 @@ export async function POST(request) {
         String(now.getMinutes()).padStart(2, '0') +
         String(now.getSeconds()).padStart(2, '0');
 
-      // Format phone number - remove + and ensure 91 prefix
-      let phoneNumber = (user.phone || '9999999999').replace(/\+/g, '');
-      if (!phoneNumber.startsWith('91') && phoneNumber.length === 10) {
+      // Format phone number - must be in format 91XXXXXXXXXX
+      let phoneNumber = (user.phone || '9999999999').replace(/[^0-9]/g, '');
+      if (phoneNumber.length === 10) {
         phoneNumber = '91' + phoneNumber;
+      } else if (phoneNumber.startsWith('91') && phoneNumber.length === 12) {
+        // Already correct
+      } else {
+        phoneNumber = '919999999999'; // fallback
       }
 
-      // ICICI Orange PG payload - exactly as per documentation
+      // Build payload with exact field names as per ICICI documentation
+      const addlParam1 = '000'; // Additional parameter 1
+      const addlParam2 = itemId || '111'; // Additional parameter 2 - store item ID
+      const amountStr = parseFloat(amount).toFixed(2);
+      const currencyCode = '356';
+      const customerEmailID = user.email;
+      const customerMobileNo = phoneNumber;
+      const customerName = user.name.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 50); // Alphanumeric only
+      const merchantId = process.env.ICICI_MID;
+      const payType = '0'; // 0 = All payment modes
+      const returnURL = `${baseUrl}/api/payment/callback`;
+      const transactionType = 'SALE';
+
+      // Generate secureHash - EXACT order as per ICICI documentation:
+      // addlParam1 + addlParam2 + amount + currencyCode + customerEmailID + 
+      // customerMobileNo + customerName + merchantId + merchantTxnNo + 
+      // payType + returnURL + transactionType + txnDate
+      const hashText = addlParam1 + addlParam2 + amountStr + currencyCode + 
+        customerEmailID + customerMobileNo + customerName + merchantId + 
+        merchantTxnNo + payType + returnURL + transactionType + txnDate;
+      
+      // HMAC-SHA256 with the key
+      const secureHash = crypto.createHmac('sha256', process.env.ICICI_KEY)
+        .update(hashText, 'utf8')
+        .digest('hex');
+
+      // Build request payload
       const paymentData = {
-        merchantId: process.env.ICICI_MID,
+        merchantId: merchantId,
         aggregatorID: process.env.ICICI_AGG_ID,
         merchantTxnNo: merchantTxnNo,
-        amount: parseFloat(amount).toFixed(2),
-        currencyCode: '356', // INR numeric code
-        payType: '0', // All payment modes
-        customerEmailID: user.email,
-        transactionType: 'SALE',
-        returnURL: `${baseUrl}/api/payment/callback`,
+        amount: amountStr,
+        currencyCode: currencyCode,
+        payType: payType,
+        customerEmailID: customerEmailID,
+        transactionType: transactionType,
+        returnURL: returnURL,
         txnDate: txnDate,
-        customerMobileNo: phoneNumber,
-        customerName: user.name,
-        addlParam1: user.id, // Store userId
-        addlParam2: itemId || '' // Store itemId
+        customerMobileNo: customerMobileNo,
+        customerName: customerName,
+        addlParam1: addlParam1,
+        addlParam2: addlParam2,
+        secureHash: secureHash
       };
 
-      // Generate secureHash - as per ICICI documentation
-      // Step 1: Sort keys alphabetically
-      const sortedKeys = Object.keys(paymentData).sort();
-      
-      // Step 2: Concatenate values of sorted keys
-      let plainHashText = '';
-      sortedKeys.forEach(key => {
-        plainHashText += paymentData[key];
-      });
-      
-      // Step 3: Generate HMAC-SHA256 hash
-      const secureHash = crypto.createHmac('sha256', process.env.ICICI_KEY)
-        .update(plainHashText)
-        .digest('hex');
-      
-      paymentData.secureHash = secureHash;
-
       console.log('ICICI Payment Request:', JSON.stringify(paymentData, null, 2));
-      console.log('Plain Hash Text:', plainHashText);
+      console.log('HashText:', hashText);
+      console.log('SecureHash:', secureHash);
 
       try {
         // Make POST request to ICICI initiateSale API
@@ -1088,7 +1098,7 @@ export async function POST(request) {
 
           return jsonResponse({
             success: false,
-            error: iciciResult.respDescription || 'Payment initiation failed',
+            error: iciciResult.respDescription || iciciResult.errorMsg || 'Payment initiation failed',
             data: iciciResult
           }, 400);
         }
