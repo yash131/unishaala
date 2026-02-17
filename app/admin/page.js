@@ -1257,6 +1257,265 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
   );
 }
 
+// Transactions Tab - ICICI Orange PG Payments
+function TransactionsTab() {
+  const [transactions, setTransactions] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [processingRefund, setProcessingRefund] = useState(null);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+
+  const fetchTransactions = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTransactions(data.data);
+        setStats(data.stats);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+    setLoading(false);
+  };
+
+  const processRefund = async (transactionId) => {
+    if (!confirm('Are you sure you want to process this refund?')) return;
+    setProcessingRefund(transactionId);
+    try {
+      const res = await fetch('/api/admin/payment/process-refund', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionId })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Refund processed successfully');
+        fetchTransactions();
+      } else {
+        toast.error(data.error || 'Refund failed');
+      }
+    } catch (e) {
+      toast.error('Failed to process refund');
+    }
+    setProcessingRefund(null);
+  };
+
+  const filtered = transactions.filter(t => {
+    const matchesSearch = 
+      t.transactionId?.toLowerCase().includes(search.toLowerCase()) ||
+      t.userName?.toLowerCase().includes(search.toLowerCase()) ||
+      t.userEmail?.toLowerCase().includes(search.toLowerCase()) ||
+      t.itemName?.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = !filterStatus || t.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'SUCCESS':
+        return <Badge className="bg-green-500">Success</Badge>;
+      case 'FAILED':
+        return <Badge className="bg-red-500">Failed</Badge>;
+      case 'PENDING':
+        return <Badge className="bg-yellow-500">Pending</Badge>;
+      default:
+        return <Badge className="bg-gray-500">{status}</Badge>;
+    }
+  };
+
+  const getRefundBadge = (refundStatus) => {
+    if (!refundStatus) return null;
+    switch (refundStatus) {
+      case 'REQUESTED':
+        return <Badge className="bg-orange-500">Refund Requested</Badge>;
+      case 'PROCESSED':
+        return <Badge className="bg-blue-500">Refunded</Badge>;
+      case 'FAILED':
+        return <Badge className="bg-red-500">Refund Failed</Badge>;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Transactions (ICICI Orange PG)</h2>
+        <Button onClick={fetchTransactions} variant="outline">
+          Refresh
+        </Button>
+      </div>
+
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          <Card className="bg-blue-50">
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-bold text-blue-600">{stats.total}</p>
+              <p className="text-sm text-gray-600">Total</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-green-50">
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-bold text-green-600">{stats.successful}</p>
+              <p className="text-sm text-gray-600">Successful</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-red-50">
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-bold text-red-600">{stats.failed}</p>
+              <p className="text-sm text-gray-600">Failed</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-yellow-50">
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+              <p className="text-sm text-gray-600">Pending</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-teal-50">
+            <CardContent className="p-4 text-center">
+              <p className="text-2xl font-bold text-teal-600">₹{stats.totalRevenue?.toLocaleString()}</p>
+              <p className="text-sm text-gray-600">Revenue</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Refund Requests Alert */}
+      {stats?.refundRequests > 0 && (
+        <Card className="mb-6 bg-orange-50 border-orange-200">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5 text-orange-600" />
+              <span className="text-orange-800 font-medium">
+                {stats.refundRequests} refund request(s) pending
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Filters */}
+      <div className="flex gap-4 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input 
+            placeholder="Search by ID, name, email..." 
+            className="pl-10" 
+            value={search} 
+            onChange={e => setSearch(e.target.value)} 
+          />
+        </div>
+        <Select value={filterStatus || "all"} onValueChange={v => setFilterStatus(v === "all" ? "" : v)}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="All Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="SUCCESS">Success</SelectItem>
+            <SelectItem value="FAILED">Failed</SelectItem>
+            <SelectItem value="PENDING">Pending</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Transactions Table */}
+      <Card>
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Transaction ID</TableHead>
+                <TableHead>User</TableHead>
+                <TableHead>Item</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Payment Method</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Date</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map(txn => (
+                <TableRow key={txn.id}>
+                  <TableCell>
+                    <div className="font-mono text-xs">{txn.transactionId}</div>
+                    {txn.iciciTransactionId && (
+                      <div className="text-xs text-gray-400">ICICI: {txn.iciciTransactionId}</div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="font-medium">{txn.userName}</div>
+                    <div className="text-xs text-gray-500">{txn.userEmail}</div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="max-w-xs truncate">{txn.itemName}</div>
+                    <div className="text-xs text-gray-400">{txn.paymentType}</div>
+                  </TableCell>
+                  <TableCell className="font-bold">₹{txn.amount}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{txn.paymentMethod || '-'}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-1">
+                      {getStatusBadge(txn.status)}
+                      {getRefundBadge(txn.refundStatus)}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="text-sm">{new Date(txn.createdAt).toLocaleDateString()}</div>
+                    <div className="text-xs text-gray-400">{new Date(txn.createdAt).toLocaleTimeString()}</div>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {txn.refundStatus === 'REQUESTED' && (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="text-orange-600 border-orange-600"
+                        onClick={() => processRefund(txn.transactionId)}
+                        disabled={processingRefund === txn.transactionId}
+                      >
+                        {processingRefund === txn.transactionId ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          'Process Refund'
+                        )}
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filtered.length === 0 && (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                    No transactions found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // Simple CRUD Table
 function CRUDTable({ title, data, columns, onDelete, loading }) {
   const [search, setSearch] = useState('');
