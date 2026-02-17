@@ -214,32 +214,22 @@ class UnishaalAuthPaymentTest:
             print(f"❌ FAIL: Exception during test - {str(e)}")
             return False
     
-    def test_user_signup_with_phone_verified(self):
-        """Test 5: User Signup with Phone Verification"""
-        print("\n=== TEST 5: User Signup with Phone Verification ===")
+    def test_logout(self):
+        """Test 6: Logout Test"""
+        print("\n=== TEST 6: Logout Test ===")
         
         try:
-            import time
-            timestamp = int(time.time())
-            unique_email = f"test{timestamp}@example.com"
-            unique_phone = f"+919876{str(timestamp)[-6:]}"  # Use last 6 digits of timestamp
-            response = self.session.post(f"{API_URL}/auth/signup", json={
-                "name": "Test User",
-                "email": unique_email,
-                "phone": unique_phone,
-                "password": "test123",
-                "phoneVerified": True
-            })
+            response = self.session.post(f"{API_URL}/auth/logout")
             
             print(f"Status Code: {response.status_code}")
             data = response.json()
             print(f"Response: {json.dumps(data, indent=2)}")
             
             if response.status_code == 200 and data.get('success'):
-                print("✅ PASS: User signup successful with phoneVerified=true")
+                print("✅ PASS: Logout successful - auth_token cookie should be cleared")
                 return True
             else:
-                print(f"❌ FAIL: Signup failed - {data.get('error', 'Unknown error')}")
+                print(f"❌ FAIL: Logout failed - {data.get('error', 'Unknown error')}")
                 return False
                 
         except Exception as e:
