@@ -1275,10 +1275,47 @@ export async function POST(request) {
           { userId: user.id },
           { sort: { createdAt: -1 } }
         );
-      } else {
-        // Try to get from body if merchantTxnNo is provided
-        if (body.merchantTxnNo) {
-          transaction = await transactions.findOne({ merchantTxnNo: body.merchantTxnNo });
+      }
+      
+      // Also try to get from body if merchantTxnNo is provided
+      if (!transaction && body.merchantTxnNo) {
+        transaction = await transactions.findOne({ merchantTxnNo: body.merchantTxnNo });
+        
+        // If not found locally but we have a txn ID, check with ICICI directly
+        if (!transaction) {
+          console.log(`Transaction ${body.merchantTxnNo} not in local DB, checking ICICI...`);
+          try {
+            const iciciStatus = await checkICICITransactionStatus(body.merchantTxnNo);
+            if (iciciStatus && iciciStatus.payload) {
+              // Create a local record for tracking
+              const newTxn = {
+                id: uuidv4(),
+                merchantTxnNo: body.merchantTxnNo,
+                status: iciciStatus.status,
+                amount: iciciStatus.payload.amount || 0,
+                iciciPayload: iciciStatus.payload,
+                crossEnvironment: true,
+                verifiedWithIcici: true,
+                createdAt: new Date(),
+                completedAt: new Date(),
+                updatedAt: new Date()
+              };
+              await transactions.insertOne(newTxn);
+              
+              return corsJsonResponse({
+                success: true,
+                transaction: {
+                  merchantTxnNo: body.merchantTxnNo,
+                  status: iciciStatus.status,
+                  amount: iciciStatus.payload.amount || 0,
+                  iciciPayload: iciciStatus.payload,
+                  verifiedWithIcici: true
+                }
+              });
+            }
+          } catch (e) {
+            console.error('Error verifying with ICICI:', e);
+          }
         }
       }
 
