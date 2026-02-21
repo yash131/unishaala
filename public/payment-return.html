@@ -237,15 +237,21 @@
       }
 
       let attempts = 0;
+      let pendingTxnNo = paymentData.merchantTxnNo || null;
+      
       async function checkPaymentStatus() {
         attempts++;
         messageEl.textContent = 'Checking payment status... (attempt ' + attempts + '/20)';
         
         try {
+          // Pass merchantTxnNo if available so backend can verify with ICICI directly
+          const requestBody = pendingTxnNo ? { merchantTxnNo: pendingTxnNo } : {};
+          
           const response = await fetch('/api/payment/check-status-by-session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            credentials: 'include'
+            credentials: 'include',
+            body: JSON.stringify(requestBody)
           });
           
           const result = await response.json();
