@@ -51,6 +51,15 @@ async function checkICICITransactionStatus(merchantTxnNo) {
       .update(hashText, 'utf8')
       .digest('hex');
 
+    console.log('ICICI Status Check Request:', {
+      merchantId,
+      aggregatorID,
+      merchantTxnNo,
+      commandType,
+      hashText,
+      secureHash
+    });
+
     const response = await fetch(process.env.ICICI_COMMAND_API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -63,18 +72,31 @@ async function checkICICITransactionStatus(merchantTxnNo) {
       })
     });
 
-    const result = await response.json();
+    // First get the raw text response
+    const rawText = await response.text();
+    console.log('ICICI Status Raw Response:', rawText);
+    
+    // Try to parse as JSON
+    let result;
+    try {
+      result = JSON.parse(rawText);
+    } catch (parseError) {
+      console.log('ICICI returned non-JSON response:', rawText);
+      // Return error if not JSON
+      return { status: 'ERROR', payload: { rawResponse: rawText, error: 'Non-JSON response from ICICI' } };
+    }
+    
     console.log('ICICI Status Check Result:', result);
 
     if (result.responseCode === '0000' || result.txnStatus === 'SUC') {
       return { status: 'SUCCESS', payload: result };
-    } else if (result.txnStatus === 'FAL' || result.responseCode !== '0000') {
+    } else if (result.txnStatus === 'FAL' || (result.responseCode && result.responseCode !== '0000')) {
       return { status: 'FAILED', payload: result };
     }
     return { status: 'PENDING', payload: result };
   } catch (error) {
     console.error('Error checking ICICI status:', error);
-    return null;
+    return { status: 'ERROR', payload: { error: error.message } };
   }
 }
 
