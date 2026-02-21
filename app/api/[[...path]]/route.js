@@ -1529,8 +1529,8 @@ export async function POST(request) {
       const customerName = user.name.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 50); // Alphanumeric only
       const merchantId = process.env.ICICI_MID;
       const payType = '0'; // 0 = All payment modes
-      // Use page-based return URL to avoid 403 on deployed environments
-      const returnURL = `${baseUrl}/payment/icici-return`;
+      // Use static HTML file for return URL to avoid 403 from WAF
+      const returnURL = `${baseUrl}/payment-return.html`;
       const transactionType = 'SALE';
       const aggregatorID = process.env.ICICI_AGG_ID;
 
