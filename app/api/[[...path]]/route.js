@@ -1150,7 +1150,152 @@ export async function POST(request) {
       return jsonResponse({ success: true, message: 'Message sent successfully' });
     }
 
-    // Process ICICI payment return (called from page handler)
+    // Process ICICI payment callback (called from client-side page)
+    if (path === '/payment/process-callback') {
+      const transactions = await getCollection('transactions');
+      
+      const {
+        merchantTxnNo,
+        txnID,
+        txnStatus,
+        responseCode,
+        txnResponseCode,
+        respDescription,
+        txnRespDescription,
+        amount,
+        paymentMode,
+        txnAuthID,
+        authCode,
+        paymentDateTime,
+        paymentSubInstType,
+        oth_charge,
+        paymentID,
+      } = body;
+
+      if (!merchantTxnNo) {
+        return corsJsonResponse({ success: false, error: 'Missing transaction ID' }, 400);
+      }
+
+      // Find transaction
+      const transaction = await transactions.findOne({ merchantTxnNo });
+      
+      if (!transaction) {
+        return corsJsonResponse({ success: false, error: 'Transaction not found' }, 404);
+      }
+
+      // Determine status
+      const actualResponseCode = responseCode || txnResponseCode;
+      const actualRespDescription = respDescription || txnRespDescription;
+      const isSuccess = txnStatus === 'SUC' || actualResponseCode === '0000';
+      const status = isSuccess ? 'SUCCESS' : (txnStatus === 'PEN' ? 'PENDING' : 'FAILED');
+
+      // Update transaction with ICICI payload
+      await transactions.updateOne(
+        { merchantTxnNo },
+        {
+          $set: {
+            status,
+            iciciTransactionId: txnID || paymentID || null,
+            txnAuthID: txnAuthID || authCode || null,
+            txnResponseCode: actualResponseCode || null,
+            txnRespDescription: actualRespDescription || null,
+            paymentMethod: paymentMode || null,
+            paymentSubInstType: paymentSubInstType || null,
+            paymentDateTime: paymentDateTime || null,
+            otherCharges: oth_charge || null,
+            iciciPayload: body,
+            gatewayResponse: body,
+            completedAt: new Date(),
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      // If success, grant access
+      if (isSuccess && transaction.examId) {
+        const users = await getCollection('users');
+        await users.updateOne(
+          { id: transaction.userId },
+          { $addToSet: { purchasedExams: transaction.examId } }
+        );
+      }
+
+      return corsJsonResponse({ success: true, status, merchantTxnNo });
+    }
+
+    // Check payment status by session/latest transaction
+    if (path === '/payment/check-status-by-session') {
+      const user = await getAuthUser(request);
+      
+      const transactions = await getCollection('transactions');
+      let transaction;
+      
+      if (user) {
+        // Get latest transaction for this user
+        transaction = await transactions.findOne(
+          { userId: user.id },
+          { sort: { createdAt: -1 } }
+        );
+      } else {
+        // Try to get from body if merchantTxnNo is provided
+        if (body.merchantTxnNo) {
+          transaction = await transactions.findOne({ merchantTxnNo: body.merchantTxnNo });
+        }
+      }
+
+      if (!transaction) {
+        return corsJsonResponse({ success: false, error: 'No transaction found' }, 404);
+      }
+
+      // If still pending, try to check with ICICI status API
+      if (transaction.status === 'PENDING') {
+        try {
+          const statusResult = await checkICICITransactionStatus(transaction.merchantTxnNo);
+          if (statusResult && statusResult.status !== 'PENDING') {
+            // Update transaction
+            await transactions.updateOne(
+              { merchantTxnNo: transaction.merchantTxnNo },
+              {
+                $set: {
+                  status: statusResult.status,
+                  iciciPayload: statusResult.payload,
+                  gatewayResponse: statusResult.payload,
+                  updatedAt: new Date(),
+                  completedAt: new Date()
+                }
+              }
+            );
+            transaction.status = statusResult.status;
+            transaction.iciciPayload = statusResult.payload;
+
+            // Grant access if success
+            if (statusResult.status === 'SUCCESS' && transaction.examId) {
+              const users = await getCollection('users');
+              await users.updateOne(
+                { id: transaction.userId },
+                { $addToSet: { purchasedExams: transaction.examId } }
+              );
+            }
+          }
+        } catch (e) {
+          console.error('Error checking ICICI status:', e);
+        }
+      }
+
+      return corsJsonResponse({
+        success: true,
+        transaction: {
+          merchantTxnNo: transaction.merchantTxnNo,
+          status: transaction.status,
+          amount: transaction.amount,
+          itemName: transaction.itemName,
+          iciciPayload: transaction.iciciPayload,
+          createdAt: transaction.createdAt
+        }
+      });
+    }
+
+    // Process ICICI payment return (called from page handler) - kept for backwards compatibility
     if (path === '/payment/process-return') {
       const transactions = await getCollection('transactions');
       
