@@ -42,11 +42,11 @@ async function checkICICITransactionStatus(merchantTxnNo) {
     const crypto = require('crypto');
     const merchantId = process.env.ICICI_MID;
     const aggregatorID = process.env.ICICI_AGG_ID;
-    const commandType = 'STATUS';
+    const transactionType = 'STATUS';
     
     // Generate hash for status check
-    // Order: aggregatorID + commandType + merchantId + merchantTxnNo
-    const hashText = aggregatorID + commandType + merchantId + merchantTxnNo;
+    // Order: aggregatorID + merchantId + merchantTxnNo + transactionType
+    const hashText = aggregatorID + merchantId + merchantTxnNo + transactionType;
     const secureHash = crypto.createHmac('sha256', process.env.ICICI_KEY)
       .update(hashText, 'utf8')
       .digest('hex');
@@ -55,7 +55,7 @@ async function checkICICITransactionStatus(merchantTxnNo) {
       merchantId,
       aggregatorID,
       merchantTxnNo,
-      commandType,
+      transactionType,
       hashText,
       secureHash
     });
@@ -67,7 +67,7 @@ async function checkICICITransactionStatus(merchantTxnNo) {
         merchantId,
         aggregatorID,
         merchantTxnNo,
-        commandType,
+        transactionType,
         secureHash
       })
     });
