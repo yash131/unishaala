@@ -7,19 +7,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/Logo';
-import { 
-  CheckCircle, 
-  ArrowRight, 
-  Home, 
-  Copy, 
-  ChevronDown, 
+import {
+  CheckCircle,
+  ArrowRight,
+  Home,
+  Copy,
+  ChevronDown,
   ChevronUp,
   CreditCard,
   Clock,
   FileText,
-  IndianRupee
+  IndianRupee,
+  Loader2
 } from 'lucide-react';
-import { toast } from 'sonner';
 
 export default function PaymentSuccessPage() {
   const searchParams = useSearchParams();
@@ -27,6 +27,7 @@ export default function PaymentSuccessPage() {
   const [transaction, setTransaction] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPayload, setShowPayload] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (transactionId) {
@@ -55,12 +56,12 @@ export default function PaymentSuccessPage() {
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text);
-    toast.success('Copied to clipboard!');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const formatDateTime = (dateStr) => {
     if (!dateStr) return '-';
-    // Handle ICICI format: 20251223145516
     if (typeof dateStr === 'string' && dateStr.length === 14) {
       const year = dateStr.slice(0, 4);
       const month = dateStr.slice(4, 6);
@@ -71,19 +72,6 @@ export default function PaymentSuccessPage() {
       return `${day}/${month}/${year} ${hour}:${min}:${sec}`;
     }
     return new Date(dateStr).toLocaleString('en-IN');
-  };
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'SUCCESS':
-        return <Badge className="bg-green-500 text-white">SUCCESS</Badge>;
-      case 'PENDING':
-        return <Badge className="bg-yellow-500 text-white">PENDING</Badge>;
-      case 'FAILED':
-        return <Badge className="bg-red-500 text-white">FAILED</Badge>;
-      default:
-        return <Badge className="bg-gray-500 text-white">{status}</Badge>;
-    }
   };
 
   return (
@@ -100,21 +88,22 @@ export default function PaymentSuccessPage() {
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <CheckCircle className="w-12 h-12 text-green-600" />
             </div>
-            
+
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Payment Successful!</h1>
             <p className="text-gray-500 mb-6">Thank you for your purchase</p>
 
             {loading ? (
-              <div className="animate-pulse space-y-4">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto"></div>
-                <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
-                <div className="h-20 bg-gray-200 rounded"></div>
+              <div className="flex items-center justify-center gap-2 py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-teal-600" />
+                <span className="text-gray-500">Loading transaction details...</span>
               </div>
             ) : transaction ? (
               <>
                 {/* Status Badge */}
                 <div className="mb-6">
-                  {getStatusBadge(transaction.status)}
+                  <Badge className="bg-green-500 text-white text-lg px-4 py-1">
+                    {transaction.status}
+                  </Badge>
                 </div>
 
                 {/* Amount Highlight */}
@@ -158,130 +147,54 @@ export default function PaymentSuccessPage() {
             <CardContent className="p-6">
               <div className="space-y-4">
                 {/* Transaction ID */}
-                <div className="flex justify-between items-center py-3 border-b">
-                  <span className="text-gray-500 font-medium">Transaction ID</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm bg-gray-100 px-3 py-1 rounded">
-                      {transaction.transactionId}
-                    </span>
-                    <button 
-                      onClick={() => copyToClipboard(transaction.transactionId)}
-                      className="p-1 hover:bg-gray-100 rounded"
-                    >
-                      <Copy className="w-4 h-4 text-gray-400" />
-                    </button>
-                  </div>
-                </div>
+                <DetailRow label="Transaction ID" value={transaction.transactionId} copyable onCopy={copyToClipboard} />
 
                 {/* ICICI Transaction ID */}
                 {transaction.iciciTransactionId && (
-                  <div className="flex justify-between items-center py-3 border-b">
-                    <span className="text-gray-500 font-medium">ICICI Txn ID</span>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm bg-gray-100 px-3 py-1 rounded">
-                        {transaction.iciciTransactionId}
-                      </span>
-                      <button 
-                        onClick={() => copyToClipboard(transaction.iciciTransactionId)}
-                        className="p-1 hover:bg-gray-100 rounded"
-                      >
-                        <Copy className="w-4 h-4 text-gray-400" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Order ID */}
-                {transaction.orderId && (
-                  <div className="flex justify-between items-center py-3 border-b">
-                    <span className="text-gray-500 font-medium">Order ID</span>
-                    <span className="font-mono text-sm">{transaction.orderId}</span>
-                  </div>
+                  <DetailRow label="ICICI Txn ID" value={transaction.iciciTransactionId} copyable onCopy={copyToClipboard} />
                 )}
 
                 {/* Item Name */}
-                <div className="flex justify-between items-center py-3 border-b">
-                  <span className="text-gray-500 font-medium">Item</span>
-                  <span className="font-medium text-gray-900">{transaction.itemName || '-'}</span>
-                </div>
+                <DetailRow label="Item" value={transaction.itemName || '-'} />
 
                 {/* Amount */}
-                <div className="flex justify-between items-center py-3 border-b">
-                  <span className="text-gray-500 font-medium">Amount</span>
-                  <span className="font-bold text-green-600">₹{transaction.amount}</span>
-                </div>
-
-                {/* Other Charges */}
-                {transaction.otherCharges && (
-                  <div className="flex justify-between items-center py-3 border-b">
-                    <span className="text-gray-500 font-medium">Other Charges</span>
-                    <span className="text-gray-600">₹{transaction.otherCharges}</span>
-                  </div>
-                )}
+                <DetailRow label="Amount" value={`₹${transaction.amount}`} highlight />
 
                 {/* Payment Method */}
-                <div className="flex justify-between items-center py-3 border-b">
-                  <span className="text-gray-500 font-medium">Payment Method</span>
-                  <div className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-gray-400" />
-                    <span className="font-medium">
-                      {transaction.paymentMethod || '-'}
-                      {transaction.paymentSubInstType && (
-                        <span className="text-gray-400 text-sm ml-1">
-                          ({transaction.paymentSubInstType})
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                </div>
+                {transaction.paymentMethod && (
+                  <DetailRow
+                    label="Payment Method"
+                    value={`${transaction.paymentMethod}${transaction.paymentSubInstType ? ` (${transaction.paymentSubInstType})` : ''}`}
+                    icon={<CreditCard className="w-4 h-4 text-gray-400" />}
+                  />
+                )}
 
                 {/* Auth ID */}
                 {transaction.txnAuthID && (
-                  <div className="flex justify-between items-center py-3 border-b">
-                    <span className="text-gray-500 font-medium">Auth ID</span>
-                    <span className="font-mono text-sm">{transaction.txnAuthID}</span>
-                  </div>
+                  <DetailRow label="Auth ID" value={transaction.txnAuthID} mono />
                 )}
 
                 {/* Response Code */}
                 {transaction.txnResponseCode && (
-                  <div className="flex justify-between items-center py-3 border-b">
-                    <span className="text-gray-500 font-medium">Response Code</span>
-                    <Badge variant="outline" className="font-mono">
-                      {transaction.txnResponseCode}
-                    </Badge>
-                  </div>
+                  <DetailRow label="Response Code" value={transaction.txnResponseCode} mono />
                 )}
 
                 {/* Payment DateTime */}
                 {transaction.paymentDateTime && (
-                  <div className="flex justify-between items-center py-3 border-b">
-                    <span className="text-gray-500 font-medium">Payment Time</span>
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-gray-400" />
-                      <span>{formatDateTime(transaction.paymentDateTime)}</span>
-                    </div>
-                  </div>
+                  <DetailRow
+                    label="Payment Time"
+                    value={formatDateTime(transaction.paymentDateTime)}
+                    icon={<Clock className="w-4 h-4 text-gray-400" />}
+                  />
                 )}
 
                 {/* Created At */}
-                <div className="flex justify-between items-center py-3 border-b">
-                  <span className="text-gray-500 font-medium">Created</span>
-                  <span>{formatDateTime(transaction.createdAt)}</span>
-                </div>
-
-                {/* Completed At */}
-                {transaction.completedAt && (
-                  <div className="flex justify-between items-center py-3 border-b">
-                    <span className="text-gray-500 font-medium">Completed</span>
-                    <span>{formatDateTime(transaction.completedAt)}</span>
-                  </div>
-                )}
+                <DetailRow label="Created" value={formatDateTime(transaction.createdAt)} />
 
                 {/* Status */}
                 <div className="flex justify-between items-center py-3">
                   <span className="text-gray-500 font-medium">Status</span>
-                  {getStatusBadge(transaction.status)}
+                  <Badge className="bg-green-500 text-white">{transaction.status}</Badge>
                 </div>
               </div>
             </CardContent>
@@ -289,19 +202,19 @@ export default function PaymentSuccessPage() {
         )}
 
         {/* ICICI Raw Payload Card */}
-        {transaction && transaction.iciciPayload && (
+        {transaction?.iciciPayload && (
           <Card className="shadow-lg">
-            <CardHeader 
+            <CardHeader
               className="border-b bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
               onClick={() => setShowPayload(!showPayload)}
             >
               <CardTitle className="flex items-center justify-between text-lg">
                 <div className="flex items-center gap-2">
                   <FileText className="w-5 h-5 text-teal-600" />
-                  ICICI Payment Response (Raw JSON)
+                  Complete ICICI Response (Raw JSON)
                 </div>
                 <div className="flex items-center gap-2">
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       copyToClipboard(JSON.stringify(transaction.iciciPayload, null, 2));
@@ -321,7 +234,7 @@ export default function PaymentSuccessPage() {
             </CardHeader>
             {showPayload && (
               <CardContent className="p-4">
-                <pre className="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-sm font-mono">
+                <pre className="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-sm font-mono max-h-96">
                   {JSON.stringify(transaction.iciciPayload, null, 2)}
                 </pre>
               </CardContent>
@@ -329,10 +242,37 @@ export default function PaymentSuccessPage() {
           </Card>
         )}
 
+        {/* Copied Toast */}
+        {copied && (
+          <div className="fixed bottom-4 right-4 bg-gray-900 text-white px-4 py-2 rounded-lg shadow-lg animate-fade-in">
+            Copied to clipboard!
+          </div>
+        )}
+
         {/* Footer Note */}
         <p className="text-center text-gray-400 text-sm mt-8">
           If you have any issues, please contact support@unishaala.com
         </p>
+      </div>
+    </div>
+  );
+}
+
+// Detail Row Component
+function DetailRow({ label, value, copyable, onCopy, icon, highlight, mono }) {
+  return (
+    <div className="flex justify-between items-center py-3 border-b last:border-0">
+      <span className="text-gray-500 font-medium">{label}</span>
+      <div className="flex items-center gap-2">
+        {icon}
+        <span className={`${highlight ? 'font-bold text-green-600' : ''} ${mono ? 'font-mono text-sm bg-gray-100 px-2 py-1 rounded' : ''}`}>
+          {value}
+        </span>
+        {copyable && onCopy && (
+          <button onClick={() => onCopy(value)} className="p-1 hover:bg-gray-100 rounded">
+            <Copy className="w-4 h-4 text-gray-400" />
+          </button>
+        )}
       </div>
     </div>
   );
