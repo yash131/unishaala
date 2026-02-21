@@ -1006,7 +1006,7 @@ export async function POST(request) {
       const customerName = user.name.replace(/[^a-zA-Z0-9 ]/g, '').substring(0, 50); // Alphanumeric only
       const merchantId = process.env.ICICI_MID;
       const payType = '0'; // 0 = All payment modes
-      const returnURL = `${baseUrl}/api/payment/callback`;
+      const returnURL = `${baseUrl}/api/payment/icici/return`;
       const transactionType = 'SALE';
       const aggregatorID = process.env.ICICI_AGG_ID;
 
