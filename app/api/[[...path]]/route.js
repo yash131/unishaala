@@ -1108,6 +1108,130 @@ export async function POST(request) {
       return jsonResponse({ success: true, message: 'Message sent successfully' });
     }
 
+    // Process ICICI payment return (called from page handler)
+    if (path === '/payment/process-return') {
+      const transactions = await getCollection('transactions');
+      
+      const {
+        merchantTxnNo,
+        txnID,
+        txnStatus,
+        responseCode,
+        txnResponseCode,
+        respDescription,
+        txnRespDescription,
+        amount,
+        paymentMode,
+        txnAuthID,
+        authCode,
+        paymentDateTime,
+        paymentSubInstType,
+        oth_charge,
+        paymentID,
+      } = body;
+
+      if (!merchantTxnNo) {
+        return jsonResponse({ success: false, error: 'Missing transaction ID' }, 400);
+      }
+
+      // Find transaction
+      const transaction = await transactions.findOne({ merchantTxnNo });
+      
+      if (!transaction) {
+        return jsonResponse({ success: false, error: 'Transaction not found' }, 404);
+      }
+
+      // Determine status
+      const actualResponseCode = responseCode || txnResponseCode;
+      const actualRespDescription = respDescription || txnRespDescription;
+      const isSuccess = txnStatus === 'SUC' || actualResponseCode === '0000';
+      const status = isSuccess ? 'SUCCESS' : (txnStatus === 'PEN' ? 'PENDING' : 'FAILED');
+
+      // Update transaction
+      await transactions.updateOne(
+        { merchantTxnNo },
+        {
+          $set: {
+            status,
+            iciciTransactionId: txnID || paymentID || null,
+            txnAuthID: txnAuthID || authCode || null,
+            txnResponseCode: actualResponseCode || null,
+            txnRespDescription: actualRespDescription || null,
+            paymentMethod: paymentMode || null,
+            paymentSubInstType: paymentSubInstType || null,
+            paymentDateTime: paymentDateTime || null,
+            otherCharges: oth_charge || null,
+            iciciPayload: body,
+            gatewayResponse: body,
+            completedAt: new Date(),
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      // If success, grant access
+      if (isSuccess && transaction.examId) {
+        const users = await getCollection('users');
+        await users.updateOne(
+          { id: transaction.userId },
+          { $addToSet: { purchasedExams: transaction.examId } }
+        );
+      }
+
+      return jsonResponse({ success: true, status, merchantTxnNo });
+    }
+
+    // Check latest payment status for current user
+    if (path === '/payment/check-latest') {
+      const user = await getAuthUser(request);
+      if (!user) {
+        return jsonResponse({ success: false, error: 'Not authenticated' }, 401);
+      }
+
+      const transactions = await getCollection('transactions');
+      const latestTransaction = await transactions.findOne(
+        { userId: user.id },
+        { sort: { createdAt: -1 } }
+      );
+
+      if (!latestTransaction) {
+        return jsonResponse({ success: false, error: 'No transactions found' }, 404);
+      }
+
+      // If transaction is still pending, try to check status with ICICI
+      if (latestTransaction.status === 'PENDING') {
+        try {
+          const statusResult = await checkICICITransactionStatus(latestTransaction.merchantTxnNo);
+          if (statusResult && statusResult.status !== 'PENDING') {
+            // Update transaction with new status
+            await transactions.updateOne(
+              { merchantTxnNo: latestTransaction.merchantTxnNo },
+              {
+                $set: {
+                  status: statusResult.status,
+                  iciciPayload: statusResult.payload,
+                  updatedAt: new Date()
+                }
+              }
+            );
+            latestTransaction.status = statusResult.status;
+          }
+        } catch (e) {
+          console.error('Error checking ICICI status:', e);
+        }
+      }
+
+      return jsonResponse({ 
+        success: true, 
+        transaction: {
+          merchantTxnNo: latestTransaction.merchantTxnNo,
+          status: latestTransaction.status,
+          amount: latestTransaction.amount,
+          itemName: latestTransaction.itemName
+        }
+      });
+    }
+
     // ============================================
     // ICICI Orange PG Payment Gateway Integration
     // ============================================
