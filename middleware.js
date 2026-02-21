@@ -4,8 +4,8 @@ export function middleware(request) {
   // Get the pathname
   const pathname = request.nextUrl.pathname;
   
-  // For ICICI payment callback endpoint, allow all origins and methods
-  if (pathname === '/api/payment/icici/return' || pathname.startsWith('/api/payment/')) {
+  // For ICICI payment callback endpoints (both API and page routes), allow all origins and methods
+  if (pathname.includes('/payment/icici') || pathname.startsWith('/api/payment/')) {
     // Handle preflight OPTIONS request
     if (request.method === 'OPTIONS') {
       return new NextResponse(null, {
@@ -34,5 +34,7 @@ export function middleware(request) {
 export const config = {
   matcher: [
     '/api/payment/:path*',
+    '/payment/icici-return',
+    '/payment/icici-return/:path*',
   ],
 };
