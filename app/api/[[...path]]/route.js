@@ -589,6 +589,19 @@ export async function GET(request) {
   }
 }
 
+// OPTIONS handler for CORS preflight requests (required for payment gateway callbacks)
+export async function OPTIONS(request) {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Accept, Origin',
+      'Access-Control-Max-Age': '86400',
+    },
+  });
+}
+
 // POST Requests Handler
 export async function POST(request) {
   const path = getPath(request);
