@@ -1179,14 +1179,50 @@ export async function POST(request) {
         return corsJsonResponse({ success: false, error: 'Missing transaction ID' }, 400);
       }
 
-      // Find transaction
-      const transaction = await transactions.findOne({ merchantTxnNo });
+      // Find transaction in local DB
+      let transaction = await transactions.findOne({ merchantTxnNo });
       
+      // If not found locally, verify with ICICI directly
       if (!transaction) {
+        console.log(`Transaction ${merchantTxnNo} not found locally, checking with ICICI...`);
+        
+        // Try to get status from ICICI
+        const iciciStatus = await checkICICITransactionStatus(merchantTxnNo);
+        
+        if (iciciStatus && iciciStatus.payload) {
+          console.log('ICICI returned status:', iciciStatus.status);
+          
+          // Create a record for this transaction (it was initiated from another environment)
+          const newTransaction = {
+            id: uuidv4(),
+            merchantTxnNo,
+            status: iciciStatus.status,
+            amount: amount || iciciStatus.payload.amount || 0,
+            iciciTransactionId: txnID || iciciStatus.payload.txnID || paymentID,
+            iciciPayload: iciciStatus.payload,
+            gatewayResponse: body,
+            crossEnvironment: true, // Flag indicating this was from another deployment
+            createdAt: new Date(),
+            completedAt: new Date(),
+            updatedAt: new Date()
+          };
+          
+          await transactions.insertOne(newTransaction);
+          
+          return corsJsonResponse({ 
+            success: true, 
+            status: iciciStatus.status, 
+            merchantTxnNo,
+            message: 'Transaction verified with ICICI',
+            iciciPayload: iciciStatus.payload
+          });
+        }
+        
+        // If ICICI also doesn't recognize it, return error
         return corsJsonResponse({ success: false, error: 'Transaction not found' }, 404);
       }
 
-      // Determine status
+      // Determine status from callback data
       const actualResponseCode = responseCode || txnResponseCode;
       const actualRespDescription = respDescription || txnRespDescription;
       const isSuccess = txnStatus === 'SUC' || actualResponseCode === '0000';
