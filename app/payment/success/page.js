@@ -46,6 +46,11 @@ export default function PaymentSuccessPage() {
       });
       const data = await res.json();
       if (data.success) {
+        // Redirect to failed page if status is not SUCCESS
+        if (data.data.status !== 'SUCCESS') {
+          window.location.href = `/payment/failed?txn=${transactionId}&reason=${encodeURIComponent(data.data.txnRespDescription || 'Payment not successful')}`;
+          return;
+        }
         setTransaction(data.data);
       }
     } catch (e) {
