@@ -4,9 +4,22 @@ import { connectToDatabase, getCollection } from '@/lib/db';
 import { createToken, verifyToken, hashPassword, verifyPassword, generateOTP, getUserFromToken } from '@/lib/auth';
 import { seedDatabase } from '@/lib/seed';
 
+// CORS headers for payment gateway callbacks
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With, Accept, Origin',
+  'Access-Control-Max-Age': '86400',
+};
+
 // Helper function to create response
 function jsonResponse(data, status = 200) {
   return NextResponse.json(data, { status });
+}
+
+// Helper function to create response with CORS headers
+function corsJsonResponse(data, status = 200) {
+  return NextResponse.json(data, { status, headers: corsHeaders });
 }
 
 // Helper to get auth user
