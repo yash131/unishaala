@@ -1153,7 +1153,12 @@ export async function POST(request) {
 
       // Prepare ICICI Orange PG request
       const crypto = require('crypto');
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+      
+      // Dynamically detect base URL from request headers (works for both preview and production)
+      const host = request.headers.get('host') || request.headers.get('x-forwarded-host');
+      const protocol = request.headers.get('x-forwarded-proto') || 'https';
+      const baseUrl = host ? `${protocol}://${host}` : process.env.NEXT_PUBLIC_BASE_URL;
+      console.log('Payment return URL will use baseUrl:', baseUrl);
       
       // Format date as YYYYMMDDHHMMSS
       const now = new Date();
