@@ -1288,11 +1288,21 @@ export async function POST(request) {
         success: true,
         data: {
           transactionId: transaction.merchantTxnNo || transaction.transactionId,
+          orderId: transaction.id,
           status: transaction.status,
           amount: transaction.amount,
           itemName: transaction.itemName,
           paymentMethod: transaction.paymentMethod,
-          createdAt: transaction.createdAt
+          paymentSubInstType: transaction.paymentSubInstType,
+          iciciTransactionId: transaction.iciciTransactionId,
+          txnAuthID: transaction.txnAuthID,
+          txnResponseCode: transaction.txnResponseCode,
+          txnRespDescription: transaction.txnRespDescription,
+          paymentDateTime: transaction.paymentDateTime,
+          otherCharges: transaction.otherCharges,
+          createdAt: transaction.createdAt,
+          completedAt: transaction.completedAt,
+          iciciPayload: transaction.iciciPayload || transaction.gatewayResponse
         }
       });
     }
