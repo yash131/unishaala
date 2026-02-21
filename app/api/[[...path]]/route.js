@@ -581,6 +581,126 @@ export async function POST(request) {
   const path = getPath(request);
 
   try {
+    // Special handling for ICICI payment return - reads form-data instead of JSON
+    if (path === '/payment/icici/return') {
+      await connectToDatabase();
+      const transactions = await getCollection('transactions');
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+      
+      let formDataObj = {};
+      
+      try {
+        // Try to read as form-data first (ICICI sends form-data)
+        const contentType = request.headers.get('content-type') || '';
+        
+        if (contentType.includes('application/x-www-form-urlencoded') || contentType.includes('multipart/form-data')) {
+          const formData = await request.formData();
+          // Convert FormData to plain object
+          for (const [key, value] of formData.entries()) {
+            formDataObj[key] = value;
+          }
+        } else {
+          // Fallback to JSON if not form-data
+          formDataObj = await request.json().catch(() => ({}));
+        }
+        
+        console.log('=== ICICI RETURN PAYLOAD ===');
+        console.log('Content-Type:', contentType);
+        console.log('Parsed Payload:', JSON.stringify(formDataObj, null, 2));
+        console.log('============================');
+        
+      } catch (parseError) {
+        console.error('Error parsing ICICI return payload:', parseError);
+        // Try to get raw text for debugging
+        try {
+          const rawText = await request.text();
+          console.log('Raw body text:', rawText);
+          // Try URL-encoded parsing manually
+          const params = new URLSearchParams(rawText);
+          for (const [key, value] of params.entries()) {
+            formDataObj[key] = value;
+          }
+        } catch (e) {
+          console.error('Failed to read raw body:', e);
+        }
+      }
+      
+      // Extract fields from the payload
+      const {
+        merchantTxnNo,
+        txnID,
+        txnStatus,
+        txnResponseCode,
+        txnRespDescription,
+        amount,
+        paymentMode,
+        txnAuthID,
+        paymentDateTime,
+        paymentSubInstType,
+        addlParam1,
+        addlParam2,
+        secureHash,
+        oth_charge,
+        ...otherFields
+      } = formDataObj;
+
+      // If no merchantTxnNo, redirect to failed
+      if (!merchantTxnNo) {
+        console.error('No merchantTxnNo in ICICI return:', formDataObj);
+        return NextResponse.redirect(`${baseUrl}/payment/failed?reason=Invalid%20payment%20response`);
+      }
+
+      // Find transaction
+      const transaction = await transactions.findOne({ merchantTxnNo });
+      
+      if (!transaction) {
+        console.error('Transaction not found for ICICI return:', merchantTxnNo);
+        return NextResponse.redirect(`${baseUrl}/payment/failed?reason=Transaction%20not%20found&txn=${merchantTxnNo}`);
+      }
+
+      // Determine status
+      const isSuccess = txnStatus === 'SUC' || txnResponseCode === '0000';
+      const status = isSuccess ? 'SUCCESS' : (txnStatus === 'PEN' ? 'PENDING' : 'FAILED');
+
+      // Update transaction with full ICICI payload
+      await transactions.updateOne(
+        { merchantTxnNo },
+        {
+          $set: {
+            status,
+            iciciTransactionId: txnID || null,
+            txnAuthID: txnAuthID || null,
+            txnResponseCode: txnResponseCode || null,
+            txnRespDescription: txnRespDescription || null,
+            paymentMethod: paymentMode || null,
+            paymentSubInstType: paymentSubInstType || null,
+            paymentDateTime: paymentDateTime || null,
+            otherCharges: oth_charge || null,
+            iciciPayload: formDataObj, // Store full ICICI payload as JSON
+            gatewayResponse: formDataObj,
+            completedAt: new Date(),
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      // If success, grant access to the exam/test
+      if (isSuccess && transaction.examId) {
+        const users = await getCollection('users');
+        await users.updateOne(
+          { id: transaction.userId },
+          { $addToSet: { purchasedExams: transaction.examId } }
+        );
+      }
+
+      // Redirect to success or failed page
+      const redirectUrl = isSuccess 
+        ? `${baseUrl}/payment/success?txn=${merchantTxnNo}`
+        : `${baseUrl}/payment/failed?txn=${merchantTxnNo}&reason=${encodeURIComponent(txnRespDescription || 'Payment failed')}`;
+
+      return NextResponse.redirect(redirectUrl);
+    }
+
     const body = await request.json().catch(() => ({}));
 
     // User Registration
