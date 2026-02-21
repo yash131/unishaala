@@ -36,6 +36,48 @@ function getPath(request) {
   return pathname;
 }
 
+// Helper function to check ICICI transaction status via Command API
+async function checkICICITransactionStatus(merchantTxnNo) {
+  try {
+    const crypto = require('crypto');
+    const merchantId = process.env.ICICI_MID;
+    const aggregatorID = process.env.ICICI_AGG_ID;
+    const commandType = 'STATUS';
+    
+    // Generate hash for status check
+    // Order: aggregatorID + commandType + merchantId + merchantTxnNo
+    const hashText = aggregatorID + commandType + merchantId + merchantTxnNo;
+    const secureHash = crypto.createHmac('sha256', process.env.ICICI_KEY)
+      .update(hashText, 'utf8')
+      .digest('hex');
+
+    const response = await fetch(process.env.ICICI_COMMAND_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        merchantId,
+        aggregatorID,
+        merchantTxnNo,
+        commandType,
+        secureHash
+      })
+    });
+
+    const result = await response.json();
+    console.log('ICICI Status Check Result:', result);
+
+    if (result.responseCode === '0000' || result.txnStatus === 'SUC') {
+      return { status: 'SUCCESS', payload: result };
+    } else if (result.txnStatus === 'FAL' || result.responseCode !== '0000') {
+      return { status: 'FAILED', payload: result };
+    }
+    return { status: 'PENDING', payload: result };
+  } catch (error) {
+    console.error('Error checking ICICI status:', error);
+    return null;
+  }
+}
+
 // GET Requests Handler
 export async function GET(request) {
   const path = getPath(request);
