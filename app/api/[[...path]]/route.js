@@ -1786,19 +1786,62 @@ export async function POST(request) {
       const { transactionId } = body;
 
       const transactions = await getCollection('transactions');
-      const transaction = await transactions.findOne({ 
+      let transaction = await transactions.findOne({ 
         $or: [
           { transactionId },
           { merchantTxnNo: transactionId }
         ]
       });
 
+      // If not found locally, verify with ICICI directly
+      if (!transaction && transactionId) {
+        console.log(`Transaction ${transactionId} not found locally, verifying with ICICI...`);
+        try {
+          const iciciStatus = await checkICICITransactionStatus(transactionId);
+          if (iciciStatus && iciciStatus.payload) {
+            console.log('ICICI verification result:', iciciStatus.status);
+            
+            // Create a local record
+            const newTxn = {
+              id: uuidv4(),
+              merchantTxnNo: transactionId,
+              transactionId: transactionId,
+              status: iciciStatus.status,
+              amount: iciciStatus.payload.amount || 0,
+              iciciPayload: iciciStatus.payload,
+              crossEnvironment: true,
+              verifiedWithIcici: true,
+              createdAt: new Date(),
+              completedAt: new Date(),
+              updatedAt: new Date()
+            };
+            await transactions.insertOne(newTxn);
+            
+            return jsonResponse({
+              success: true,
+              data: {
+                transactionId: transactionId,
+                status: iciciStatus.status,
+                amount: iciciStatus.payload.amount || 0,
+                iciciPayload: iciciStatus.payload,
+                verifiedWithIcici: true,
+                message: 'Transaction verified directly with ICICI'
+              }
+            });
+          }
+        } catch (e) {
+          console.error('Error verifying with ICICI:', e);
+        }
+        
+        return jsonResponse({ success: false, error: 'Transaction not found' }, 404);
+      }
+
       if (!transaction) {
         return jsonResponse({ success: false, error: 'Transaction not found' }, 404);
       }
 
-      // If user is checking their own transaction or admin
-      if (transaction.userId !== user?.id && user?.role !== 'SUPER_ADMIN' && user?.role !== 'ADMIN') {
+      // If user is checking their own transaction or admin - skip auth check for cross-environment txns
+      if (!transaction.crossEnvironment && transaction.userId !== user?.id && user?.role !== 'SUPER_ADMIN' && user?.role !== 'ADMIN') {
         return jsonResponse({ success: false, error: 'Unauthorized' }, 403);
       }
 
