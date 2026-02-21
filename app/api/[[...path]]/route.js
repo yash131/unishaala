@@ -823,6 +823,9 @@ export async function POST(request) {
 
     const body = await request.json().catch(() => ({}));
 
+    // Ensure database is connected for all POST endpoints
+    await connectToDatabase();
+
     // User Registration
     if (path === '/auth/signup') {
       const { name, email, phone, password, phoneVerified } = body;
