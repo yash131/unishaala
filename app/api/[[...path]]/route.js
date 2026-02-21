@@ -613,7 +613,8 @@ export async function POST(request) {
         console.error('Error parsing ICICI return payload:', parseError);
         // Try to get raw text for debugging
         try {
-          const rawText = await request.text();
+          const clonedRequest = request.clone();
+          const rawText = await clonedRequest.text();
           console.log('Raw body text:', rawText);
           // Try URL-encoded parsing manually
           const params = new URLSearchParams(rawText);
@@ -630,24 +631,35 @@ export async function POST(request) {
         merchantTxnNo,
         txnID,
         txnStatus,
+        responseCode,
         txnResponseCode,
+        respDescription,
         txnRespDescription,
         amount,
         paymentMode,
         txnAuthID,
+        authCode,
         paymentDateTime,
         paymentSubInstType,
         addlParam1,
         addlParam2,
         secureHash,
         oth_charge,
+        paymentID,
         ...otherFields
       } = formDataObj;
 
-      // If no merchantTxnNo, redirect to failed
+      // If no merchantTxnNo, return HTML redirect page
       if (!merchantTxnNo) {
         console.error('No merchantTxnNo in ICICI return:', formDataObj);
-        return NextResponse.redirect(`${baseUrl}/payment/failed?reason=Invalid%20payment%20response`);
+        const redirectUrl = `${baseUrl}/payment/failed?reason=Invalid%20payment%20response`;
+        return new NextResponse(
+          `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=${redirectUrl}"></head><body><p>Redirecting...</p><script>window.location.href="${redirectUrl}";</script></body></html>`,
+          { 
+            status: 200, 
+            headers: { 'Content-Type': 'text/html' } 
+          }
+        );
       }
 
       // Find transaction
@@ -655,11 +667,20 @@ export async function POST(request) {
       
       if (!transaction) {
         console.error('Transaction not found for ICICI return:', merchantTxnNo);
-        return NextResponse.redirect(`${baseUrl}/payment/failed?reason=Transaction%20not%20found&txn=${merchantTxnNo}`);
+        const redirectUrl = `${baseUrl}/payment/failed?reason=Transaction%20not%20found&txn=${merchantTxnNo}`;
+        return new NextResponse(
+          `<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0;url=${redirectUrl}"></head><body><p>Redirecting...</p><script>window.location.href="${redirectUrl}";</script></body></html>`,
+          { 
+            status: 200, 
+            headers: { 'Content-Type': 'text/html' } 
+          }
+        );
       }
 
-      // Determine status
-      const isSuccess = txnStatus === 'SUC' || txnResponseCode === '0000';
+      // Determine status - ICICI uses responseCode "0000" for success
+      const actualResponseCode = responseCode || txnResponseCode;
+      const actualRespDescription = respDescription || txnRespDescription;
+      const isSuccess = txnStatus === 'SUC' || actualResponseCode === '0000';
       const status = isSuccess ? 'SUCCESS' : (txnStatus === 'PEN' ? 'PENDING' : 'FAILED');
 
       // Update transaction with full ICICI payload
@@ -668,10 +689,10 @@ export async function POST(request) {
         {
           $set: {
             status,
-            iciciTransactionId: txnID || null,
-            txnAuthID: txnAuthID || null,
-            txnResponseCode: txnResponseCode || null,
-            txnRespDescription: txnRespDescription || null,
+            iciciTransactionId: txnID || paymentID || null,
+            txnAuthID: txnAuthID || authCode || null,
+            txnResponseCode: actualResponseCode || null,
+            txnRespDescription: actualRespDescription || null,
             paymentMethod: paymentMode || null,
             paymentSubInstType: paymentSubInstType || null,
             paymentDateTime: paymentDateTime || null,
@@ -693,12 +714,43 @@ export async function POST(request) {
         );
       }
 
-      // Redirect to success or failed page
+      // Build redirect URL
       const redirectUrl = isSuccess 
         ? `${baseUrl}/payment/success?txn=${merchantTxnNo}`
-        : `${baseUrl}/payment/failed?txn=${merchantTxnNo}&reason=${encodeURIComponent(txnRespDescription || 'Payment failed')}`;
+        : `${baseUrl}/payment/failed?txn=${merchantTxnNo}&reason=${encodeURIComponent(actualRespDescription || 'Payment failed')}`;
 
-      return NextResponse.redirect(redirectUrl);
+      console.log('Redirecting to:', redirectUrl);
+
+      // Return HTML page with meta redirect to avoid Next.js Server Actions validation
+      return new NextResponse(
+        `<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="refresh" content="0;url=${redirectUrl}">
+  <title>Processing Payment...</title>
+  <style>
+    body { font-family: Arial, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%); }
+    .container { text-align: center; padding: 40px; }
+    .spinner { border: 4px solid #f3f3f3; border-top: 4px solid #14b8a6; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    p { color: #666; font-size: 16px; }
+    a { color: #14b8a6; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="spinner"></div>
+    <p>Processing your payment...</p>
+    <p><a href="${redirectUrl}">Click here if you are not redirected automatically</a></p>
+  </div>
+  <script>window.location.href="${redirectUrl}";</script>
+</body>
+</html>`,
+        { 
+          status: 200, 
+          headers: { 'Content-Type': 'text/html; charset=utf-8' } 
+        }
+      );
     }
 
     const body = await request.json().catch(() => ({}));
