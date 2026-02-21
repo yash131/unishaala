@@ -1143,7 +1143,13 @@ export async function POST(request) {
         updatedAt: new Date()
       };
 
-      await transactions.insertOne(transaction);
+      console.log('Creating transaction:', merchantTxnNo);
+      const insertResult = await transactions.insertOne(transaction);
+      console.log('Transaction created:', merchantTxnNo, 'insertedId:', insertResult.insertedId);
+      
+      // Verify the transaction was saved
+      const savedTxn = await transactions.findOne({ merchantTxnNo });
+      console.log('Verified transaction saved:', savedTxn ? 'YES' : 'NO');
 
       // Prepare ICICI Orange PG request
       const crypto = require('crypto');
