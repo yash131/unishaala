@@ -120,6 +120,8 @@ function formatTransactionResponse(txn) {
     status: txn.status,
     amount: txn.amount,
     itemName: txn.itemName,
+    examId: txn.examId,
+    mockTestId: txn.mockTestId,
     paymentMethod: txn.paymentMethod,
     paymentSubInstType: txn.paymentSubInstType,
     iciciTransactionId: txn.iciciTxnId,
