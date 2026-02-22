@@ -126,11 +126,19 @@ export default function PaymentSuccessPage() {
 
             {/* Action Buttons */}
             <div className="space-y-3 mt-6">
-              <Link href="/exams">
-                <Button className="w-full bg-teal-600 hover:bg-teal-700">
-                  Start Learning <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </Link>
+              {transaction?.examId ? (
+                <Link href={`/exams/${transaction.examId}`}>
+                  <Button className="w-full bg-teal-600 hover:bg-teal-700">
+                    Start Exam Now <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+              ) : (
+                <Link href="/exams">
+                  <Button className="w-full bg-teal-600 hover:bg-teal-700">
+                    Start Learning <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+              )}
               <Link href="/">
                 <Button variant="outline" className="w-full">
                   <Home className="w-4 h-4 mr-2" /> Go to Home
