@@ -44,11 +44,11 @@ export async function POST(request) {
     }
 
     // Determine return URL from request headers
-    // Use static HTML page instead of API endpoint to avoid 403 from platform security
+    // Use Next.js page route (not API or static file) to handle ICICI redirect
     const host = request.headers.get('host') || request.headers.get('x-forwarded-host');
     const protocol = request.headers.get('x-forwarded-proto') || 'https';
     const baseUrl = host ? `${protocol}://${host}` : process.env.NEXT_PUBLIC_BASE_URL;
-    const returnUrl = `${baseUrl}/payment-callback.html`;
+    const returnUrl = `${baseUrl}/payment/return`;
 
     console.log('Payment initiation for:', user.email);
     console.log('Return URL:', returnUrl);
