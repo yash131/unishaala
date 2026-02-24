@@ -1,96 +1,91 @@
 import { NextResponse } from 'next/server';
 import { connectToDatabase, getCollection } from '@/lib/db';
-import { checkPaymentStatus } from '@/lib/icici';
+import { verifyPaymentSignature, fetchPayment } from '@/lib/razorpay';
 
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { merchantTxnNo } = body;
+    const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
 
-    if (!merchantTxnNo) {
-      return NextResponse.json({ success: false, error: 'Transaction ID required' }, { status: 400 });
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Missing payment details' 
+      }, { status: 400 });
+    }
+
+    // Verify signature
+    const isValid = verifyPaymentSignature({
+      orderId: razorpay_order_id,
+      paymentId: razorpay_payment_id,
+      signature: razorpay_signature,
+    });
+
+    if (!isValid) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Invalid payment signature' 
+      }, { status: 400 });
     }
 
     await connectToDatabase();
     const transactions = await getCollection('transactions');
 
-    // Find local transaction
-    let transaction = await transactions.findOne({ merchantTxnNo });
+    // Find and update transaction
+    const transaction = await transactions.findOne({ razorpayOrderId: razorpay_order_id });
 
-    // If already completed, return immediately
-    if (transaction && (transaction.status === 'SUCCESS' || transaction.status === 'FAILED')) {
-      return NextResponse.json({
-        success: true,
-        data: {
-          transactionId: transaction.merchantTxnNo,
-          status: transaction.status,
-          examId: transaction.examId,
-          amount: transaction.amount,
-          txnRespDescription: transaction.txnRespDescription
-        }
-      });
+    if (!transaction) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Transaction not found' 
+      }, { status: 404 });
     }
 
-    // Check with ICICI
-    console.log('Verifying with ICICI:', merchantTxnNo);
-    const iciciResult = await checkPaymentStatus(merchantTxnNo);
-    console.log('ICICI result:', iciciResult);
+    // Fetch payment details from Razorpay
+    const payment = await fetchPayment(razorpay_payment_id);
 
-    if (iciciResult.success) {
-      const newStatus = iciciResult.status;
-      
-      if (transaction) {
-        // Update existing transaction
-        await transactions.updateOne(
-          { merchantTxnNo },
-          {
-            $set: {
-              status: newStatus,
-              iciciTxnId: iciciResult.iciciTxnId,
-              txnResponseCode: iciciResult.responseCode,
-              txnRespDescription: iciciResult.responseDescription,
-              iciciPayload: iciciResult.rawResponse,
-              completedAt: newStatus !== 'PENDING' ? new Date() : null,
-              updatedAt: new Date()
-            }
-          }
-        );
-
-        // Grant exam access if success
-        if (newStatus === 'SUCCESS' && transaction.examId) {
-          const users = await getCollection('users');
-          await users.updateOne(
-            { id: transaction.userId },
-            { $addToSet: { purchasedExams: transaction.examId } }
-          );
-        }
-
-        return NextResponse.json({
-          success: true,
-          data: {
-            transactionId: merchantTxnNo,
-            status: newStatus,
-            examId: transaction.examId,
-            amount: transaction.amount,
-            txnRespDescription: iciciResult.responseDescription
-          }
-        });
+    // Update transaction
+    await transactions.updateOne(
+      { razorpayOrderId: razorpay_order_id },
+      {
+        $set: {
+          status: 'SUCCESS',
+          razorpayPaymentId: razorpay_payment_id,
+          razorpaySignature: razorpay_signature,
+          paymentMethod: payment.method,
+          paymentDetails: payment,
+          completedAt: new Date(),
+          updatedAt: new Date(),
+        },
       }
+    );
+
+    // Grant exam access
+    if (transaction.examId) {
+      const users = await getCollection('users');
+      await users.updateOne(
+        { id: transaction.userId },
+        { $addToSet: { purchasedExams: transaction.examId } }
+      );
     }
 
-    // Return current status
     return NextResponse.json({
       success: true,
+      status: 'SUCCESS',
+      transactionId: razorpay_payment_id,
+      message: 'Payment verified successfully',
       data: {
-        transactionId: merchantTxnNo,
-        status: transaction?.status || 'PENDING',
-        examId: transaction?.examId,
-        amount: transaction?.amount
-      }
+        orderId: razorpay_order_id,
+        paymentId: razorpay_payment_id,
+        examId: transaction.examId,
+        amount: transaction.amount,
+      },
     });
-
   } catch (error) {
-    console.error('Verify error:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error('Verify payment error:', error);
+    return NextResponse.json({ 
+      success: false, 
+      error: error.message || 'Verification failed' 
+    }, { status: 500 });
   }
 }
