@@ -307,7 +307,8 @@ export default function ExamDetailPage() {
     try {
       const amount = selectedTest?.isExamPurchase ? exam.price : selectedTest?.price;
       
-      const response = await fetch('/api/payment/initiate', {
+      // Create Razorpay order
+      const response = await fetch('/api/payment/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -320,9 +321,57 @@ export default function ExamDetailPage() {
 
       const result = await response.json();
 
-      if (result.success && result.data.paymentUrl) {
-        // Redirect to ICICI payment page
-        window.location.href = result.data.paymentUrl;
+      if (result.success) {
+        // Load Razorpay script if not loaded
+        if (!window.Razorpay) {
+          await new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.body.appendChild(script);
+          });
+        }
+
+        const { orderId, keyId, name, description, prefill } = result.data;
+        
+        const options = {
+          key: keyId,
+          amount: result.data.amount,
+          currency: result.data.currency,
+          name,
+          description,
+          order_id: orderId,
+          prefill,
+          theme: { color: '#14b8a6' },
+          handler: async function (response) {
+            try {
+              const verifyRes = await fetch('/api/payment/verify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(response),
+              });
+              const verifyData = await verifyRes.json();
+              if (verifyData.success) {
+                if (verifyData.data?.examId) {
+                  window.location.href = `/exams/${verifyData.data.examId}`;
+                } else {
+                  window.location.href = `/payment/success?txn=${response.razorpay_payment_id}`;
+                }
+              } else {
+                window.location.href = `/payment/failed?reason=${encodeURIComponent(verifyData.error)}`;
+              }
+            } catch (err) {
+              window.location.href = `/payment/failed?reason=${encodeURIComponent(err.message)}`;
+            }
+          },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', function (response) {
+          window.location.href = `/payment/failed?reason=${encodeURIComponent(response.error.description)}`;
+        });
+        rzp.open();
       } else {
         alert(result.error || 'Failed to initiate payment. Please try again.');
       }
