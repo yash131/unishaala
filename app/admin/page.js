@@ -747,6 +747,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
       const res = await fetch('/api/admin/questions/bulk-delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           questionIds: selectedQuestions,
           mockTestId: selectedTestId
