@@ -941,6 +941,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
       const res = await fetch('/api/admin/questions/save-batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({
           mockTestId: selectedTestId,
           questions: validQuestions,
