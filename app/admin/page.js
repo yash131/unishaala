@@ -681,6 +681,11 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
     setPreviewData([]);
     setShowPreview(false);
     setSelectedQuestions([]);
+    setCsvFormat(null);
+    setHasImageColumns(false);
+    setDetectedColumns([]);
+    setZipFile(null);
+    setCsvFileSelected(null);
   }, [selectedTestType]);
 
   // Fetch questions when test is selected
