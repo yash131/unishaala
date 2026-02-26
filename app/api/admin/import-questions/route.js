@@ -278,14 +278,19 @@ export async function POST(request) {
       }
     }
 
-    // Update test question count
+    // Update test question count and publish status
     const totalQuestions = await questions.countDocuments({ test_id: testId });
+    const updateData = { totalQuestions, updatedAt: new Date() };
+    if (publish) {
+      updateData.isPublished = true;
+    }
     await mockTests.updateOne(
       { id: testId },
-      { $set: { totalQuestions, updatedAt: new Date() } }
+      { $set: updateData }
     );
 
     result.success = true;
+    result.published = publish;
     return NextResponse.json(result);
 
   } catch (error) {
