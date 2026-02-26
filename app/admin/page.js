@@ -645,6 +645,14 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
   const [showPreview, setShowPreview] = useState(false);
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
+  const zipInputRef = useRef(null);
+  
+  // CSV Format Detection State
+  const [csvFormat, setCsvFormat] = useState(null); // 'old' | 'new' | null
+  const [hasImageColumns, setHasImageColumns] = useState(false);
+  const [detectedColumns, setDetectedColumns] = useState([]);
+  const [zipFile, setZipFile] = useState(null);
+  const [csvFileSelected, setCsvFileSelected] = useState(null);
 
   // Bulk Delete State
   const [selectedQuestions, setSelectedQuestions] = useState([]);
