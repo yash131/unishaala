@@ -645,7 +645,9 @@ export default function MockTestPage() {
                           if (!option) return null;
                           // Handle both array of strings and array of objects
                           const optionTitle = typeof option === 'string' ? option : (option?.title || option?.text || '');
-                          const optionImageUrl = typeof option === 'object' ? (option?.image_url || option?.imageUrl) : null;
+                          // Check optionImages array from API or object format
+                          const optionImageUrl = currentQ.optionImages?.[index] || 
+                            (typeof option === 'object' ? (option?.image_url || option?.imageUrl) : null);
                           
                           return (
                             <Label
