@@ -1753,7 +1753,7 @@ export default function AdminPage() {
   };
 
   const handleLogout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
     localStorage.removeItem('user');
     router.push('/login');
   };
