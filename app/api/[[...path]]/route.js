@@ -2315,6 +2315,12 @@ export async function POST(request) {
 
       // Save Questions (from CSV preview) - Save Draft or Publish
       if (path === '/admin/questions/save-batch') {
+        // Admin authentication check
+        const user = await getAuthUser(request);
+        if (!user || !['SUPER_ADMIN', 'ADMIN', 'CONTENT_MANAGER'].includes(user.role)) {
+          return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+        }
+
         const { mockTestId, questions: questionsData, publish } = body;
         
         if (!mockTestId || !Array.isArray(questionsData) || questionsData.length === 0) {
