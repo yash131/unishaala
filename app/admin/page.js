@@ -1710,14 +1710,14 @@ export default function AdminPage() {
     setLoading(true);
     try {
       if (activeTab === 'dashboard') {
-        const res = await fetch('/api/admin/stats');
+        const res = await fetch('/api/admin/stats', { credentials: 'include' });
         const d = await res.json();
         if (d.success) setStats(d.data);
       } else if (activeTab === 'tests') {
         // Fetch both exams and mock tests
         const [examsRes, testsRes] = await Promise.all([
-          fetch('/api/admin/exams'),
-          fetch('/api/admin/mock-tests')
+          fetch('/api/admin/exams', { credentials: 'include' }),
+          fetch('/api/admin/mock-tests', { credentials: 'include' })
         ]);
         const examsData = await examsRes.json();
         const testsData = await testsRes.json();
@@ -1726,22 +1726,22 @@ export default function AdminPage() {
       } else if (activeTab === 'questions') {
         // Fetch both exams and mock tests for questions tab
         const [examsRes, testsRes] = await Promise.all([
-          fetch('/api/admin/exams'),
-          fetch('/api/admin/mock-tests')
+          fetch('/api/admin/exams', { credentials: 'include' }),
+          fetch('/api/admin/mock-tests', { credentials: 'include' })
         ]);
         const examsData = await examsRes.json();
         const testsData = await testsRes.json();
         if (examsData.success) setData(p => ({ ...p, exams: examsData.data }));
         if (testsData.success) setData(p => ({ ...p, mockTests: testsData.data }));
       } else if (activeTab === 'exams') {
-        const res = await fetch('/api/admin/exams');
+        const res = await fetch('/api/admin/exams', { credentials: 'include' });
         const d = await res.json();
         if (d.success) setData(p => ({ ...p, exams: d.data }));
       } else {
         const endpoints = { jobs: '/api/admin/jobs', colleges: '/api/admin/colleges', users: '/api/admin/users', testimonials: '/api/admin/testimonials', contacts: '/api/admin/contacts' };
         const endpoint = endpoints[activeTab];
         if (endpoint) {
-          const res = await fetch(endpoint);
+          const res = await fetch(endpoint, { credentials: 'include' });
           const d = await res.json();
           if (d.success) setData(p => ({ ...p, [activeTab]: d.data }));
         }
