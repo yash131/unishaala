@@ -231,7 +231,8 @@ Sample Test,Math Basics,2,Solve this equation,q2.jpg,90,Algebra,x = 5,Isolate va
                   <SelectValue placeholder="Choose a test..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {tests.map((test) => (\n                    <SelectItem key={test.id} value={test.id}>
+                  {tests.map((test) => (
+                    <SelectItem key={test.id} value={test.id}>
                       {test.title}
                     </SelectItem>
                   ))}
