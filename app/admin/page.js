@@ -801,10 +801,54 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
     a.click();
   };
 
-  // Parse CSV and show preview
-  const handleFileUpload = async (e) => {
+  // Handle CSV file selection and detect format
+  const handleCsvSelect = async (e) => {
     const file = e.target.files?.[0];
+    setCsvFileSelected(file);
+    setCsvFormat(null);
+    setHasImageColumns(false);
+    setDetectedColumns([]);
+    setZipFile(null);
+    if (zipInputRef.current) zipInputRef.current.value = '';
+    
     if (!file) return;
+    
+    try {
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      
+      if (lines.length < 1) return;
+      
+      const firstLine = lines[0];
+      const delimiter = firstLine.includes('\t') ? '\t' : ',';
+      const headers = firstLine.split(delimiter).map(h => h.trim().toLowerCase().replace(/"/g, ''));
+      
+      setDetectedColumns(headers);
+      
+      // Check for image columns
+      const imageColumns = ['question_image', 'option1_image', 'option2_image', 'option3_image', 'option4_image'];
+      const foundImageColumns = headers.filter(h => imageColumns.includes(h) || h.includes('image'));
+      
+      if (foundImageColumns.length > 0) {
+        setCsvFormat('new');
+        setHasImageColumns(true);
+        toast.info(`Detected NEW format with ${foundImageColumns.length} image columns. You can upload a ZIP file with images.`);
+      } else {
+        setCsvFormat('old');
+        setHasImageColumns(false);
+      }
+    } catch (err) {
+      console.error('Error detecting CSV format:', err);
+    }
+  };
+
+  // Parse CSV and show preview
+  const handleFileUpload = async () => {
+    const file = csvFileSelected;
+    if (!file) {
+      toast.error('Please select a CSV file');
+      return;
+    }
     
     if (!selectedTestId) {
       toast.error('Please select a test first');
@@ -813,7 +857,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
 
     try {
       const text = await file.text();
-      const lines = text.split('\n').filter(l => l.trim());
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
       
       if (lines.length < 2) {
         toast.error('CSV is empty');
