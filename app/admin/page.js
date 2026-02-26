@@ -1394,6 +1394,7 @@ function TransactionsTab() {
       const res = await fetch('/api/admin/transactions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({})
       });
       const data = await res.json();
@@ -1414,6 +1415,7 @@ function TransactionsTab() {
       const res = await fetch('/api/admin/payment/process-refund', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ transactionId })
       });
       const data = await res.json();
