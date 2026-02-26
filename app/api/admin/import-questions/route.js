@@ -168,6 +168,12 @@ export async function POST(request) {
 
     // STEP 3 & 4: Process records and save to DB
     const questions = await getCollection('questions');
+    
+    // Track used question numbers to detect duplicates
+    const usedQuestionNumbers = new Set();
+    // Get existing max question number for this test
+    const maxExisting = await questions.find({ test_id: testId }).sort({ question_number: -1 }).limit(1).toArray();
+    let nextQuestionNumber = (maxExisting[0]?.question_number || 0) + 1;
 
     for (let i = 0; i < records.length; i++) {
       const row = records[i];
@@ -181,7 +187,7 @@ export async function POST(request) {
         }
 
         // Extract fields (support both question_title and question_text)
-        const questionNumber = parseInt(normalizedRow['question_number']);
+        let questionNumber = parseInt(normalizedRow['question_number']);
         const questionText = normalizedRow['question_title']?.trim() || normalizedRow['question_text']?.trim();
         const option1Title = normalizedRow['option1_title']?.trim();
         const option2Title = normalizedRow['option2_title']?.trim();
@@ -189,9 +195,15 @@ export async function POST(request) {
         const option4Title = normalizedRow['option4_title']?.trim();
         const correctOption = parseInt(normalizedRow['correct_option_number']);
 
+        // Handle duplicate/missing question numbers - assign new unique number
+        if (!questionNumber || isNaN(questionNumber) || usedQuestionNumbers.has(questionNumber)) {
+          questionNumber = nextQuestionNumber++;
+          console.log(`Row ${rowNum}: Assigned new question_number ${questionNumber} (was duplicate or invalid)`);
+        }
+        usedQuestionNumbers.add(questionNumber);
+
         // Validation
         const errors = [];
-        if (!questionNumber || isNaN(questionNumber)) errors.push('invalid question_number');
         if (!questionText) errors.push('missing question_text');
         if (!option1Title) errors.push('missing option1_title');
         if (!option2Title) errors.push('missing option2_title');
