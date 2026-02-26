@@ -309,6 +309,7 @@ export async function POST(request) {
     const updateData = { totalQuestions, updatedAt: new Date() };
     if (publish) {
       updateData.isPublished = true;
+      updateData.status = 'Active'; // Required for user-facing visibility
     }
     await mockTests.updateOne(
       { id: testId },
