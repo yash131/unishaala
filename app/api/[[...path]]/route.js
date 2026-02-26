@@ -436,20 +436,46 @@ export async function GET(request) {
           { status: 'active' },
           { status: { $exists: false } }
         ]
-      }).sort({ questionNumber: 1 }).toArray();
+      }).sort({ question_number: 1 }).toArray();
       
-      // Remove correct answers for test mode
-      const questionsWithoutAnswers = testQuestions.map(q => ({
-        id: q.id,
-        questionNumber: q.questionNumber,
-        question_title: q.question_title,
-        questionText: q.question_title, // Backward compatibility
-        description: q.description,
-        topic_title: q.topic_title,
-        options: [q.option1_title, q.option2_title, q.option3_title, q.option4_title],
-        marks: q.marks || 2,
-        duration: q.duration
-      }));
+      // Remove correct answers for test mode - handle both old and new format
+      const questionsWithoutAnswers = testQuestions.map(q => {
+        // Handle options - could be array of objects or separate fields
+        let options;
+        if (q.options && Array.isArray(q.options)) {
+          // New format: options is array of {number, title, image_url}
+          options = q.options.map(opt => opt?.title || opt?.text || opt || '');
+        } else {
+          // Old format: separate option1_title, option2_title fields
+          options = [q.option1_title, q.option2_title, q.option3_title, q.option4_title];
+        }
+        
+        // Handle question text - could be question_text or question_title
+        const questionText = q.question_text || q.question_title || '';
+        
+        // Handle question image
+        const questionImage = q.question_image_url || q.questionImageUrl || null;
+        
+        // Handle option images (new format)
+        let optionImages = [null, null, null, null];
+        if (q.options && Array.isArray(q.options)) {
+          optionImages = q.options.map(opt => opt?.image_url || opt?.imageUrl || null);
+        }
+        
+        return {
+          id: q.id,
+          questionNumber: q.question_number || q.questionNumber,
+          question_title: questionText,
+          questionText: questionText,
+          question_image_url: questionImage,
+          description: q.description,
+          topic_title: q.topic_title,
+          options: options,
+          optionImages: optionImages,
+          marks: q.marks || 2,
+          duration: q.duration
+        };
+      });
 
       return jsonResponse({ success: true, data: questionsWithoutAnswers });
     }
