@@ -122,6 +122,7 @@ export async function POST(request) {
           if (entry.isDirectory) continue;
           if (entry.entryName.startsWith('__MACOSX')) continue;
           if (entry.entryName.startsWith('.')) continue;
+          if (path.basename(entry.entryName).startsWith('.')) continue;
 
           const fileName = path.basename(entry.entryName);
           const ext = path.extname(fileName).toLowerCase();
@@ -136,13 +137,26 @@ export async function POST(request) {
           // Extract and save
           fs.writeFileSync(filePath, entry.getData());
 
-          // Map original filename to public URL
+          // Map original filename to public URL (multiple variations for flexibility)
           const publicUrl = `/uploads/questions/${uniqueName}`;
+          
+          // Map with full path from ZIP
+          imageMap[entry.entryName.toLowerCase()] = publicUrl;
+          
+          // Map with just filename
           imageMap[fileName.toLowerCase()] = publicUrl;
           
-          // Also map without extension for flexibility
+          // Map without extension
           const nameWithoutExt = path.basename(fileName, ext).toLowerCase();
           imageMap[nameWithoutExt] = publicUrl;
+          
+          // Also map relative path variations (e.g., image/fdg.png -> fdg.png)
+          const parts = entry.entryName.split('/');
+          if (parts.length > 1) {
+            imageMap[parts[parts.length - 1].toLowerCase()] = publicUrl;
+          }
+          
+          console.log(`Mapped image: ${fileName} -> ${publicUrl}`);
         }
 
         console.log('Extracted images:', Object.keys(imageMap).length);
