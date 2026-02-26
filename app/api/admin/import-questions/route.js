@@ -165,9 +165,9 @@ export async function POST(request) {
           normalizedRow[key.toLowerCase().trim()] = value;
         }
 
-        // Extract fields
+        // Extract fields (support both question_title and question_text)
         const questionNumber = parseInt(normalizedRow['question_number']);
-        const questionText = normalizedRow['question_text']?.trim();
+        const questionText = normalizedRow['question_title']?.trim() || normalizedRow['question_text']?.trim();
         const option1Title = normalizedRow['option1_title']?.trim();
         const option2Title = normalizedRow['option2_title']?.trim();
         const option3Title = normalizedRow['option3_title']?.trim();
