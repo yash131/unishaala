@@ -54,6 +54,7 @@ export async function POST(request) {
     const testId = formData.get('test_id');
     const csvFile = formData.get('csv_file');
     const imagesZip = formData.get('images_zip');
+    const publish = formData.get('publish') === 'true';
 
     if (!testId) {
       return NextResponse.json({ ...result, error: 'Test ID is required' }, { status: 400 });
