@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import MainNavbar from '@/app/components/MainNavbar';
+import MainNavbar from '@/components/MainNavbar';
 import { 
   Upload, FileSpreadsheet, ImageIcon, CheckCircle, XCircle, AlertTriangle, 
   Loader2, Download, Info, FileArchive 
