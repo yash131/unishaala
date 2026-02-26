@@ -450,6 +450,7 @@ function TestsTab({ mockTests, exams, onRefresh }) {
       await fetch('/api/admin/mock-tests/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ testId: test.id, isPublished: !test.isPublished })
       });
       toast.success(test.isPublished ? 'Unpublished' : 'Published');
