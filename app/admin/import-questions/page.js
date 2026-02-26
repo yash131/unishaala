@@ -63,20 +63,51 @@ export default function ImportQuestionsPage() {
 
     try {
       const text = await file.text();
-      const lines = text.split('\n').filter(line => line.trim());
+      const lines = text.split(/\r?\n/).filter(line => line.trim());
       
       if (lines.length === 0) {
         setError('CSV file is empty');
         return;
       }
 
-      // Parse header row
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+      // Parse header row - handle quoted columns and various separators
+      let headers = [];
+      const headerLine = lines[0];
+      
+      // Try to parse CSV header properly (handling quotes)
+      const headerMatch = headerLine.match(/("([^"]*)"|[^,]+)/g);
+      if (headerMatch) {
+        headers = headerMatch.map(h => 
+          h.replace(/^["']|["']$/g, '') // Remove quotes
+           .trim()
+           .toLowerCase()
+           .replace(/\s+/g, '_') // Replace spaces with underscores
+        );
+      } else {
+        headers = headerLine.split(',').map(h => h.trim().toLowerCase());
+      }
+      
+      console.log('Detected headers:', headers);
       setDetectedColumns(headers);
 
-      // Check for image columns
-      const imageColumns = ['question_image', 'option1_image', 'option2_image', 'option3_image', 'option4_image'];
-      const foundImageColumns = imageColumns.filter(col => headers.includes(col));
+      // Check for image columns (be flexible with naming)
+      const imageColumnPatterns = [
+        'question_image', 'questionimage', 'question image',
+        'option1_image', 'option1image', 'option1 image',
+        'option2_image', 'option2image', 'option2 image',
+        'option3_image', 'option3image', 'option3 image',
+        'option4_image', 'option4image', 'option4 image'
+      ];
+      
+      const foundImageColumns = headers.filter(h => {
+        const normalized = h.replace(/[\s_-]/g, '').toLowerCase();
+        return imageColumnPatterns.some(pattern => 
+          normalized === pattern.replace(/[\s_-]/g, '').toLowerCase() ||
+          normalized.includes('image')
+        );
+      });
+      
+      console.log('Found image columns:', foundImageColumns);
       
       if (foundImageColumns.length > 0) {
         setCsvFormat('new');
@@ -89,7 +120,7 @@ export default function ImportQuestionsPage() {
       }
     } catch (e) {
       console.error('Error parsing CSV:', e);
-      setError('Failed to parse CSV file');
+      setError('Failed to parse CSV file: ' + e.message);
     }
   };
 
