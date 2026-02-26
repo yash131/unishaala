@@ -1122,13 +1122,14 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
               <Upload className="w-5 h-5 text-orange-600" /> Step 4: Upload CSV
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
+            {/* CSV File Upload */}
             <div className="flex flex-wrap items-center gap-4">
               <Input
                 ref={fileInputRef}
                 type="file"
                 accept=".csv,.tsv"
-                onChange={handleFileUpload}
+                onChange={handleCsvSelect}
                 className="flex-1"
               />
               <Button variant="outline" onClick={downloadSampleCSV}>
@@ -1138,8 +1139,65 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
                 <Download className="w-4 h-4 mr-2" /> Export
               </Button>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-              Upload CSV with columns: question_title, option1_title, option2_title, option3_title, option4_title, correct_option_number (1-4)
+
+            {/* Format Detection Result */}
+            {csvFormat && (
+              <div className={`p-3 rounded-lg border ${hasImageColumns ? 'bg-purple-50 border-purple-200' : 'bg-green-50 border-green-200'}`}>
+                <div className="flex items-center gap-2">
+                  {hasImageColumns ? (
+                    <>
+                      <Badge className="bg-purple-600">NEW Format</Badge>
+                      <span className="text-sm text-purple-700">Image columns detected ({detectedColumns.filter(c => c.includes('image')).length} columns)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Badge className="bg-green-600">OLD Format</Badge>
+                      <span className="text-sm text-green-700">No image columns - standard import</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ZIP Upload - Only shown when image columns are detected */}
+            {hasImageColumns && (
+              <div className="p-4 border-2 border-dashed border-purple-300 rounded-lg bg-purple-50">
+                <Label className="flex items-center gap-2 mb-2 text-purple-700 font-medium">
+                  <Upload className="w-4 h-4" />
+                  Upload Images ZIP (Optional)
+                </Label>
+                <Input
+                  ref={zipInputRef}
+                  type="file"
+                  accept=".zip"
+                  onChange={(e) => setZipFile(e.target.files?.[0] || null)}
+                  className="bg-white"
+                />
+                {zipFile && (
+                  <p className="text-sm text-purple-600 mt-2">
+                    Selected: {zipFile.name} ({(zipFile.size / 1024 / 1024).toFixed(2)} MB)
+                  </p>
+                )}
+                <p className="text-xs text-gray-500 mt-2">
+                  Supported: PNG, JPG, JPEG, WEBP. Max 100MB. If not uploaded, questions will import without images.
+                </p>
+              </div>
+            )}
+
+            {/* Import Button */}
+            {csvFileSelected && (
+              <Button 
+                onClick={handleFileUpload} 
+                className="w-full bg-teal-600 hover:bg-teal-700"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Import {csvFormat === 'new' ? '(with images)' : 'Questions'}
+              </Button>
+            )}
+
+            <p className="text-xs text-gray-500">
+              Required columns: question_title, option1_title, option2_title, option3_title, option4_title, correct_option_number (1-4)
+              {hasImageColumns && <><br/>Image columns: question_image, option1_image, option2_image, option3_image, option4_image</>}
             </p>
           </CardContent>
         </Card>
