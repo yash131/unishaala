@@ -609,8 +609,9 @@ export async function GET(request) {
         const mockTestId = searchParams.get('mockTestId');
         const questions = await getCollection('questions');
         
-        const query = mockTestId ? { mockTestId } : {};
-        const allQuestions = await questions.find(query).sort({ createdAt: -1 }).toArray();
+        // Support both mockTestId and test_id field names
+        const query = mockTestId ? { $or: [{ mockTestId }, { test_id: mockTestId }] } : {};
+        const allQuestions = await questions.find(query).sort({ question_number: 1 }).toArray();
         
         return jsonResponse({ success: true, data: allQuestions });
       }
