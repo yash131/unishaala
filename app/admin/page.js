@@ -928,7 +928,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Save questions
+  // Save questions (with ZIP support)
   const saveQuestions = async (publish = false) => {
     if (!selectedTestId || previewData.length === 0) return;
     
@@ -940,32 +940,69 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
 
     setSaving(true);
     try {
-      const res = await fetch('/api/admin/questions/save-batch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          mockTestId: selectedTestId,
-          questions: validQuestions,
-          publish
-        })
-      });
-      
-      const result = await res.json();
-      
-      if (result.success) {
-        toast.success(
-          `Saved: ${result.data.inserted} inserted, ${result.data.duplicates} duplicates skipped, ${result.data.failed} failed` +
-          (publish ? ' - Test Published!' : '')
-        );
-        setShowPreview(false);
-        setPreviewData([]);
-        fetchQuestions();
-        onRefresh();
+      // If ZIP file is present and we have image columns, use import-questions API
+      if (zipFile && hasImageColumns) {
+        const formData = new FormData();
+        formData.append('test_id', selectedTestId);
+        formData.append('csv_file', csvFileSelected);
+        formData.append('images_zip', zipFile);
+        if (publish) formData.append('publish', 'true');
+
+        const res = await fetch('/api/admin/import-questions', {
+          method: 'POST',
+          credentials: 'include',
+          body: formData
+        });
+        
+        const result = await res.json();
+        
+        if (result.success) {
+          toast.success(
+            `Imported: ${result.imported} new, ${result.updated} updated, ${result.skipped} skipped` +
+            (result.missing_images?.length > 0 ? ` (${result.missing_images.length} missing images)` : '') +
+            (publish ? ' - Test Published!' : '')
+          );
+          setShowPreview(false);
+          setPreviewData([]);
+          setZipFile(null);
+          setCsvFileSelected(null);
+          setCsvFormat(null);
+          setHasImageColumns(false);
+          fetchQuestions();
+          onRefresh();
+        } else {
+          toast.error(result.error || 'Import failed');
+        }
       } else {
-        toast.error(result.error);
+        // No ZIP file - use regular save-batch
+        const res = await fetch('/api/admin/questions/save-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            mockTestId: selectedTestId,
+            questions: validQuestions,
+            publish
+          })
+        });
+        
+        const result = await res.json();
+        
+        if (result.success) {
+          toast.success(
+            `Saved: ${result.data.inserted} inserted, ${result.data.duplicates} duplicates skipped, ${result.data.failed} failed` +
+            (publish ? ' - Test Published!' : '')
+          );
+          setShowPreview(false);
+          setPreviewData([]);
+          fetchQuestions();
+          onRefresh();
+        } else {
+          toast.error(result.error);
+        }
       }
     } catch (e) {
+      console.error('Save error:', e);
       toast.error('Failed to save');
     }
     setSaving(false);
