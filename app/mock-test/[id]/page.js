@@ -620,8 +620,19 @@ export default function MockTestPage() {
                   <>
                     <div className="mb-6">
                       <p className="text-lg text-gray-900 leading-relaxed">
-                        {currentQ.questionText || currentQ.question_title}
+                        {currentQ.questionText || currentQ.question_text || currentQ.question_title}
                       </p>
+                      {/* Question Image */}
+                      {(currentQ.question_image_url || currentQ.questionImageUrl) && (
+                        <div className="mt-4">
+                          <img 
+                            src={currentQ.question_image_url || currentQ.questionImageUrl} 
+                            alt="Question" 
+                            className="max-w-full h-auto rounded-lg border shadow-sm"
+                            style={{ maxHeight: '300px' }}
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <RadioGroup
@@ -629,19 +640,35 @@ export default function MockTestPage() {
                       onValueChange={(value) => handleAnswerSelect(currentQ.id, parseInt(value))}
                     >
                       <div className="space-y-3">
-                        {currentQ.options?.map((option, index) => (
-                          <Label
-                            key={index}
-                            className={`flex items-center gap-4 p-4 border rounded-lg cursor-pointer transition-all ${
-                              answers[currentQ.id] === index + 1
-                                ? 'border-teal-500 bg-teal-50'
-                                : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
-                            <RadioGroupItem value={(index + 1).toString()} />
-                            <span className="text-gray-700">{option}</span>
-                          </Label>
-                        ))}
+                        {currentQ.options?.map((option, index) => {
+                          // Handle both array of strings and array of objects
+                          const optionTitle = typeof option === 'string' ? option : (option.title || option.text);
+                          const optionImageUrl = typeof option === 'object' ? (option.image_url || option.imageUrl) : null;
+                          
+                          return (
+                            <Label
+                              key={index}
+                              className={`flex items-start gap-4 p-4 border rounded-lg cursor-pointer transition-all ${
+                                answers[currentQ.id] === index + 1
+                                  ? 'border-teal-500 bg-teal-50'
+                                  : 'border-gray-200 hover:border-gray-300'
+                              }`}
+                            >
+                              <RadioGroupItem value={(index + 1).toString()} className="mt-1" />
+                              <div className="flex-1">
+                                <span className="text-gray-700">{optionTitle}</span>
+                                {optionImageUrl && (
+                                  <img 
+                                    src={optionImageUrl} 
+                                    alt={`Option ${index + 1}`} 
+                                    className="mt-2 max-w-full h-auto rounded border"
+                                    style={{ maxHeight: '150px' }}
+                                  />
+                                )}
+                              </div>
+                            </Label>
+                          );
+                        })}
                       </div>
                     </RadioGroup>
                   </>
