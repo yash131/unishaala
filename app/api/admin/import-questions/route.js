@@ -266,7 +266,7 @@ export async function POST(request) {
           description: normalizedRow['description']?.trim() || '',
           solution_text: normalizedRow['solution_text']?.trim() || '',
           tip: normalizedRow['tip']?.trim() || '',
-          status: normalizedRow['status']?.trim() || 'active',
+          status: 'active', // Always set to active for visibility
           options: [
             { number: 1, title: option1Title, image_url: option1ImageUrl },
             { number: 2, title: option2Title, image_url: option2ImageUrl },
