@@ -641,9 +641,11 @@ export default function MockTestPage() {
                     >
                       <div className="space-y-3">
                         {currentQ.options?.map((option, index) => {
+                          // Skip null/undefined options
+                          if (!option) return null;
                           // Handle both array of strings and array of objects
-                          const optionTitle = typeof option === 'string' ? option : (option.title || option.text);
-                          const optionImageUrl = typeof option === 'object' ? (option.image_url || option.imageUrl) : null;
+                          const optionTitle = typeof option === 'string' ? option : (option?.title || option?.text || '');
+                          const optionImageUrl = typeof option === 'object' ? (option?.image_url || option?.imageUrl) : null;
                           
                           return (
                             <Label
