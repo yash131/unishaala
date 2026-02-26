@@ -256,6 +256,7 @@ export async function POST(request) {
         // Build question document
         const questionDoc = {
           test_id: testId,
+          mockTestId: testId, // Also set mockTestId for user-facing queries
           test_title: normalizedRow['test_title']?.trim() || test.title,
           topic_title: normalizedRow['topic_title']?.trim() || '',
           question_number: questionNumber,
