@@ -540,6 +540,30 @@ export async function GET(request) {
       return jsonResponse({ success: true, data: userData });
     }
 
+    // Get user's purchased tests/exams
+    if (path === '/user/purchases') {
+      const user = await getAuthUser(request);
+      if (!user) {
+        return jsonResponse({ success: false, error: 'Please login' }, 401);
+      }
+
+      const transactions = await getCollection('transactions');
+      const purchases = await transactions.find({
+        userId: user.id,
+        status: 'SUCCESS'
+      }).toArray();
+
+      return jsonResponse({
+        success: true,
+        data: purchases.map(p => ({
+          mockTestId: p.mockTestId,
+          examId: p.examId,
+          itemName: p.itemName,
+          purchasedAt: p.completedAt || p.createdAt
+        }))
+      });
+    }
+
     // Test attempt result with solutions
     if (path.startsWith('/attempt/')) {
       const attemptId = path.split('/attempt/')[1];
