@@ -261,6 +261,7 @@ export default function ExamDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [selectedTest, setSelectedTest] = useState(null);
+  const [purchasedTests, setPurchasedTests] = useState(new Set());
 
   useEffect(() => {
     async function fetchExamDetail() {
@@ -269,6 +270,27 @@ export default function ExamDetailPage() {
         const result = await response.json();
         if (result.success) {
           setData(result.data);
+          
+          // Fetch user's purchased tests
+          const userData = localStorage.getItem('user');
+          if (userData) {
+            try {
+              const purchaseRes = await fetch('/api/user/purchases', {
+                credentials: 'include'
+              });
+              const purchaseData = await purchaseRes.json();
+              if (purchaseData.success) {
+                const purchased = new Set(purchaseData.data.map(p => p.mockTestId).filter(Boolean));
+                // Also add all tests if exam was purchased
+                if (purchaseData.data.some(p => p.examId === result.data.exam?.id)) {
+                  result.data.mockTests?.forEach(t => purchased.add(t.id));
+                }
+                setPurchasedTests(purchased);
+              }
+            } catch (e) {
+              console.error('Error fetching purchases:', e);
+            }
+          }
         }
       } catch (error) {
         console.error('Error fetching exam detail:', error);
@@ -285,13 +307,13 @@ export default function ExamDetailPage() {
     // Check if user is logged in
     const userData = localStorage.getItem('user');
     
-    // If test is free, go directly
-    if (test.isFree || test.price === 0) {
+    // If test is free or already purchased, go directly
+    if (test.isFree || test.price === 0 || purchasedTests.has(test.id)) {
       window.location.href = `/mock-test/${test.id}`;
       return;
     }
     
-    // Check if user has already purchased this test or exam
+    // Check if user has already purchased this test or exam (double-check via API)
     if (userData) {
       try {
         const checkRes = await fetch('/api/payment/verify-access', {
