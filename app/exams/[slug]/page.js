@@ -489,51 +489,58 @@ export default function ExamDetailPage() {
   const practiceQuestions = mockTests?.filter(t => t.testType === 'practice_questions') || [];
   const previousYearTests = mockTests?.filter(t => t.testType === 'previous_year') || [];
 
-  const renderTestCard = (test) => (
-    <Card key={test.id} className="card-hover">
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
-            {test.testType === 'practice_questions' ? (
-              <BookOpen className="w-6 h-6 text-teal-600" />
-            ) : test.testType === 'previous_year' ? (
-              <History className="w-6 h-6 text-purple-600" />
+  const renderTestCard = (test) => {
+    // Determine if test is accessible
+    const isTestFree = test.isFree || test.price === 0 || test.price === null;
+    const isTestPurchased = purchasedTests.has(test.id);
+    const isAccessible = isTestFree || isTestPurchased || examPurchased;
+    
+    return (
+      <Card key={test.id} className="card-hover">
+        <CardContent className="p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div className="w-12 h-12 bg-teal-100 rounded-lg flex items-center justify-center">
+              {test.testType === 'practice_questions' ? (
+                <BookOpen className="w-6 h-6 text-teal-600" />
+              ) : test.testType === 'previous_year' ? (
+                <History className="w-6 h-6 text-purple-600" />
+              ) : (
+                <ClipboardList className="w-6 h-6 text-teal-600" />
+              )}
+            </div>
+            {isTestPurchased || examPurchased ? (
+              <Badge className="bg-green-100 text-green-700"><CheckCircle className="w-3 h-3 mr-1 inline" /> Unlocked</Badge>
+            ) : isTestFree ? (
+              <Badge className="bg-green-100 text-green-700">FREE</Badge>
+            ) : exam.price > 0 ? (
+              <Badge className="bg-amber-100 text-amber-700">Premium</Badge>
             ) : (
-              <ClipboardList className="w-6 h-6 text-teal-600" />
+              <Badge className="bg-rose-100 text-rose-700">₹{test.price}</Badge>
             )}
           </div>
-          {purchasedTests.has(test.id) ? (
-            <Badge className="bg-green-100 text-green-700"><CheckCircle className="w-3 h-3 mr-1 inline" /> Purchased</Badge>
-          ) : exam.price > 0 ? (
-            <Badge className="bg-amber-100 text-amber-700">Premium</Badge>
-          ) : test.isFree ? (
-            <Badge className="bg-green-100 text-green-700">FREE</Badge>
-          ) : (
-            <Badge className="bg-rose-100 text-rose-700">₹{test.price}</Badge>
-          )}
-        </div>
-        <h3 className="font-bold text-gray-900 mb-2">{test.title}</h3>
-        <p className="text-sm text-gray-500 mb-4 line-clamp-2">{test.description}</p>
-        <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
-          <span className="flex items-center gap-1">
-            <Clock className="w-4 h-4" /> {test.duration} min
-          </span>
-          <span>{test.questionCount || test.totalQuestions} Qs</span>
-          <span>{test.totalMarks} Marks</span>
-        </div>
-        <Button 
-          className="w-full bg-teal-600 hover:bg-teal-700"
-          onClick={() => handleStartTest(test)}
-        >
-          {purchasedTests.has(test.id) || test.isFree || test.price === 0 ? (
-            <><Play className="w-4 h-4 mr-2" /> Start Test</>
-          ) : (
-            <><Lock className="w-4 h-4 mr-2" /> Unlock & Start</>
-          )}
-        </Button>
-      </CardContent>
-    </Card>
-  );
+          <h3 className="font-bold text-gray-900 mb-2">{test.title}</h3>
+          <p className="text-sm text-gray-500 mb-4 line-clamp-2">{test.description}</p>
+          <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
+            <span className="flex items-center gap-1">
+              <Clock className="w-4 h-4" /> {test.duration} min
+            </span>
+            <span>{test.questionCount || test.totalQuestions} Qs</span>
+            <span>{test.totalMarks} Marks</span>
+          </div>
+          <Button 
+            className="w-full bg-teal-600 hover:bg-teal-700"
+            onClick={() => handleStartTest(test)}
+          >
+            {isAccessible ? (
+              <><Play className="w-4 h-4 mr-2" /> Start Test</>
+            ) : (
+              <><Lock className="w-4 h-4 mr-2" /> Unlock & Start</>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
