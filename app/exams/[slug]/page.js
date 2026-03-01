@@ -6,7 +6,6 @@ import { useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { MainNavbar } from '@/components/MainNavbar';
 import {
@@ -17,292 +16,58 @@ import {
   Clock,
   Play,
   Lock,
-  Download,
   CheckCircle,
   ArrowLeft,
   History,
-  Medal,
   Users,
-  TrendingUp,
-  Crown,
-  Award,
-  Target
+  Layers,
+  ChevronRight
 } from 'lucide-react';
-
-// Leaderboard Component
-function LeaderboardTab({ examSlug }) {
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [examInfo, setExamInfo] = useState(null);
-  const [totalParticipants, setTotalParticipants] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [myRank, setMyRank] = useState(null);
-
-  useEffect(() => {
-    fetchLeaderboard();
-    fetchMyRank();
-  }, [examSlug]);
-
-  const fetchLeaderboard = async () => {
-    try {
-      const res = await fetch(`/api/leaderboard/${examSlug}`);
-      const data = await res.json();
-      if (data.success) {
-        setLeaderboard(data.data.leaderboard);
-        setExamInfo(data.data.exam);
-        setTotalParticipants(data.data.totalParticipants);
-      }
-    } catch (e) {
-      console.error('Failed to fetch leaderboard:', e);
-    }
-    setLoading(false);
-  };
-
-  const fetchMyRank = async () => {
-    try {
-      const res = await fetch(`/api/my-rank/${examSlug}`);
-      const data = await res.json();
-      if (data.success && data.data.rank) {
-        setMyRank(data.data);
-      }
-    } catch (e) {
-      // User not logged in or no attempts
-    }
-  };
-
-  const getRankIcon = (rank) => {
-    if (rank === 1) return <Crown className="w-6 h-6 text-yellow-500" />;
-    if (rank === 2) return <Medal className="w-6 h-6 text-gray-400" />;
-    if (rank === 3) return <Medal className="w-6 h-6 text-amber-600" />;
-    return <span className="w-6 h-6 flex items-center justify-center font-bold text-gray-500">{rank}</span>;
-  };
-
-  const getRankBadge = (rank) => {
-    if (rank === 1) return 'bg-gradient-to-r from-yellow-400 to-yellow-600 text-white';
-    if (rank === 2) return 'bg-gradient-to-r from-gray-300 to-gray-500 text-white';
-    if (rank === 3) return 'bg-gradient-to-r from-amber-400 to-amber-600 text-white';
-    if (rank <= 10) return 'bg-teal-100 text-teal-700';
-    return 'bg-gray-100 text-gray-600';
-  };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-teal-600 border-t-transparent"></div>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {/* Stats Cards */}
-      <div className="grid md:grid-cols-3 gap-4 mb-6">
-        <Card className="bg-gradient-to-br from-teal-500 to-teal-700 text-white">
-          <CardContent className="p-6 text-center">
-            <Users className="w-8 h-8 mx-auto mb-2 opacity-80" />
-            <p className="text-3xl font-bold">{totalParticipants}</p>
-            <p className="text-sm opacity-80">Total Participants</p>
-          </CardContent>
-        </Card>
-        
-        {myRank && (
-          <>
-            <Card className="bg-gradient-to-br from-purple-500 to-purple-700 text-white">
-              <CardContent className="p-6 text-center">
-                <Trophy className="w-8 h-8 mx-auto mb-2 opacity-80" />
-                <p className="text-3xl font-bold">#{myRank.rank}</p>
-                <p className="text-sm opacity-80">Your Rank</p>
-              </CardContent>
-            </Card>
-            <Card className="bg-gradient-to-br from-orange-500 to-orange-700 text-white">
-              <CardContent className="p-6 text-center">
-                <Target className="w-8 h-8 mx-auto mb-2 opacity-80" />
-                <p className="text-3xl font-bold">{myRank.bestScore}/{myRank.totalMarks}</p>
-                <p className="text-sm opacity-80">Your Best Score</p>
-              </CardContent>
-            </Card>
-          </>
-        )}
-        
-        {!myRank && (
-          <Card className="md:col-span-2 bg-gray-50">
-            <CardContent className="p-6 text-center">
-              <p className="text-gray-500">Login and attempt a test to see your rank!</p>
-              <Link href="/login">
-                <Button className="mt-2 bg-teal-600 hover:bg-teal-700">Login Now</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {/* My Rank Card (if logged in) */}
-      {myRank && (
-        <Card className="mb-6 border-2 border-teal-500">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className={`w-14 h-14 rounded-full flex items-center justify-center ${getRankBadge(myRank.rank)}`}>
-                  {getRankIcon(myRank.rank)}
-                </div>
-                <div>
-                  <p className="font-bold text-lg">Your Position</p>
-                  <p className="text-gray-500">Rank #{myRank.rank} of {myRank.totalParticipants}</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-teal-600">{myRank.bestScore}</p>
-                <p className="text-sm text-gray-500">Best Score</p>
-              </div>
-              <div className="text-right">
-                <p className="text-2xl font-bold text-purple-600">Top {100 - myRank.percentile}%</p>
-                <p className="text-sm text-gray-500">Percentile</p>
-              </div>
-              <div className="text-right">
-                <p className="text-lg font-semibold">{myRank.attempts}</p>
-                <p className="text-sm text-gray-500">Attempts</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Leaderboard Table */}
-      <Card>
-        <CardHeader className="border-b bg-gray-50">
-          <CardTitle className="flex items-center gap-2">
-            <Trophy className="w-5 h-5 text-yellow-500" />
-            Live Leaderboard
-            <Badge className="ml-2 bg-green-500">Real-time</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {leaderboard.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Rank</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-gray-600">Name</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Best Score</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Accuracy</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-600">Attempts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaderboard.map((entry, index) => (
-                    <tr 
-                      key={entry.userId} 
-                      className={`border-b hover:bg-gray-50 transition-colors ${
-                        entry.rank <= 3 ? 'bg-gradient-to-r from-yellow-50 to-transparent' : ''
-                      }`}
-                    >
-                      <td className="px-4 py-4">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${getRankBadge(entry.rank)}`}>
-                          {entry.rank <= 3 ? getRankIcon(entry.rank) : entry.rank}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
-                            <span className="font-bold text-teal-600">
-                              {entry.name?.charAt(0)?.toUpperCase() || 'U'}
-                            </span>
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-900">{entry.name}</p>
-                            {entry.rank === 1 && (
-                              <Badge className="bg-yellow-100 text-yellow-700 text-xs">🏆 Top Scorer</Badge>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <span className="font-bold text-lg text-gray-900">{entry.bestScore}</span>
-                        <span className="text-gray-400">/{entry.totalMarks}</span>
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <div className="w-16 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className={`h-2 rounded-full ${
-                                entry.accuracy >= 80 ? 'bg-green-500' : 
-                                entry.accuracy >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                              }`}
-                              style={{ width: `${entry.accuracy}%` }}
-                            ></div>
-                          </div>
-                          <span className="font-medium">{entry.accuracy}%</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <Badge variant="outline">{entry.attempts}</Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="p-12 text-center">
-              <Trophy className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 text-lg">No rankings yet</p>
-              <p className="text-gray-400">Be the first to attempt a test and top the leaderboard!</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
 
 export default function ExamDetailPage() {
   const params = useParams();
-  const [data, setData] = useState(null);
+  const [exam, setExam] = useState(null);
+  const [domains, setDomains] = useState([]);
+  const [selectedDomain, setSelectedDomain] = useState(null);
+  const [tests, setTests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [testsLoading, setTestsLoading] = useState(false);
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [selectedTest, setSelectedTest] = useState(null);
   const [purchasedTests, setPurchasedTests] = useState(new Set());
+  const [purchasedDomains, setPurchasedDomains] = useState(new Set());
   const [examPurchased, setExamPurchased] = useState(false);
 
+  // Fetch exam and domains
   useEffect(() => {
-    async function fetchExamDetail() {
+    async function fetchExamData() {
       try {
         const response = await fetch(`/api/exams/${params.slug}`);
         const result = await response.json();
         if (result.success) {
-          setData(result.data);
+          setExam(result.data.exam);
+          setDomains(result.data.domains || []);
           
-          // Fetch user's purchased tests
+          // Fetch user purchases
           const userData = localStorage.getItem('user');
           if (userData) {
             try {
-              const purchaseRes = await fetch('/api/user/purchases', {
-                credentials: 'include'
-              });
+              const purchaseRes = await fetch('/api/user/purchases', { credentials: 'include' });
               const purchaseData = await purchaseRes.json();
               if (purchaseData.success && purchaseData.data) {
-                const purchased = new Set();
+                const purchasedTestSet = new Set();
+                const purchasedDomainSet = new Set();
                 let hasExamPurchase = false;
                 
-                // Check each purchase
                 purchaseData.data.forEach(p => {
-                  if (p.mockTestId) {
-                    purchased.add(p.mockTestId);
-                  }
-                  if (p.examId === result.data.exam?.id) {
-                    hasExamPurchase = true;
-                  }
+                  if (p.mockTestId) purchasedTestSet.add(p.mockTestId);
+                  if (p.domainId) purchasedDomainSet.add(p.domainId);
+                  if (p.examId === result.data.exam?.id) hasExamPurchase = true;
                 });
                 
-                // If exam was purchased, add all tests under it
-                if (hasExamPurchase) {
-                  setExamPurchased(true);
-                  result.data.mockTests?.forEach(t => purchased.add(t.id));
-                }
-                
-                setPurchasedTests(purchased);
-                console.log('Purchased tests:', [...purchased]);
-                console.log('Exam purchased:', hasExamPurchase);
+                setPurchasedTests(purchasedTestSet);
+                setPurchasedDomains(purchasedDomainSet);
+                setExamPurchased(hasExamPurchase);
               }
             } catch (e) {
               console.error('Error fetching purchases:', e);
@@ -310,46 +75,63 @@ export default function ExamDetailPage() {
           }
         }
       } catch (error) {
-        console.error('Error fetching exam detail:', error);
+        console.error('Error fetching exam:', error);
       } finally {
         setLoading(false);
       }
     }
     if (params.slug) {
-      fetchExamDetail();
+      fetchExamData();
     }
   }, [params.slug]);
 
+  // Fetch tests when domain is selected
+  const handleSelectDomain = async (domain) => {
+    setSelectedDomain(domain);
+    setTestsLoading(true);
+    try {
+      const response = await fetch(`/api/domains/${domain.id}`);
+      const result = await response.json();
+      if (result.success) {
+        setTests(result.data.tests || []);
+      }
+    } catch (error) {
+      console.error('Error fetching tests:', error);
+    } finally {
+      setTestsLoading(false);
+    }
+  };
+
+  const handleBackToDomains = () => {
+    setSelectedDomain(null);
+    setTests([]);
+  };
+
   const handleStartTest = async (test) => {
-    // Check if user is logged in
     const userData = localStorage.getItem('user');
-    
-    // Determine if test is free
     const isTestFree = test.isFree || !test.price || test.price === 0;
+    const isDomainPurchased = purchasedDomains.has(selectedDomain?.id);
     
-    // If test is free, always allow access (no login required)
+    // Free tests are always accessible
     if (isTestFree) {
       window.location.href = `/mock-test/${test.id}`;
       return;
     }
     
-    // If user already purchased this test or the exam, go directly
-    if (purchasedTests.has(test.id) || examPurchased) {
+    // Check if already purchased (test, domain, or exam)
+    if (purchasedTests.has(test.id) || isDomainPurchased || examPurchased) {
       window.location.href = `/mock-test/${test.id}`;
       return;
     }
     
-    // Double-check via API (in case state is stale)
+    // Verify via API
     if (userData) {
       try {
         const checkRes = await fetch('/api/payment/verify-access', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({
-            mockTestId: test.id,
-            examId: data?.exam?.id
-          })
+          body: JSON.stringify({ mockTestId: test.id, domainId: selectedDomain?.id, examId: exam?.id })
         });
         const checkData = await checkRes.json();
         if (checkData.success && checkData.data?.hasAccess) {
@@ -361,21 +143,18 @@ export default function ExamDetailPage() {
       }
     }
     
-    // Not logged in - prompt login
     if (!userData) {
       alert('Please login to access this test');
       window.location.href = '/login';
       return;
     }
     
-    // Need to purchase - show payment modal for individual test
-    // User can also choose to buy full exam from modal
+    // Show payment modal
     setSelectedTest(test);
     setShowUnlockModal(true);
   };
 
-  const handlePayment = async (isExamPurchase = false) => {
-    // Check if user is logged in
+  const handlePayment = async (purchaseType) => {
     const userData = localStorage.getItem('user');
     if (!userData) {
       alert('Please login to make payment');
@@ -383,25 +162,29 @@ export default function ExamDetailPage() {
       return;
     }
 
+    let amount, paymentData;
+    
+    if (purchaseType === 'exam') {
+      amount = exam.price;
+      paymentData = { examId: exam.id, amount, paymentType: 'exam_purchase' };
+    } else if (purchaseType === 'domain') {
+      amount = selectedDomain.price;
+      paymentData = { domainId: selectedDomain.id, examId: exam.id, amount, paymentType: 'domain_purchase' };
+    } else {
+      amount = selectedTest.price;
+      paymentData = { mockTestId: selectedTest.id, amount, paymentType: 'test_purchase' };
+    }
+
     try {
-      const amount = isExamPurchase ? exam.price : selectedTest?.price;
-      
-      // Create Razorpay order
       const response = await fetch('/api/payment/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          examId: isExamPurchase ? exam.id : null,
-          mockTestId: isExamPurchase ? null : selectedTest?.id,
-          amount: amount,
-          paymentType: isExamPurchase ? 'exam_purchase' : 'test_purchase'
-        })
+        body: JSON.stringify(paymentData)
       });
 
       const result = await response.json();
 
       if (result.success) {
-        // Load Razorpay script if not loaded
         if (!window.Razorpay) {
           await new Promise((resolve, reject) => {
             const script = document.createElement('script');
@@ -432,62 +215,95 @@ export default function ExamDetailPage() {
               });
               const verifyData = await verifyRes.json();
               if (verifyData.success) {
-                if (verifyData.data?.examId) {
-                  window.location.href = `/exams/${verifyData.data.examId}`;
-                } else {
-                  window.location.href = `/payment/success?txn=${response.razorpay_payment_id}`;
-                }
+                window.location.href = `/payment/success?txn=${response.razorpay_payment_id}`;
               } else {
                 window.location.href = `/payment/failed?reason=${encodeURIComponent(verifyData.error)}`;
               }
             } catch (err) {
               window.location.href = `/payment/failed?reason=${encodeURIComponent(err.message)}`;
             }
-          },
+          }
         };
-
-        const rzp = new window.Razorpay(options);
-        rzp.on('payment.failed', function (response) {
+        
+        options['handler.failed'] = function (response) {
           window.location.href = `/payment/failed?reason=${encodeURIComponent(response.error.description)}`;
-        });
+        };
+        
+        const rzp = new window.Razorpay(options);
         rzp.open();
       } else {
-        alert(result.error || 'Failed to initiate payment. Please try again.');
+        alert(result.error || 'Failed to initiate payment');
       }
     } catch (error) {
       console.error('Payment error:', error);
-      alert('Payment initiation failed. Please try again.');
+      alert('Payment failed. Please try again.');
     }
+    
+    setShowUnlockModal(false);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-teal-600 border-t-transparent"></div>
+      <div className="min-h-screen bg-gray-50">
+        <MainNavbar />
+        <div className="pt-24 flex items-center justify-center">
+          <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
+        </div>
       </div>
     );
   }
 
-  if (!data?.exam) {
+  if (!exam) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Exam not found</p>
+      <div className="min-h-screen bg-gray-50">
+        <MainNavbar />
+        <div className="pt-24 text-center">
+          <p className="text-gray-500">Exam not found</p>
+        </div>
       </div>
     );
   }
 
-  const { exam, mockTests, previousPapers, topperNotes, questionBankCount } = data;
+  // Render domain card
+  const renderDomainCard = (domain) => {
+    const isPurchased = purchasedDomains.has(domain.id) || examPurchased;
+    const isFree = !domain.price || domain.price === 0;
+    
+    return (
+      <Card key={domain.id} className="card-hover cursor-pointer" onClick={() => handleSelectDomain(domain)}>
+        <CardContent className="p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div className="w-14 h-14 bg-gradient-to-br from-teal-400 to-teal-600 rounded-xl flex items-center justify-center">
+              <Layers className="w-7 h-7 text-white" />
+            </div>
+            {isPurchased ? (
+              <Badge className="bg-green-100 text-green-700"><CheckCircle className="w-3 h-3 mr-1 inline" /> Unlocked</Badge>
+            ) : isFree ? (
+              <Badge className="bg-green-100 text-green-700">FREE</Badge>
+            ) : (
+              <Badge className="bg-rose-100 text-rose-700">₹{domain.price}</Badge>
+            )}
+          </div>
+          <h3 className="text-xl font-bold text-gray-900 mb-2">{domain.name}</h3>
+          <p className="text-sm text-gray-500 mb-4 line-clamp-2">{domain.description}</p>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-600">
+              <ClipboardList className="w-4 h-4 inline mr-1" />
+              {domain.testCount || 0} Tests
+            </span>
+            <ChevronRight className="w-5 h-5 text-teal-600" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
 
-  // Group tests by type
-  const mockTestsOnly = mockTests?.filter(t => !t.testType || t.testType === 'mock_test') || [];
-  const practiceQuestions = mockTests?.filter(t => t.testType === 'practice_questions') || [];
-  const previousYearTests = mockTests?.filter(t => t.testType === 'previous_year') || [];
-
+  // Render test card
   const renderTestCard = (test) => {
-    // Determine if test is accessible
-    const isTestFree = test.isFree || test.price === 0 || test.price === null;
+    const isTestFree = test.isFree || !test.price || test.price === 0;
     const isTestPurchased = purchasedTests.has(test.id);
-    const isAccessible = isTestFree || isTestPurchased || examPurchased;
+    const isDomainPurchased = purchasedDomains.has(selectedDomain?.id);
+    const isAccessible = isTestFree || isTestPurchased || isDomainPurchased || examPurchased;
     
     return (
       <Card key={test.id} className="card-hover">
@@ -502,12 +318,10 @@ export default function ExamDetailPage() {
                 <ClipboardList className="w-6 h-6 text-teal-600" />
               )}
             </div>
-            {isTestPurchased || examPurchased ? (
+            {isTestPurchased || isDomainPurchased || examPurchased ? (
               <Badge className="bg-green-100 text-green-700"><CheckCircle className="w-3 h-3 mr-1 inline" /> Unlocked</Badge>
             ) : isTestFree ? (
               <Badge className="bg-green-100 text-green-700">FREE</Badge>
-            ) : exam.price > 0 ? (
-              <Badge className="bg-amber-100 text-amber-700">Premium</Badge>
             ) : (
               <Badge className="bg-rose-100 text-rose-700">₹{test.price}</Badge>
             )}
@@ -519,7 +333,6 @@ export default function ExamDetailPage() {
               <Clock className="w-4 h-4" /> {test.duration} min
             </span>
             <span>{test.questionCount || test.totalQuestions} Qs</span>
-            <span>{test.totalMarks} Marks</span>
           </div>
           <Button 
             className="w-full bg-teal-600 hover:bg-teal-700"
@@ -543,144 +356,84 @@ export default function ExamDetailPage() {
       {/* Hero Section */}
       <div className="pt-20 bg-gradient-to-b from-teal-50 to-white">
         <div className="container mx-auto px-4 py-8">
-          <Link href="/exams" className="inline-flex items-center text-teal-600 hover:text-teal-700 mb-4">
-            <ArrowLeft className="w-4 h-4 mr-2" /> Back to Exams
-          </Link>
+          {selectedDomain ? (
+            <button 
+              onClick={handleBackToDomains}
+              className="inline-flex items-center text-teal-600 hover:text-teal-700 mb-4"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" /> Back to Domains
+            </button>
+          ) : (
+            <Link href="/exams" className="inline-flex items-center text-teal-600 hover:text-teal-700 mb-4">
+              <ArrowLeft className="w-4 h-4 mr-2" /> All Exams
+            </Link>
+          )}
           
           <div className="flex items-start gap-6">
-            <div className="w-20 h-20 bg-teal-100 rounded-2xl flex items-center justify-center text-4xl">
-              {exam.icon}
+            <div className="w-20 h-20 bg-white rounded-2xl shadow-lg flex items-center justify-center">
+              <Trophy className="w-10 h-10 text-teal-600" />
             </div>
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">{exam.name}</h1>
-              <p className="text-lg text-teal-600 font-medium mb-2">{exam.fullName}</p>
-              <p className="text-gray-600 max-w-2xl">{exam.description}</p>
-              <div className="flex items-center gap-6 mt-4 flex-wrap">
-                <Badge className="bg-teal-100 text-teal-700">{exam.category}</Badge>
-                <span className="text-sm text-gray-600">{mockTests?.length || 0} Tests Available</span>
-                {exam.price > 0 && (
-                  <Badge className="bg-amber-100 text-amber-700 text-lg px-3 py-1">
-                    Full Access: ₹{exam.price}
-                  </Badge>
-                )}
-              </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">
+                {selectedDomain ? `${exam.name} - ${selectedDomain.name}` : exam.name}
+              </h1>
+              <p className="text-gray-600 mt-2">
+                {selectedDomain ? selectedDomain.description : `Select a domain to view available tests`}
+              </p>
+              {!selectedDomain && domains.length > 0 && (
+                <p className="text-sm text-teal-600 mt-2">
+                  <Layers className="w-4 h-4 inline mr-1" />
+                  {domains.length} domains available
+                </p>
+              )}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Tabs Section */}
+      {/* Content */}
       <div className="container mx-auto px-4 py-8">
-        <Tabs defaultValue="mock-tests" className="w-full">
-          <TabsList className="grid w-full grid-cols-5 mb-8 bg-white shadow rounded-lg h-14">
-            <TabsTrigger value="mock-tests" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
-              <ClipboardList className="w-4 h-4 mr-2" /> Mock Tests
-            </TabsTrigger>
-            <TabsTrigger value="practice-questions" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
-              <BookOpen className="w-4 h-4 mr-2" /> Practice
-            </TabsTrigger>
-            <TabsTrigger value="previous-papers" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
-              <History className="w-4 h-4 mr-2" /> Previous Year
-            </TabsTrigger>
-            <TabsTrigger value="leaderboard" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
-              <Trophy className="w-4 h-4 mr-2" /> Leaderboard
-            </TabsTrigger>
-            <TabsTrigger value="topper-notes" className="data-[state=active]:bg-teal-600 data-[state=active]:text-white rounded-lg">
-              <Award className="w-4 h-4 mr-2" /> Toppers
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Mock Tests Tab */}
-          <TabsContent value="mock-tests">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {mockTestsOnly.length > 0 ? mockTestsOnly.map(renderTestCard) : (
-                <p className="text-gray-500 col-span-3 text-center py-8">No mock tests available yet</p>
-              )}
+        {!selectedDomain ? (
+          // Show domains
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 mb-6">Select a Domain</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {domains.map(renderDomainCard)}
             </div>
-          </TabsContent>
-
-          {/* Practice Questions Tab */}
-          <TabsContent value="practice-questions">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {practiceQuestions.length > 0 ? practiceQuestions.map(renderTestCard) : (
-                <Card className="col-span-3">
-                  <CardContent className="p-8 text-center">
-                    <div className="w-20 h-20 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <BookOpen className="w-10 h-10 text-teal-600" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-gray-900 mb-2">Practice Questions</h3>
-                    <p className="text-gray-600 mb-4">Topic-wise practice questions coming soon</p>
-                    <p className="text-gray-500 mb-6">Practice with detailed solutions and explanations</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </TabsContent>
-
-          {/* Previous Year Papers Tab */}
-          <TabsContent value="previous-papers">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {previousYearTests.length > 0 ? previousYearTests.map(renderTestCard) : previousPapers?.length > 0 ? previousPapers.map((paper) => (
-                <Card key={paper.id} className="card-hover">
-                  <CardContent className="p-6">
-                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                      <FileText className="w-6 h-6 text-purple-600" />
-                    </div>
-                    <h3 className="font-bold text-gray-900 mb-2">{paper.title}</h3>
-                    <p className="text-sm text-gray-500 mb-4">{paper.year}</p>
-                    <Button variant="outline" className="w-full border-teal-600 text-teal-600">
-                      <Download className="w-4 h-4 mr-2" /> Download PDF
-                    </Button>
-                  </CardContent>
-                </Card>
-              )) : (
-                <Card className="col-span-3">
-                  <CardContent className="p-8 text-center">
-                    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <History className="w-10 h-10 text-gray-400" />
-                    </div>
-                    <p className="text-gray-500">Previous year papers will be available soon</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </TabsContent>
-
-          {/* Leaderboard Tab */}
-          <TabsContent value="leaderboard">
-            <LeaderboardTab examSlug={params.slug} />
-          </TabsContent>
-
-          {/* Topper Notes Tab */}
-          <TabsContent value="topper-notes">
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {topperNotes?.length > 0 ? topperNotes.map((note) => (
-                <Card key={note.id} className="card-hover">
-                  <CardContent className="p-6">
-                    <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center mb-4">
-                      <Trophy className="w-6 h-6 text-yellow-600" />
-                    </div>
-                    <h3 className="font-bold text-gray-900 mb-2">{note.title}</h3>
-                    <p className="text-sm text-teal-600 mb-2">By {note.author}</p>
-                    <p className="text-sm text-gray-500 mb-4">{note.rank}</p>
-                    <Button variant="outline" className="w-full border-teal-600 text-teal-600">
-                      <Download className="w-4 h-4 mr-2" /> Download Notes
-                    </Button>
-                  </CardContent>
-                </Card>
-              )) : (
-                <Card className="col-span-3">
-                  <CardContent className="p-8 text-center">
-                    <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                      <Trophy className="w-10 h-10 text-gray-400" />
-                    </div>
-                    <p className="text-gray-500">Topper notes will be available soon</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
+            {domains.length === 0 && (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <Layers className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">No domains available yet</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        ) : (
+          // Show tests in domain
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 mb-6">
+              Tests in {selectedDomain.name}
+            </h2>
+            {testsLoading ? (
+              <div className="flex justify-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-teal-500 border-t-transparent rounded-full"></div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {tests.map(renderTestCard)}
+              </div>
+            )}
+            {!testsLoading && tests.length === 0 && (
+              <Card>
+                <CardContent className="p-12 text-center">
+                  <ClipboardList className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-500">No tests available in this domain yet</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Unlock Modal */}
@@ -688,38 +441,48 @@ export default function ExamDetailPage() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-2xl">Unlock Test</DialogTitle>
-            <DialogDescription>
-              Choose how you want to access this test
-            </DialogDescription>
+            <DialogDescription>Choose how you want to access this test</DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-4">
             {selectedTest && (
-              <div className="space-y-4">
-                {/* Individual Test Purchase Option */}
+              <>
+                {/* Individual Test Purchase */}
                 <div className="border-2 border-teal-500 rounded-lg p-4 bg-teal-50">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="font-semibold text-gray-900">This Test Only</h4>
                     <span className="text-xl font-bold text-teal-600">₹{selectedTest.price || 0}</span>
                   </div>
                   <p className="text-sm text-gray-600 mb-3">{selectedTest.title}</p>
-                  <ul className="space-y-1 text-sm text-gray-600 mb-3">
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="w-3 h-3 text-green-500" /> Detailed Solutions
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <CheckCircle className="w-3 h-3 text-green-500" /> Unlimited Attempts
-                    </li>
-                  </ul>
                   <Button 
                     className="w-full bg-teal-600 hover:bg-teal-700"
-                    onClick={() => handlePayment(false)}
+                    onClick={() => handlePayment('test')}
                   >
                     Pay ₹{selectedTest.price || 0} for Test
                   </Button>
                 </div>
 
-                {/* Full Exam Purchase Option - only show if exam has price */}
-                {exam.price > 0 && !examPurchased && (
+                {/* Domain Purchase Option */}
+                {selectedDomain?.price > 0 && !purchasedDomains.has(selectedDomain.id) && (
+                  <div className="border-2 border-blue-400 rounded-lg p-4 bg-blue-50">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h4 className="font-semibold text-gray-900">Full Domain Access</h4>
+                        <Badge className="bg-blue-200 text-blue-800 text-xs">Recommended</Badge>
+                      </div>
+                      <span className="text-xl font-bold text-blue-600">₹{selectedDomain.price}</span>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3">{selectedDomain.name} - All Tests</p>
+                    <Button 
+                      className="w-full bg-blue-500 hover:bg-blue-600"
+                      onClick={() => handlePayment('domain')}
+                    >
+                      Pay ₹{selectedDomain.price} for Domain
+                    </Button>
+                  </div>
+                )}
+
+                {/* Exam Purchase Option */}
+                {exam?.price > 0 && !examPurchased && (
                   <div className="border-2 border-amber-400 rounded-lg p-4 bg-amber-50">
                     <div className="flex items-center justify-between mb-2">
                       <div>
@@ -728,27 +491,16 @@ export default function ExamDetailPage() {
                       </div>
                       <span className="text-xl font-bold text-amber-600">₹{exam.price}</span>
                     </div>
-                    <p className="text-sm text-gray-600 mb-3">{exam.name} - All Tests</p>
-                    <ul className="space-y-1 text-sm text-gray-600 mb-3">
-                      <li className="flex items-center gap-2">
-                        <CheckCircle className="w-3 h-3 text-green-500" /> All Mock Tests
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle className="w-3 h-3 text-green-500" /> Practice Questions
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle className="w-3 h-3 text-green-500" /> Previous Year Papers
-                      </li>
-                    </ul>
+                    <p className="text-sm text-gray-600 mb-3">{exam.name} - All Domains & Tests</p>
                     <Button 
                       className="w-full bg-amber-500 hover:bg-amber-600"
-                      onClick={() => handlePayment(true)}
+                      onClick={() => handlePayment('exam')}
                     >
                       Pay ₹{exam.price} for Full Exam
                     </Button>
                   </div>
                 )}
-              </div>
+              </>
             )}
           </div>
         </DialogContent>
