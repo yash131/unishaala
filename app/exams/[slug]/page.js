@@ -324,13 +324,19 @@ export default function ExamDetailPage() {
     // Check if user is logged in
     const userData = localStorage.getItem('user');
     
-    // If test is free or already purchased, go directly
-    if (test.isFree || test.price === 0 || purchasedTests.has(test.id)) {
+    // If test is free, always allow access
+    if (test.isFree || test.price === 0) {
       window.location.href = `/mock-test/${test.id}`;
       return;
     }
     
-    // Check if user has already purchased this test or exam (double-check via API)
+    // If user already purchased this test or the exam, go directly
+    if (purchasedTests.has(test.id) || examPurchased) {
+      window.location.href = `/mock-test/${test.id}`;
+      return;
+    }
+    
+    // Double-check via API (in case state is stale)
     if (userData) {
       try {
         const checkRes = await fetch('/api/payment/verify-access', {
@@ -344,7 +350,6 @@ export default function ExamDetailPage() {
         });
         const checkData = await checkRes.json();
         if (checkData.success && checkData.data?.hasAccess) {
-          // User has already purchased - go directly to test
           window.location.href = `/mock-test/${test.id}`;
           return;
         }
@@ -353,12 +358,21 @@ export default function ExamDetailPage() {
       }
     }
     
-    // Check if exam requires purchase
+    // Not logged in - prompt login
+    if (!userData) {
+      alert('Please login to access this test');
+      window.location.href = '/login';
+      return;
+    }
+    
+    // Need to purchase - check if exam requires purchase first
     const examPrice = data?.exam?.price || 0;
-    if (examPrice > 0) {
+    if (examPrice > 0 && !examPurchased) {
+      // Offer exam purchase
       setSelectedTest({ ...test, examPrice, isExamPurchase: true });
       setShowUnlockModal(true);
     } else if (!test.isFree && test.price > 0) {
+      // Offer individual test purchase
       setSelectedTest(test);
       setShowUnlockModal(true);
     } else {
