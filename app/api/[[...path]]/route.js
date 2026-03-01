@@ -591,6 +591,7 @@ export async function GET(request) {
         success: true,
         data: purchases.map(p => ({
           mockTestId: p.mockTestId,
+          domainId: p.domainId,
           examId: p.examId,
           itemName: p.itemName,
           purchasedAt: p.completedAt || p.createdAt
