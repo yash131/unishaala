@@ -2877,6 +2877,22 @@ export async function DELETE(request) {
       return jsonResponse({ success: true, message: 'Exam deleted' });
     }
 
+    // Delete Domain (also reassign tests to General or delete them)
+    if (path.startsWith('/admin/domains/')) {
+      const domainId = path.split('/admin/domains/')[1];
+      const domainsCollection = await getCollection('domains');
+      const mockTests = await getCollection('mock_tests');
+      
+      // Move tests to no domain or delete them
+      await mockTests.updateMany(
+        { domainId: domainId },
+        { $unset: { domainId: '' } }
+      );
+      
+      await domainsCollection.deleteOne({ id: domainId });
+      return jsonResponse({ success: true, message: 'Domain deleted' });
+    }
+
     // Delete Job
     if (path.startsWith('/admin/jobs/')) {
       const jobId = path.split('/admin/jobs/')[1];
