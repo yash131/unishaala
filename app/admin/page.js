@@ -362,6 +362,255 @@ function ExamsTab({ exams, onRefresh }) {
   );
 }
 
+// Domains Tab - Manage domains under exams
+function DomainsTab({ exams, onRefresh }) {
+  const [domains, setDomains] = useState([]);
+  const [search, setSearch] = useState('');
+  const [filterExamId, setFilterExamId] = useState('');
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [editingDomain, setEditingDomain] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '', description: '', price: 0, status: 'Active', examId: ''
+  });
+
+  useEffect(() => {
+    fetchDomains();
+  }, []);
+
+  const fetchDomains = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/domains', { credentials: 'include' });
+      const data = await res.json();
+      if (data.success) {
+        setDomains(data.data || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch domains:', e);
+    }
+    setLoading(false);
+  };
+
+  const filteredDomains = domains.filter(d => {
+    const matchesSearch = d.name?.toLowerCase().includes(search.toLowerCase());
+    const matchesExam = !filterExamId || d.examId === filterExamId;
+    return matchesSearch && matchesExam;
+  });
+
+  const getExamName = (examId) => {
+    const exam = exams?.find(e => e.id === examId);
+    return exam ? exam.name : '-';
+  };
+
+  const handleSave = async () => {
+    if (!formData.name) {
+      toast.error('Name is required');
+      return;
+    }
+    if (!formData.examId && !editingDomain) {
+      toast.error('Please select an exam');
+      return;
+    }
+    setLoading(true);
+    try {
+      const url = editingDomain ? `/api/admin/domains/${editingDomain.id}` : '/api/admin/domains';
+      const method = editingDomain ? 'POST' : 'POST';
+      
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(formData)
+      });
+      const result = await res.json();
+      
+      if (result.success) {
+        toast.success(editingDomain ? 'Domain updated!' : 'Domain created!');
+        setShowAddDialog(false);
+        setEditingDomain(null);
+        setFormData({ name: '', description: '', price: 0, status: 'Active', examId: '' });
+        fetchDomains();
+      } else {
+        toast.error(result.error);
+      }
+    } catch (e) {
+      toast.error('Failed to save');
+    }
+    setLoading(false);
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('Delete this domain? Tests will be unassigned.')) return;
+    try {
+      await fetch(`/api/admin/domains/${id}`, { method: 'DELETE', credentials: 'include' });
+      toast.success('Deleted');
+      fetchDomains();
+    } catch (e) {
+      toast.error('Failed');
+    }
+  };
+
+  const handleEdit = (domain) => {
+    setEditingDomain(domain);
+    setFormData({
+      name: domain.name,
+      description: domain.description || '',
+      price: domain.price || 0,
+      status: domain.status || 'Active',
+      examId: domain.examId
+    });
+    setShowAddDialog(true);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Domains</h2>
+          <p className="text-gray-500">Manage domains under each exam</p>
+        </div>
+        <Button onClick={() => { setEditingDomain(null); setFormData({ name: '', description: '', price: 0, status: 'Active', examId: '' }); setShowAddDialog(true); }}>
+          <Plus className="w-4 h-4 mr-2" /> Add Domain
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-4">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Input
+            placeholder="Search domains..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={filterExamId} onValueChange={setFilterExamId}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="All Exams" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">All Exams</SelectItem>
+            {exams?.map(exam => (
+              <SelectItem key={exam.id} value={exam.id}>{exam.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Table */}
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Exam</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {loading ? (
+                <TableRow><TableCell colSpan={5} className="text-center py-8"><Loader2 className="w-6 h-6 animate-spin mx-auto" /></TableCell></TableRow>
+              ) : filteredDomains.length === 0 ? (
+                <TableRow><TableCell colSpan={5} className="text-center py-8 text-gray-500">No domains found</TableCell></TableRow>
+              ) : (
+                filteredDomains.map(domain => (
+                  <TableRow key={domain.id}>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center gap-2">
+                        <Layers className="w-4 h-4 text-teal-600" />
+                        {domain.name}
+                      </div>
+                    </TableCell>
+                    <TableCell>{getExamName(domain.examId)}</TableCell>
+                    <TableCell>{domain.price > 0 ? `₹${domain.price}` : 'Free'}</TableCell>
+                    <TableCell>
+                      <Badge className={domain.status === 'Active' ? 'bg-green-500' : 'bg-gray-500'}>
+                        {domain.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="outline" onClick={() => handleEdit(domain)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="destructive" onClick={() => handleDelete(domain.id)}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {/* Add/Edit Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingDomain ? 'Edit Domain' : 'Add New Domain'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Exam *</Label>
+              <Select value={formData.examId} onValueChange={v => setFormData({ ...formData, examId: v })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select Exam" />
+                </SelectTrigger>
+                <SelectContent>
+                  {exams?.map(exam => (
+                    <SelectItem key={exam.id} value={exam.id}>{exam.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Name *</Label>
+              <Input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="e.g., Computer Science" />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Domain description" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Price (₹)</Label>
+                <Input type="number" value={formData.price} onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) || 0 })} />
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select value={formData.status} onValueChange={v => setFormData({ ...formData, status: v })}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
+            <Button onClick={handleSave} disabled={loading}>
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+              {editingDomain ? 'Update' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 // Tests Tab (replaces Mock Tests Tab) - with Test Type selection
 function TestsTab({ mockTests, exams, onRefresh }) {
   const [search, setSearch] = useState('');
