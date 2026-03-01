@@ -2413,6 +2413,7 @@ export async function POST(request) {
           title: body.title,
           description: body.description || '',
           examId: body.examId || null,
+          domainId: body.domainId || null,
           testType: body.testType || 'mock_test', // mock_test, practice_questions, previous_year
           duration: parseInt(body.duration) || 60,
           totalQuestions: 0,
