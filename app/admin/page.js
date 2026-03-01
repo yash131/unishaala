@@ -1474,17 +1474,18 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-blue-600" /> Step 3: Select Test
+              <BookOpen className="w-5 h-5 text-blue-600" /> Step 4: Select Test
             </CardTitle>
           </CardHeader>
           <CardContent>
             {filteredMockTests.length > 0 ? (
               <>
-                <Select value={selectedTestId} onValueChange={setSelectedTestId}>
+                <Select value={selectedTestId || "none"} onValueChange={v => setSelectedTestId(v === "none" ? "" : v)}>
                   <SelectTrigger className="w-full md:w-96">
                     <SelectValue placeholder="Choose a test..." />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">-- Select Test --</SelectItem>
                     {filteredMockTests.map(t => (
                       <SelectItem key={t.id} value={t.id}>
                         {t.title} ({t.questionCount || t.totalQuestions || 0} Qs) {t.isPublished ? '✓' : '(Draft)'}
