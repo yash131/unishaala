@@ -486,12 +486,12 @@ function DomainsTab({ exams, onRefresh }) {
             className="pl-10"
           />
         </div>
-        <Select value={filterExamId} onValueChange={setFilterExamId}>
+        <Select value={filterExamId || "all"} onValueChange={v => setFilterExamId(v === "all" ? "" : v)}>
           <SelectTrigger className="w-48">
             <SelectValue placeholder="All Exams" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">All Exams</SelectItem>
+            <SelectItem value="all">All Exams</SelectItem>
             {exams?.map(exam => (
               <SelectItem key={exam.id} value={exam.id}>{exam.name}</SelectItem>
             ))}
