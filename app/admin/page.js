@@ -2076,6 +2076,7 @@ export default function AdminPage() {
         <main className="p-8">
           {activeTab === 'dashboard' && <DashboardTab stats={stats} />}
           {activeTab === 'exams' && <ExamsTab exams={data.exams} onRefresh={fetchData} />}
+          {activeTab === 'domains' && <DomainsTab exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'tests' && <TestsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'questions' && <QuestionsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'transactions' && <TransactionsTab />}
