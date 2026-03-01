@@ -18,7 +18,7 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { examId, mockTestId, amount, paymentType } = body;
+    const { examId, mockTestId, domainId, amount, paymentType } = body;
 
     if (!amount || amount <= 0) {
       return NextResponse.json({ success: false, error: 'Invalid amount' }, { status: 400 });
@@ -28,10 +28,14 @@ export async function POST(request) {
 
     // Get item details
     let itemName = 'Test Purchase';
-    if (examId) {
+    if (examId && paymentType === 'exam_purchase') {
       const exams = await getCollection('exams');
       const exam = await exams.findOne({ id: examId });
       if (exam) itemName = `${exam.name} - Full Access`;
+    } else if (domainId && paymentType === 'domain_purchase') {
+      const domains = await getCollection('domains');
+      const domain = await domains.findOne({ id: domainId });
+      if (domain) itemName = `${domain.name} - Domain Access`;
     } else if (mockTestId) {
       const mockTests = await getCollection('mock_tests');
       const test = await mockTests.findOne({ id: mockTestId });
@@ -47,6 +51,7 @@ export async function POST(request) {
       notes: {
         userId: user.id,
         examId: examId || '',
+        domainId: domainId || '',
         mockTestId: mockTestId || '',
         itemName,
       },
@@ -63,8 +68,9 @@ export async function POST(request) {
       userEmail: user.email,
       userPhone: user.phone || '',
       examId: examId || null,
+      domainId: domainId || null,
       mockTestId: mockTestId || null,
-      paymentType: paymentType || 'exam_purchase',
+      paymentType: paymentType || 'test_purchase',
       itemName,
       amount: parseFloat(amount),
       currency: 'INR',
