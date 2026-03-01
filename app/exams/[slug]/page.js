@@ -471,7 +471,9 @@ export default function ExamDetailPage() {
               <ClipboardList className="w-6 h-6 text-teal-600" />
             )}
           </div>
-          {exam.price > 0 ? (
+          {purchasedTests.has(test.id) ? (
+            <Badge className="bg-green-100 text-green-700"><CheckCircle className="w-3 h-3 mr-1 inline" /> Purchased</Badge>
+          ) : exam.price > 0 ? (
             <Badge className="bg-amber-100 text-amber-700">Premium</Badge>
           ) : test.isFree ? (
             <Badge className="bg-green-100 text-green-700">FREE</Badge>
@@ -492,10 +494,10 @@ export default function ExamDetailPage() {
           className="w-full bg-teal-600 hover:bg-teal-700"
           onClick={() => handleStartTest(test)}
         >
-          {exam.price > 0 || (!test.isFree && test.price > 0) ? (
-            <><Lock className="w-4 h-4 mr-2" /> Unlock & Start</>
-          ) : (
+          {purchasedTests.has(test.id) || test.isFree || test.price === 0 ? (
             <><Play className="w-4 h-4 mr-2" /> Start Test</>
+          ) : (
+            <><Lock className="w-4 h-4 mr-2" /> Unlock & Start</>
           )}
         </Button>
       </CardContent>
