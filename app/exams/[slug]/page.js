@@ -374,7 +374,7 @@ export default function ExamDetailPage() {
     setShowUnlockModal(true);
   };
 
-  const handlePayment = async () => {
+  const handlePayment = async (isExamPurchase = false) => {
     // Check if user is logged in
     const userData = localStorage.getItem('user');
     if (!userData) {
@@ -384,17 +384,17 @@ export default function ExamDetailPage() {
     }
 
     try {
-      const amount = selectedTest?.isExamPurchase ? exam.price : selectedTest?.price;
+      const amount = isExamPurchase ? exam.price : selectedTest?.price;
       
       // Create Razorpay order
       const response = await fetch('/api/payment/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          examId: selectedTest?.isExamPurchase ? exam.id : null,
-          mockTestId: selectedTest?.isExamPurchase ? null : selectedTest?.id,
+          examId: isExamPurchase ? exam.id : null,
+          mockTestId: isExamPurchase ? null : selectedTest?.id,
           amount: amount,
-          paymentType: selectedTest?.isExamPurchase ? 'exam_purchase' : 'test_purchase'
+          paymentType: isExamPurchase ? 'exam_purchase' : 'test_purchase'
         })
       });
 
