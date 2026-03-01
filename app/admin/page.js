@@ -60,6 +60,7 @@ function AdminSidebar({ activeTab, setActiveTab }) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'exams', label: 'Exams', icon: <GraduationCap className="w-5 h-5" /> },
+    { id: 'domains', label: 'Domains', icon: <Layers className="w-5 h-5" /> },
     { id: 'tests', label: 'Tests', icon: <ClipboardList className="w-5 h-5" /> },
     { id: 'questions', label: 'Questions', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'transactions', label: 'Transactions', icon: <CreditCard className="w-5 h-5" /> },
