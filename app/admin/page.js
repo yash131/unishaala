@@ -1370,11 +1370,12 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <Select value={selectedExamId} onValueChange={setSelectedExamId}>
+          <Select value={selectedExamId || "none"} onValueChange={v => setSelectedExamId(v === "none" ? "" : v)}>
             <SelectTrigger className="w-full md:w-96">
               <SelectValue placeholder="Choose an exam (GATE, CAT, UPSC, JEE...)..." />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="none">-- Select Exam --</SelectItem>
               {exams.map(e => (
                 <SelectItem key={e.id} value={e.id}>
                   <span className="flex items-center gap-2">
@@ -1400,20 +1401,49 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
         </CardContent>
       </Card>
 
-      {/* Step 2: Select Test Type (only if exam selected) */}
+      {/* Step 2: Select Domain (only if exam selected) */}
       {selectedExamId && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <ClipboardList className="w-5 h-5 text-purple-600" /> Step 2: Select Test Type
+              <Layers className="w-5 h-5 text-indigo-600" /> Step 2: Select Domain
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <Select value={selectedTestType} onValueChange={setSelectedTestType}>
+            <Select value={selectedDomainId || "none"} onValueChange={v => setSelectedDomainId(v === "none" ? "" : v)}>
+              <SelectTrigger className="w-full md:w-96">
+                <SelectValue placeholder="Choose a domain..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">-- Select Domain --</SelectItem>
+                {filteredDomains.map(d => (
+                  <SelectItem key={d.id} value={d.id}>
+                    <span className="flex items-center gap-2">
+                      <Layers className="w-4 h-4" /> {d.name}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 3: Select Test Type (only if domain selected) */}
+      {selectedExamId && selectedDomainId && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <ClipboardList className="w-5 h-5 text-purple-600" /> Step 3: Select Test Type
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedTestType || "none"} onValueChange={v => setSelectedTestType(v === "none" ? "" : v)}>
               <SelectTrigger className="w-full md:w-96">
                 <SelectValue placeholder="Choose test type..." />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">-- Select Test Type --</SelectItem>
                 {TEST_TYPES.map(t => (
                   <SelectItem key={t.value} value={t.value}>
                     <span className="flex items-center gap-2">
@@ -1439,8 +1469,8 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
         </Card>
       )}
 
-      {/* Step 3: Select Test (only if test type selected) */}
-      {selectedExamId && selectedTestType && (
+      {/* Step 4: Select Test (only if test type selected) */}
+      {selectedExamId && selectedDomainId && selectedTestType && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
