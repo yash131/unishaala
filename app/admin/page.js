@@ -613,6 +613,7 @@ function DomainsTab({ exams, onRefresh }) {
 
 // Tests Tab (replaces Mock Tests Tab) - with Test Type selection
 function TestsTab({ mockTests, exams, onRefresh }) {
+  const [domains, setDomains] = useState([]);
   const [search, setSearch] = useState('');
   const [filterExamId, setFilterExamId] = useState('');
   const [filterType, setFilterType] = useState('');
@@ -620,8 +621,27 @@ function TestsTab({ mockTests, exams, onRefresh }) {
   const [editingTest, setEditingTest] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', testType: 'mock_test'
+    title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', domainId: '', testType: 'mock_test'
   });
+
+  useEffect(() => {
+    fetchDomains();
+  }, []);
+
+  const fetchDomains = async () => {
+    try {
+      const res = await fetch('/api/admin/domains', { credentials: 'include' });
+      const data = await res.json();
+      if (data.success) {
+        setDomains(data.data || []);
+      }
+    } catch (e) {
+      console.error('Failed to fetch domains:', e);
+    }
+  };
+
+  // Get domains for selected exam
+  const filteredDomains = domains.filter(d => d.examId === formData.examId);
 
   const filteredTests = mockTests.filter(t => {
     const matchesSearch = t.title?.toLowerCase().includes(search.toLowerCase());
@@ -633,6 +653,11 @@ function TestsTab({ mockTests, exams, onRefresh }) {
   const getExamName = (examId) => {
     const exam = exams?.find(e => e.id === examId);
     return exam ? exam.name : '-';
+  };
+
+  const getDomainName = (domainId) => {
+    const domain = domains?.find(d => d.id === domainId);
+    return domain ? domain.name : '-';
   };
 
   const getTestTypeLabel = (type) => {
