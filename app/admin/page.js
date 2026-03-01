@@ -936,7 +936,9 @@ function TestsTab({ mockTests, exams, onRefresh }) {
 
 // Questions Tab with Exam -> Test Type -> Test -> CSV flow
 function QuestionsTab({ mockTests, exams, onRefresh }) {
+  const [domains, setDomains] = useState([]);
   const [selectedExamId, setSelectedExamId] = useState('');
+  const [selectedDomainId, setSelectedDomainId] = useState('');
   const [selectedTestType, setSelectedTestType] = useState('');
   const [selectedTestId, setSelectedTestId] = useState('');
   const [questions, setQuestions] = useState([]);
@@ -961,15 +963,35 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
   const [selectedQuestions, setSelectedQuestions] = useState([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Filter mock tests by selected exam and test type
+  // Fetch domains on mount
+  useEffect(() => {
+    fetchDomains();
+  }, []);
+
+  const fetchDomains = async () => {
+    try {
+      const res = await fetch('/api/admin/domains', { credentials: 'include' });
+      const data = await res.json();
+      if (data.success) setDomains(data.data || []);
+    } catch (e) {
+      console.error('Failed to fetch domains:', e);
+    }
+  };
+
+  // Filtered domains for selected exam
+  const filteredDomains = domains.filter(d => d.examId === selectedExamId);
+
+  // Filter mock tests by selected exam, domain and test type
   const filteredMockTests = mockTests.filter(t => {
     const matchesExam = !selectedExamId || t.examId === selectedExamId;
+    const matchesDomain = !selectedDomainId || t.domainId === selectedDomainId;
     const matchesType = !selectedTestType || t.testType === selectedTestType;
-    return matchesExam && matchesType;
+    return matchesExam && matchesDomain && matchesType;
   });
 
   // Reset subsequent selections when parent changes
   useEffect(() => {
+    setSelectedDomainId('');
     setSelectedTestType('');
     setSelectedTestId('');
     setQuestions([]);
@@ -977,6 +999,15 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
     setShowPreview(false);
     setSelectedQuestions([]);
   }, [selectedExamId]);
+
+  useEffect(() => {
+    setSelectedTestType('');
+    setSelectedTestId('');
+    setQuestions([]);
+    setPreviewData([]);
+    setShowPreview(false);
+    setSelectedQuestions([]);
+  }, [selectedDomainId]);
 
   useEffect(() => {
     setSelectedTestId('');
