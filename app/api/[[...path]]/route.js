@@ -140,7 +140,7 @@ export async function GET(request) {
       });
     }
 
-    // Single Exam by slug - only show PUBLISHED mock tests for THIS EXAM to users
+    // Single Exam by slug - return domains for this exam
     if (path.startsWith('/exams/')) {
       const slug = path.split('/exams/')[1];
       const exams = await getCollection('exams');
@@ -150,22 +150,58 @@ export async function GET(request) {
         return jsonResponse({ success: false, error: 'Exam not found' }, 404);
       }
 
+      // Get domains for this exam
+      const domainsCollection = await getCollection('domains');
+      const domains = await domainsCollection.find({ 
+        examId: exam.id, 
+        status: 'Active' 
+      }).toArray();
+
+      // Get test counts for each domain
       const mockTests = await getCollection('mock_tests');
-      const previousPapers = await getCollection('previous_papers');
-      const topperNotes = await getCollection('topper_notes');
+      const domainsWithCounts = await Promise.all(domains.map(async (domain) => {
+        const testCount = await mockTests.countDocuments({ 
+          domainId: domain.id, 
+          isPublished: true, 
+          status: 'Active' 
+        });
+        return { ...domain, testCount };
+      }));
+
+      return jsonResponse({
+        success: true,
+        data: {
+          exam,
+          domains: domainsWithCounts
+        }
+      });
+    }
+
+    // Get tests for a specific domain
+    if (path.startsWith('/domains/') && !path.includes('/admin')) {
+      const domainId = path.split('/domains/')[1];
+      const domainsCollection = await getCollection('domains');
+      const domain = await domainsCollection.findOne({ id: domainId });
+      
+      if (!domain) {
+        return jsonResponse({ success: false, error: 'Domain not found' }, 404);
+      }
+
+      const exams = await getCollection('exams');
+      const exam = await exams.findOne({ id: domain.examId });
+
+      const mockTests = await getCollection('mock_tests');
       const questions = await getCollection('questions');
 
-      // Get ONLY mock tests for THIS EXAM that are published and active
-      // Filter by: examId matches current exam, isPublished = true, status = Active
-      const examMockTests = await mockTests.find({
-        examId: exam.id,
+      // Get tests for this domain
+      const domainTests = await mockTests.find({
+        domainId: domain.id,
         isPublished: true,
         status: 'Active'
       }).toArray();
 
-      // Add question count to each test (case-insensitive status check)
-      const testsWithCount = await Promise.all(examMockTests.map(async (test) => {
-        // Count questions with status Active or active (case-insensitive)
+      // Add question count to each test
+      const testsWithCount = await Promise.all(domainTests.map(async (test) => {
         const qCount = await questions.countDocuments({ 
           mockTestId: test.id, 
           $or: [
@@ -177,17 +213,15 @@ export async function GET(request) {
         return { ...test, questionCount: qCount };
       }));
 
-      // Only return tests that actually have questions
+      // Only return tests that have questions
       const finalTests = testsWithCount.filter(t => t.questionCount > 0);
 
       return jsonResponse({
         success: true,
         data: {
+          domain,
           exam,
-          mockTests: finalTests,
-          previousPapers: await previousPapers.find({ examId: exam.id }).toArray(),
-          topperNotes: await topperNotes.find({ examId: exam.id }).toArray(),
-          questionBankCount: await questions.countDocuments({ status: 'Active' })
+          tests: finalTests
         }
       });
     }
