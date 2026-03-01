@@ -815,7 +815,7 @@ function TestsTab({ mockTests, exams, onRefresh }) {
                   </Button>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="sm" onClick={() => { setEditingTest(test); setFormData({ title: test.title, description: test.description || '', duration: test.duration, isFree: test.isFree ?? true, price: test.price || 0, status: test.status, examId: test.examId || '', testType: test.testType || 'mock_test' }); setShowAddDialog(true); }}>
+                  <Button variant="ghost" size="sm" onClick={() => { setEditingTest(test); setFormData({ title: test.title, description: test.description || '', duration: test.duration, isFree: test.isFree ?? true, price: test.price || 0, status: test.status, examId: test.examId || '', domainId: test.domainId || '', testType: test.testType || 'mock_test' }); setShowAddDialog(true); }}>
                     <Edit className="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="sm" className="text-red-500" onClick={() => handleDelete(test.id)}>
