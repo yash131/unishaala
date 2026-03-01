@@ -368,19 +368,10 @@ export default function ExamDetailPage() {
       return;
     }
     
-    // Need to purchase - check if exam requires purchase first
-    const examPrice = data?.exam?.price || 0;
-    if (examPrice > 0 && !examPurchased) {
-      // Offer exam purchase
-      setSelectedTest({ ...test, examPrice, isExamPurchase: true });
-      setShowUnlockModal(true);
-    } else if (test.price > 0) {
-      // Offer individual test purchase
-      setSelectedTest(test);
-      setShowUnlockModal(true);
-    } else {
-      window.location.href = `/mock-test/${test.id}`;
-    }
+    // Need to purchase - show payment modal for individual test
+    // User can also choose to buy full exam from modal
+    setSelectedTest(test);
+    setShowUnlockModal(true);
   };
 
   const handlePayment = async () => {
