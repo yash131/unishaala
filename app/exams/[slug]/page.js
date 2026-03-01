@@ -262,6 +262,7 @@ export default function ExamDetailPage() {
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [selectedTest, setSelectedTest] = useState(null);
   const [purchasedTests, setPurchasedTests] = useState(new Set());
+  const [examPurchased, setExamPurchased] = useState(false);
 
   useEffect(() => {
     async function fetchExamDetail() {
@@ -279,13 +280,29 @@ export default function ExamDetailPage() {
                 credentials: 'include'
               });
               const purchaseData = await purchaseRes.json();
-              if (purchaseData.success) {
-                const purchased = new Set(purchaseData.data.map(p => p.mockTestId).filter(Boolean));
-                // Also add all tests if exam was purchased
-                if (purchaseData.data.some(p => p.examId === result.data.exam?.id)) {
+              if (purchaseData.success && purchaseData.data) {
+                const purchased = new Set();
+                let hasExamPurchase = false;
+                
+                // Check each purchase
+                purchaseData.data.forEach(p => {
+                  if (p.mockTestId) {
+                    purchased.add(p.mockTestId);
+                  }
+                  if (p.examId === result.data.exam?.id) {
+                    hasExamPurchase = true;
+                  }
+                });
+                
+                // If exam was purchased, add all tests under it
+                if (hasExamPurchase) {
+                  setExamPurchased(true);
                   result.data.mockTests?.forEach(t => purchased.add(t.id));
                 }
+                
                 setPurchasedTests(purchased);
+                console.log('Purchased tests:', [...purchased]);
+                console.log('Exam purchased:', hasExamPurchase);
               }
             } catch (e) {
               console.error('Error fetching purchases:', e);
