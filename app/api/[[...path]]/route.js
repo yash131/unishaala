@@ -2650,6 +2650,49 @@ export async function POST(request) {
         return jsonResponse({ success: true, data: jobData });
       }
 
+      // Create Domain
+      if (path === '/admin/domains') {
+        const { examId, name, description, price } = body;
+        if (!examId || !name) {
+          return jsonResponse({ success: false, error: 'examId and name are required' }, 400);
+        }
+        
+        const domainsCollection = await getCollection('domains');
+        const domainData = {
+          id: uuidv4(),
+          examId,
+          name,
+          description: description || '',
+          price: price || 0,
+          status: 'Active',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        await domainsCollection.insertOne(domainData);
+        return jsonResponse({ success: true, data: domainData });
+      }
+
+      // Update Domain
+      if (path.startsWith('/admin/domains/')) {
+        const domainId = path.split('/admin/domains/')[1];
+        const domainsCollection = await getCollection('domains');
+        
+        const { name, description, price, status } = body;
+        const updateData = { updatedAt: new Date() };
+        if (name !== undefined) updateData.name = name;
+        if (description !== undefined) updateData.description = description;
+        if (price !== undefined) updateData.price = price;
+        if (status !== undefined) updateData.status = status;
+        
+        await domainsCollection.updateOne(
+          { id: domainId },
+          { $set: updateData }
+        );
+        
+        const updated = await domainsCollection.findOne({ id: domainId });
+        return jsonResponse({ success: true, data: updated });
+      }
+
       // Create Testimonial
       if (path === '/admin/testimonials') {
         const testimonialData = {
