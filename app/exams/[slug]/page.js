@@ -294,7 +294,7 @@ export default function ExamDetailPage() {
     // Check if user has already purchased this test or exam
     if (userData) {
       try {
-        const checkRes = await fetch('/api/payment/check-access', {
+        const checkRes = await fetch('/api/payment/verify-access', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
