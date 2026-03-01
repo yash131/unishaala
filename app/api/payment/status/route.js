@@ -34,6 +34,7 @@ export async function POST(request) {
         amount: transaction.amount,
         itemName: transaction.itemName,
         examId: transaction.examId,
+        mockTestId: transaction.mockTestId,
         paymentMethod: transaction.paymentMethod,
         createdAt: transaction.createdAt,
         completedAt: transaction.completedAt,
