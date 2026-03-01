@@ -1917,6 +1917,30 @@ export async function POST(request) {
       });
     }
 
+    // Get user's purchased tests/exams
+    if (path === '/user/purchases') {
+      const user = await getAuthUser(request);
+      if (!user) {
+        return jsonResponse({ success: false, error: 'Please login' }, 401);
+      }
+
+      const transactions = await getCollection('transactions');
+      const purchases = await transactions.find({
+        userId: user.id,
+        status: 'SUCCESS'
+      }).toArray();
+
+      return jsonResponse({
+        success: true,
+        data: purchases.map(p => ({
+          mockTestId: p.mockTestId,
+          examId: p.examId,
+          itemName: p.itemName,
+          purchasedAt: p.completedAt || p.createdAt
+        }))
+      });
+    }
+
     // Verify Payment (for exam access check)
     if (path === '/payment/verify-access') {
       const user = await getAuthUser(request);
