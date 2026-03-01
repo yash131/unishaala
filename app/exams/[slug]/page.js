@@ -324,8 +324,11 @@ export default function ExamDetailPage() {
     // Check if user is logged in
     const userData = localStorage.getItem('user');
     
-    // If test is free, always allow access
-    if (test.isFree || test.price === 0) {
+    // Determine if test is free
+    const isTestFree = test.isFree || !test.price || test.price === 0;
+    
+    // If test is free, always allow access (no login required)
+    if (isTestFree) {
       window.location.href = `/mock-test/${test.id}`;
       return;
     }
@@ -371,7 +374,7 @@ export default function ExamDetailPage() {
       // Offer exam purchase
       setSelectedTest({ ...test, examPrice, isExamPurchase: true });
       setShowUnlockModal(true);
-    } else if (!test.isFree && test.price > 0) {
+    } else if (test.price > 0) {
       // Offer individual test purchase
       setSelectedTest(test);
       setShowUnlockModal(true);
