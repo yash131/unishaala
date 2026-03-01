@@ -99,7 +99,7 @@ export async function POST(request) {
     console.log('CSV Format:', hasImageColumns ? 'NEW (with images)' : 'OLD (no images)');
     console.log('Headers:', headers);
 
-    // STEP 2: Process ZIP if uploaded
+    // STEP 2: Process ZIP if uploaded - Store images in MongoDB
     let imageMap = {};
     if (imagesZip && imagesZip.size > 0) {
       if (imagesZip.size > MAX_ZIP_SIZE) {
@@ -111,11 +111,8 @@ export async function POST(request) {
         const zip = new AdmZip(zipBuffer);
         const entries = zip.getEntries();
 
-        // Create temp directory for images
-        const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'questions');
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
-        }
+        // Get the images collection to store images in MongoDB
+        const imagesCollection = await getCollection('uploaded_images');
 
         for (const entry of entries) {
           // Skip directories and system files
@@ -130,15 +127,34 @@ export async function POST(request) {
           // Only process allowed image formats
           if (!ALLOWED_IMAGE_EXTENSIONS.includes(ext)) continue;
 
-          // Generate unique filename
-          const uniqueName = `${uuidv4()}${ext}`;
-          const filePath = path.join(uploadDir, uniqueName);
+          // Generate unique ID for the image
+          const imageId = uuidv4();
+          const imageData = entry.getData();
+          
+          // Determine MIME type
+          const mimeType = ext === '.png' ? 'image/png' 
+            : ext === '.jpg' || ext === '.jpeg' ? 'image/jpeg'
+            : ext === '.webp' ? 'image/webp' 
+            : 'image/png';
 
-          // Extract and save
-          fs.writeFileSync(filePath, entry.getData());
+          // Store image in MongoDB
+          await imagesCollection.updateOne(
+            { id: imageId },
+            { 
+              $set: {
+                id: imageId,
+                filename: fileName,
+                mimeType: mimeType,
+                data: imageData.toString('base64'),
+                size: imageData.length,
+                createdAt: new Date()
+              }
+            },
+            { upsert: true }
+          );
 
-          // Map original filename to public URL (multiple variations for flexibility)
-          const publicUrl = `/uploads/questions/${uniqueName}`;
+          // Map original filename to API URL
+          const publicUrl = `/api/images/${imageId}`;
           
           // Map with full path from ZIP
           imageMap[entry.entryName.toLowerCase()] = publicUrl;
@@ -156,7 +172,7 @@ export async function POST(request) {
             imageMap[parts[parts.length - 1].toLowerCase()] = publicUrl;
           }
           
-          console.log(`Mapped image: ${fileName} -> ${publicUrl}`);
+          console.log(`Stored image in DB: ${fileName} -> ${publicUrl}`);
         }
 
         console.log('Extracted images:', Object.keys(imageMap).length);
