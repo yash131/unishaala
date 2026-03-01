@@ -281,7 +281,39 @@ export default function ExamDetailPage() {
     }
   }, [params.slug]);
 
-  const handleStartTest = (test) => {
+  const handleStartTest = async (test) => {
+    // Check if user is logged in
+    const userData = localStorage.getItem('user');
+    
+    // If test is free, go directly
+    if (test.isFree || test.price === 0) {
+      window.location.href = `/mock-test/${test.id}`;
+      return;
+    }
+    
+    // Check if user has already purchased this test or exam
+    if (userData) {
+      try {
+        const checkRes = await fetch('/api/payment/check-access', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            mockTestId: test.id,
+            examId: data?.exam?.id
+          })
+        });
+        const checkData = await checkRes.json();
+        if (checkData.success && checkData.data?.hasAccess) {
+          // User has already purchased - go directly to test
+          window.location.href = `/mock-test/${test.id}`;
+          return;
+        }
+      } catch (e) {
+        console.error('Error checking access:', e);
+      }
+    }
+    
     // Check if exam requires purchase
     const examPrice = data?.exam?.price || 0;
     if (examPrice > 0) {
