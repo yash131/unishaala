@@ -672,6 +672,15 @@ export async function GET(request) {
         return jsonResponse({ success: true, data: await exams.find({}).toArray() });
       }
 
+      // Admin - Get all domains
+      if (path === '/admin/domains') {
+        const examId = searchParams.get('examId');
+        const domainsCollection = await getCollection('domains');
+        const query = examId ? { examId } : {};
+        const domains = await domainsCollection.find(query).sort({ createdAt: 1 }).toArray();
+        return jsonResponse({ success: true, data: domains });
+      }
+
       // Admin - Get all mock tests (including unpublished)
       if (path === '/admin/mock-tests') {
         const mockTests = await getCollection('mock_tests');
