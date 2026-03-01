@@ -687,68 +687,67 @@ export default function ExamDetailPage() {
       <Dialog open={showUnlockModal} onOpenChange={setShowUnlockModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-2xl">
-              {selectedTest?.isExamPurchase ? 'Unlock Full Exam Access' : 'Unlock This Test'}
-            </DialogTitle>
+            <DialogTitle className="text-2xl">Unlock Test</DialogTitle>
             <DialogDescription>
-              {selectedTest?.isExamPurchase 
-                ? 'Get access to all tests in this exam' 
-                : 'Get full access to this premium test'}
+              Choose how you want to access this test
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
             {selectedTest && (
               <div className="space-y-4">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-semibold text-gray-900">
-                    {selectedTest.isExamPurchase ? exam.name : selectedTest.title}
-                  </h4>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {selectedTest.isExamPurchase 
-                      ? `Full access to all Mock Tests, Practice Questions & Previous Year Papers` 
-                      : selectedTest.description}
-                  </p>
-                </div>
-                {!selectedTest.isExamPurchase && (
-                  <>
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-gray-600">Duration</span>
-                      <span className="font-medium">{selectedTest.duration} minutes</span>
-                    </div>
-                    <div className="flex items-center justify-between py-2 border-b">
-                      <span className="text-gray-600">Questions</span>
-                      <span className="font-medium">{selectedTest.questionCount || selectedTest.totalQuestions}</span>
-                    </div>
-                  </>
-                )}
-                <div className="flex items-center justify-between py-2">
-                  <span className="text-gray-600 font-semibold">Price</span>
-                  <span className="text-2xl font-bold text-teal-600">
-                    ₹{selectedTest.isExamPurchase ? exam.price : selectedTest.price}
-                  </span>
-                </div>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-500" /> Detailed Solutions
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-500" /> Performance Analytics
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-green-500" /> Unlimited Attempts
-                  </li>
-                  {selectedTest.isExamPurchase && (
+                {/* Individual Test Purchase Option */}
+                <div className="border-2 border-teal-500 rounded-lg p-4 bg-teal-50">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-semibold text-gray-900">This Test Only</h4>
+                    <span className="text-xl font-bold text-teal-600">₹{selectedTest.price || 0}</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-3">{selectedTest.title}</p>
+                  <ul className="space-y-1 text-sm text-gray-600 mb-3">
                     <li className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-green-500" /> Access to ALL test types
+                      <CheckCircle className="w-3 h-3 text-green-500" /> Detailed Solutions
                     </li>
-                  )}
-                </ul>
-                <Button 
-                  className="w-full bg-rose-500 hover:bg-rose-600 text-lg py-6"
-                  onClick={handlePayment}
-                >
-                  Pay ₹{selectedTest.isExamPurchase ? exam.price : selectedTest.price} & Start
-                </Button>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle className="w-3 h-3 text-green-500" /> Unlimited Attempts
+                    </li>
+                  </ul>
+                  <Button 
+                    className="w-full bg-teal-600 hover:bg-teal-700"
+                    onClick={() => handlePayment(false)}
+                  >
+                    Pay ₹{selectedTest.price || 0} for Test
+                  </Button>
+                </div>
+
+                {/* Full Exam Purchase Option - only show if exam has price */}
+                {exam.price > 0 && !examPurchased && (
+                  <div className="border-2 border-amber-400 rounded-lg p-4 bg-amber-50">
+                    <div className="flex items-center justify-between mb-2">
+                      <div>
+                        <h4 className="font-semibold text-gray-900">Full Exam Access</h4>
+                        <Badge className="bg-amber-200 text-amber-800 text-xs">Best Value</Badge>
+                      </div>
+                      <span className="text-xl font-bold text-amber-600">₹{exam.price}</span>
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3">{exam.name} - All Tests</p>
+                    <ul className="space-y-1 text-sm text-gray-600 mb-3">
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-3 h-3 text-green-500" /> All Mock Tests
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-3 h-3 text-green-500" /> Practice Questions
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <CheckCircle className="w-3 h-3 text-green-500" /> Previous Year Papers
+                      </li>
+                    </ul>
+                    <Button 
+                      className="w-full bg-amber-500 hover:bg-amber-600"
+                      onClick={() => handlePayment(true)}
+                    >
+                      Pay ₹{exam.price} for Full Exam
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>
