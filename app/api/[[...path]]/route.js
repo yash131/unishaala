@@ -2157,11 +2157,22 @@ export async function POST(request) {
       // Check if it's a paid test
       if (!test.isFree && test.price > 0) {
         const transactions = await getCollection('transactions');
-        const hasPurchased = await transactions.findOne({
+        
+        // Check for direct test purchase OR exam-level purchase
+        let hasPurchased = await transactions.findOne({
           userId: user.id,
           mockTestId,
           status: 'SUCCESS'
         });
+        
+        // Also check if user purchased the exam that contains this test
+        if (!hasPurchased && test.examId) {
+          hasPurchased = await transactions.findOne({
+            userId: user.id,
+            examId: test.examId,
+            status: 'SUCCESS'
+          });
+        }
         
         if (!hasPurchased) {
           return jsonResponse({ 
