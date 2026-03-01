@@ -773,7 +773,7 @@ function TestsTab({ mockTests, exams, onRefresh }) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input placeholder="Search..." className="pl-10 w-48" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <Button onClick={() => { setEditingTest(null); setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', testType: 'mock_test' }); setShowAddDialog(true); }} className="bg-teal-600 hover:bg-teal-700">
+          <Button onClick={() => { setEditingTest(null); setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', domainId: '', testType: 'mock_test' }); setShowAddDialog(true); }} className="bg-teal-600 hover:bg-teal-700">
             <Plus className="w-4 h-4 mr-2" /> Add Test
           </Button>
         </div>
