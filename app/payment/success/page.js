@@ -106,10 +106,16 @@ export default function PaymentSuccessPage() {
             )}
 
             <div className="space-y-3 mt-6">
-              {transaction?.examId ? (
-                <Link href={`/exams/${transaction.examId}`}>
+              {transaction?.mockTestId ? (
+                <Link href={`/mock-test/${transaction.mockTestId}`}>
                   <Button className="w-full bg-teal-600 hover:bg-teal-700">
-                    Start Exam Now <ArrowRight className="w-4 h-4 ml-2" />
+                    Start Test Now <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                </Link>
+              ) : transaction?.examId ? (
+                <Link href={`/exams/${transaction.examSlug || transaction.examId}`}>
+                  <Button className="w-full bg-teal-600 hover:bg-teal-700">
+                    Go to Exam <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </Link>
               ) : (
