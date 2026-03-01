@@ -836,7 +836,7 @@ function TestsTab({ mockTests, exams, onRefresh }) {
             {/* Exam Selection */}
             <div>
               <Label>Exam *</Label>
-              <Select value={formData.examId} onValueChange={v => setFormData({ ...formData, examId: v })}>
+              <Select value={formData.examId} onValueChange={v => setFormData({ ...formData, examId: v, domainId: '' })}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select Exam (GATE, CAT, UPSC...)" />
                 </SelectTrigger>
@@ -849,6 +849,24 @@ function TestsTab({ mockTests, exams, onRefresh }) {
                 </SelectContent>
               </Select>
             </div>
+            {/* Domain Selection */}
+            {formData.examId && (
+              <div>
+                <Label>Domain *</Label>
+                <Select value={formData.domainId} onValueChange={v => setFormData({ ...formData, domainId: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Domain" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredDomains.map(d => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             {/* Test Type Selection */}
             <div>
               <Label>Test Type *</Label>
