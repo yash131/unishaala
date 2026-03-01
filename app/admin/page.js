@@ -1518,12 +1518,12 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
         </Card>
       )}
 
-      {/* Step 4: Upload CSV (only if test selected) */}
+      {/* Step 5: Upload CSV (only if test selected) */}
       {selectedTestId && !showPreview && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <Upload className="w-5 h-5 text-orange-600" /> Step 4: Upload CSV
+              <Upload className="w-5 h-5 text-orange-600" /> Step 5: Upload Questions
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
