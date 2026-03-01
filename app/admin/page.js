@@ -853,11 +853,12 @@ function TestsTab({ mockTests, exams, onRefresh }) {
             {formData.examId && (
               <div>
                 <Label>Domain *</Label>
-                <Select value={formData.domainId} onValueChange={v => setFormData({ ...formData, domainId: v })}>
+                <Select value={formData.domainId || "none"} onValueChange={v => setFormData({ ...formData, domainId: v === "none" ? "" : v })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select Domain" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">-- Select Domain --</SelectItem>
                     {filteredDomains.map(d => (
                       <SelectItem key={d.id} value={d.id}>
                         {d.name}
@@ -867,52 +868,59 @@ function TestsTab({ mockTests, exams, onRefresh }) {
                 </Select>
               </div>
             )}
-            {/* Test Type Selection */}
-            <div>
-              <Label>Test Type *</Label>
-              <Select value={formData.testType} onValueChange={v => setFormData({ ...formData, testType: v })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select Test Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TEST_TYPES.map(t => (
-                    <SelectItem key={t.value} value={t.value}>
-                      {t.icon} {t.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-gray-500 mt-1">All test types have same behavior: timed, answers shown after submission</p>
-            </div>
-            <div>
-              <Label>Title *</Label>
-              <Input value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="e.g., GATE CS Full Mock Test 1" />
-            </div>
-            <div>
-              <Label>Description</Label>
-              <Textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Brief description of the test" />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
+            {/* Test Type Selection - only show after domain selected */}
+            {formData.domainId && (
               <div>
-                <Label>Duration (min)</Label>
-                <Input type="number" value={formData.duration} onChange={e => setFormData({ ...formData, duration: parseInt(e.target.value) })} />
-              </div>
-              <div>
-                <Label>Status</Label>
-                <Select value={formData.status} onValueChange={v => setFormData({ ...formData, status: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                <Label>Test Type *</Label>
+                <Select value={formData.testType} onValueChange={v => setFormData({ ...formData, testType: v })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Test Type" />
+                  </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Active">Active</SelectItem>
-                    <SelectItem value="Inactive">Inactive</SelectItem>
+                    {TEST_TYPES.map(t => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.icon} {t.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
+                <p className="text-xs text-gray-500 mt-1">All test types have same behavior: timed, answers shown after submission</p>
               </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Switch checked={formData.isFree} onCheckedChange={c => setFormData({ ...formData, isFree: c })} />
-              <Label>Free Test</Label>
-              {!formData.isFree && <Input type="number" placeholder="Price (₹)" className="w-32" value={formData.price} onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) })} />}
-            </div>
+            )}
+            {/* Title - show after test type selected */}
+            {formData.testType && formData.domainId && (
+              <>
+                <div>
+                  <Label>Title *</Label>
+                  <Input value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} placeholder="e.g., GATE CS Full Mock Test 1" />
+                </div>
+                <div>
+                  <Label>Description</Label>
+                  <Textarea value={formData.description} onChange={e => setFormData({ ...formData, description: e.target.value })} placeholder="Brief description of the test" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Duration (min)</Label>
+                    <Input type="number" value={formData.duration} onChange={e => setFormData({ ...formData, duration: parseInt(e.target.value) })} />
+                  </div>
+                  <div>
+                    <Label>Status</Label>
+                    <Select value={formData.status} onValueChange={v => setFormData({ ...formData, status: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Active">Active</SelectItem>
+                        <SelectItem value="Inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <Switch checked={formData.isFree} onCheckedChange={c => setFormData({ ...formData, isFree: c })} />
+                  <Label>Free Test</Label>
+                  {!formData.isFree && <Input type="number" placeholder="Price (₹)" className="w-32" value={formData.price} onChange={e => setFormData({ ...formData, price: parseInt(e.target.value) })} />}
+                </div>
+              </>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
