@@ -119,12 +119,9 @@ export default function TermsOfServicePage() {
             {/* Section 6 */}
             <section className="mb-10">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">6. Refund Policy</h2>
-              <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg mb-4">
-                <p className="text-amber-800 font-medium">
-                  All purchases are non-refundable by default.
-                </p>
-              </div>
-              <p className="text-gray-600 mb-4">Refunds may be considered in the following exceptional circumstances:</p>
+              <p className="text-gray-600 mb-4">
+                <strong>All purchases are non-refundable by default.</strong> Refunds may be considered in the following exceptional circumstances:
+              </p>
               <ul className="list-disc pl-6 text-gray-600 space-y-2">
                 <li>Technical issues preventing access to purchased content (verified by our team)</li>
                 <li>Duplicate payments made in error</li>
