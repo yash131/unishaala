@@ -420,6 +420,11 @@ function Footer() {
 
         <div className="border-t border-gray-200 pt-8 text-center text-sm text-gray-600">
           <p>&copy; 2025 Unishaala. All rights reserved.</p>
+          <p className="mt-2 text-xs text-gray-400">
+            <Link href="/privacy-policy" className="hover:text-gray-600">Privacy Policy</Link>
+            <span className="mx-2">•</span>
+            <Link href="/terms-of-service" className="hover:text-gray-600">Terms of Service</Link>
+          </p>
         </div>
       </div>
     </footer>
