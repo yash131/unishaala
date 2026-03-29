@@ -3,7 +3,7 @@ import { MainNavbar } from '@/components/MainNavbar';
 import { ArrowLeft } from 'lucide-react';
 
 export const metadata = {
-  title: 'Privacy Policy | Unishaala',
+  title: 'Privacy & Data Policy | Unishaala',
   description: 'Learn how Unishaala collects, uses, and protects your personal information.',
 };
 
@@ -21,147 +21,128 @@ export default function PrivacyPolicyPage() {
 
           {/* Header */}
           <header className="mb-12">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">Privacy Policy</h1>
-            <p className="text-sm text-gray-500">Last Updated: March 1, 2025</p>
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">Privacy & Data Policy</h1>
+            <p className="text-sm text-gray-500">Effective Date: 1 March 2026</p>
           </header>
 
           {/* Content */}
           <article className="prose prose-gray max-w-none">
-            <p className="text-gray-600 leading-relaxed mb-8">
-              At Unishaala, we are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our platform.
-            </p>
-
-            {/* Section 1 */}
-            <section className="mb-10">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Information We Collect</h2>
-              
-              <h3 className="text-lg font-medium text-gray-800 mt-6 mb-3">Personal Information</h3>
-              <p className="text-gray-600 mb-4">When you create an account or use our services, we may collect:</p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2 mb-4">
-                <li>Name and email address</li>
-                <li>Phone number</li>
-                <li>Profile information</li>
-                <li>Educational background and preferences</li>
-              </ul>
-
-              <h3 className="text-lg font-medium text-gray-800 mt-6 mb-3">Usage Data</h3>
-              <p className="text-gray-600 mb-4">We automatically collect information about how you interact with our platform:</p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2 mb-4">
-                <li>Test attempts and scores</li>
-                <li>Time spent on different sections</li>
-                <li>Device information and browser type</li>
-                <li>IP address and location data</li>
-              </ul>
-
-              <h3 className="text-lg font-medium text-gray-800 mt-6 mb-3">Payment Information</h3>
+            
+            {/* Privacy Policy */}
+            <section className="mb-12">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Privacy Policy</h2>
               <p className="text-gray-600 mb-4">
-                When you make purchases, payment information is processed securely through our payment partners (Razorpay). We do not store complete credit card numbers or CVV codes on our servers.
+                Unishaala is committed to protecting your privacy and ensuring that your personal information is handled in a safe and responsible manner. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit and use unishaala.com (the "Platform").
               </p>
-            </section>
-
-            {/* Section 2 */}
-            <section className="mb-10">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. How We Use Information</h2>
-              <p className="text-gray-600 mb-4">We use the collected information to:</p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2">
-                <li>Provide and maintain our services</li>
-                <li>Personalize your learning experience</li>
-                <li>Process transactions and send related information</li>
-                <li>Send administrative information, updates, and promotional content</li>
-                <li>Analyze usage patterns to improve our platform</li>
-                <li>Detect and prevent fraudulent activities</li>
-                <li>Comply with legal obligations</li>
-              </ul>
-            </section>
-
-            {/* Section 3 */}
-            <section className="mb-10">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Data Sharing</h2>
               <p className="text-gray-600 mb-4">
-                <strong className="text-gray-900">We do not sell your personal data to third parties.</strong>
+                When you use the Platform, we may collect personal information such as your name, email address, phone number, and payment details, as well as non-personal information including device data, browser type, IP address, and usage patterns. This information is collected either directly from you when you register or interact with the Platform, or automatically through technologies such as cookies and analytics tools.
               </p>
-              <p className="text-gray-600 mb-4">We may share your information only in the following circumstances:</p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2">
-                <li>With service providers who assist in operating our platform</li>
-                <li>When required by law or to protect our legal rights</li>
-                <li>In connection with a merger, acquisition, or sale of assets</li>
-                <li>With your explicit consent</li>
-              </ul>
-            </section>
-
-            {/* Section 4 */}
-            <section className="mb-10">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. Data Security</h2>
               <p className="text-gray-600 mb-4">
-                We implement appropriate technical and organizational security measures to protect your personal information:
+                The information we collect is used to provide, operate, and improve our services. This includes facilitating course access, processing transactions, personalizing user experience, communicating important updates, and analyzing user behavior to enhance the Platform. We may also use your information to send promotional or informational communications, which you can opt out of at any time.
               </p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2">
-                <li>All data transmission is encrypted using HTTPS/TLS protocols</li>
-                <li>Passwords are hashed and stored securely</li>
-                <li>Regular security audits and vulnerability assessments</li>
-                <li>Access controls and authentication mechanisms</li>
-                <li>Secure data storage with encryption at rest</li>
-              </ul>
-            </section>
-
-            {/* Section 5 */}
-            <section className="mb-10">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">5. User Rights</h2>
-              <p className="text-gray-600 mb-4">You have the right to:</p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2">
-                <li><strong>Access:</strong> Request a copy of your personal data</li>
-                <li><strong>Update:</strong> Correct inaccurate or incomplete information</li>
-                <li><strong>Delete:</strong> Request deletion of your account and associated data</li>
-                <li><strong>Portability:</strong> Receive your data in a structured format</li>
-                <li><strong>Opt-out:</strong> Unsubscribe from marketing communications</li>
-              </ul>
-              <p className="text-gray-600 mt-4">
-                To exercise any of these rights, please contact us at support@unishaala.com.
-              </p>
-            </section>
-
-            {/* Section 6 */}
-            <section className="mb-10">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">6. Cookies</h2>
               <p className="text-gray-600 mb-4">
-                We use cookies and similar tracking technologies to enhance your experience:
+                <strong>We do not sell your personal information to third parties.</strong> However, we may share your data with trusted service providers who assist us in operating the Platform, such as payment processors, hosting providers, and analytics services. We may also disclose information where required by law, regulation, or legal process, or where necessary to protect our rights, users, or the integrity of the Platform.
               </p>
-              <ul className="list-disc pl-6 text-gray-600 space-y-2">
-                <li><strong>Essential cookies:</strong> Required for platform functionality</li>
-                <li><strong>Analytics cookies:</strong> Help us understand usage patterns</li>
-                <li><strong>Preference cookies:</strong> Remember your settings and preferences</li>
-              </ul>
-              <p className="text-gray-600 mt-4">
-                You can control cookies through your browser settings, though disabling certain cookies may affect platform functionality.
+              <p className="text-gray-600 mb-4">
+                Unishaala implements reasonable technical and organizational measures to protect your personal data from unauthorized access, loss, misuse, or alteration. While we strive to safeguard your information, no method of transmission over the internet or electronic storage is completely secure, and we cannot guarantee absolute security.
               </p>
-            </section>
-
-            {/* Section 7 */}
-            <section className="mb-10">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">7. Third-Party Links</h2>
+              <p className="text-gray-600 mb-4">
+                You have certain rights regarding your personal data, including the right to access, update, correct, or request deletion of your information, subject to applicable legal requirements. You may exercise these rights by contacting us using the details provided below.
+              </p>
+              <p className="text-gray-600 mb-4">
+                The Platform may contain links to third-party websites or services. Unishaala is not responsible for the privacy practices or content of such third parties, and users are encouraged to review their respective privacy policies.
+              </p>
+              <p className="text-gray-600 mb-4">
+                Our services are not intended for children under the age of 13 without appropriate parental or guardian consent. We do not knowingly collect personal information from children in violation of applicable laws.
+              </p>
+              <p className="text-gray-600 mb-4">
+                We may update this Privacy Policy from time to time to reflect changes in our practices, technology, or legal requirements. Any updates will be posted on this page with a revised effective date.
+              </p>
               <p className="text-gray-600">
-                Our platform may contain links to third-party websites or services. We are not responsible for the privacy practices of these external sites. We encourage you to review their privacy policies before providing any personal information.
+                If you have any questions, concerns, or requests regarding this Privacy Policy, you may contact us at <a href="mailto:admin@unishaala.com" className="text-teal-600 hover:underline">admin@unishaala.com</a>.
               </p>
             </section>
 
-            {/* Section 8 */}
-            <section className="mb-10">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">8. Contact Details</h2>
+            {/* Data Protection & User Rights */}
+            <section className="mb-12 pt-8 border-t border-gray-200">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Data Protection & User Rights Addendum</h2>
               <p className="text-gray-600 mb-4">
-                If you have any questions or concerns about this Privacy Policy, please contact us:
+                Unishaala is committed to complying with applicable data protection laws, including the Digital Personal Data Protection Act, 2023 (India), and, where applicable, principles aligned with the General Data Protection Regulation (GDPR).
               </p>
-              <div className="bg-gray-50 p-6 rounded-lg">
-                <p className="text-gray-700"><strong>Email:</strong> support@unishaala.com</p>
-                <p className="text-gray-700 mt-2"><strong>Address:</strong> New Delhi, India</p>
-              </div>
+              <p className="text-gray-600 mb-4">
+                We process personal data only for lawful purposes, including providing services, fulfilling contractual obligations, complying with legal requirements, and pursuing legitimate business interests. Wherever required, we obtain your consent before collecting or processing your personal data.
+              </p>
+              <p className="text-gray-600 mb-4">
+                You, as a user ("Data Principal"), have the right to access your personal data, request correction or erasure, withdraw consent, and request grievance redressal. Requests may be submitted through our designated contact channels, and we will respond within a reasonable timeframe as required by applicable law.
+              </p>
+              <p className="text-gray-600 mb-4">
+                Unishaala implements appropriate technical and organizational safeguards to protect personal data, including encryption, access controls, and secure storage practices. In the event of a data breach, we will take necessary steps to notify affected users and relevant authorities in accordance with applicable laws.
+              </p>
+              <p className="text-gray-600 mb-4">
+                Where personal data is transferred to third-party service providers or processed outside your jurisdiction, we ensure that such transfers are subject to appropriate safeguards and contractual protections.
+              </p>
+              <p className="text-gray-600 mb-4">
+                We retain personal data only for as long as necessary to fulfill the purposes for which it was collected or as required by law. Once no longer required, data is securely deleted or anonymized.
+              </p>
+              <p className="text-gray-600 mb-4">
+                We have appointed a Grievance Officer / Data Protection Contact to address user concerns related to data privacy. For any such concerns, please contact <a href="mailto:admin@unishaala.com" className="text-teal-600 hover:underline">admin@unishaala.com</a>.
+              </p>
+              <p className="text-gray-600">
+                By continuing to use the Platform, you acknowledge and consent to the collection and processing of your data as described in this Privacy Policy and related documents.
+              </p>
             </section>
 
-            {/* Changes Notice */}
-            <section className="border-t border-gray-200 pt-8 mt-12">
-              <p className="text-sm text-gray-500">
-                We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last Updated" date.
+            {/* Cookie Policy */}
+            <section className="mb-12 pt-8 border-t border-gray-200">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Cookie Policy</h2>
+              <p className="text-sm text-gray-500 mb-4">Effective Date: 1 March, 2026</p>
+              <p className="text-gray-600 mb-4">
+                This Cookie Policy explains how Unishaala uses cookies and similar tracking technologies when you access and use our platform available at https://unishaala.com (the "Platform"). By continuing to use the Platform, you consent to the use of cookies in accordance with this policy.
+              </p>
+              <p className="text-gray-600 mb-4">
+                Cookies are small text files that are stored on your device when you visit a website. They help us recognize your device, remember your preferences, and improve your overall user experience. We use both session cookies, which expire when you close your browser, and persistent cookies, which remain on your device until deleted or expired.
+              </p>
+              <p className="text-gray-600 mb-4">
+                Unishaala uses cookies for several purposes, including enabling essential website functionality, remembering user preferences, analyzing traffic and user behavior, and improving performance. We may also use cookies to personalize content and deliver relevant communications.
+              </p>
+              <p className="text-gray-600 mb-4">
+                In addition to our own cookies, we may allow third-party service providers, such as analytics and advertising partners, to place cookies on your device. These third parties may use cookies to collect information about your online activities across different websites and services.
+              </p>
+              <p className="text-gray-600 mb-4">
+                You have the ability to control or disable cookies through your browser settings. However, please note that disabling cookies may affect the functionality of certain features on the Platform and limit your user experience.
+              </p>
+              <p className="text-gray-600 mb-4">
+                We may update this Cookie Policy from time to time to reflect changes in technology, law, or our practices. Continued use of the Platform after such updates constitutes your acceptance of the revised policy.
+              </p>
+              <p className="text-gray-600">
+                For any questions regarding this Cookie Policy, please contact us at <a href="mailto:admin@unishaala.com" className="text-teal-600 hover:underline">admin@unishaala.com</a>.
               </p>
             </section>
+
+            {/* Copyright & Intellectual Property */}
+            <section className="mb-12 pt-8 border-t border-gray-200">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Copyright & Intellectual Property Policy</h2>
+              <p className="text-sm text-gray-500 mb-4">Effective Date: 1 March, 2026</p>
+              <p className="text-gray-600 mb-4">
+                Unishaala respects the intellectual property rights of others and expects users and instructors to do the same. This policy outlines how we handle claims of copyright infringement on the Platform.
+              </p>
+              <p className="text-gray-600 mb-4">
+                All content available on Unishaala, including courses, videos, text, graphics, and logos, is protected by applicable copyright and intellectual property laws. Unauthorized use, reproduction, or distribution of such content is strictly prohibited.
+              </p>
+              <p className="text-gray-600 mb-4">
+                If you believe that any content on the Platform infringes your copyright, you may submit a notice to us with relevant details, including identification of the copyrighted work, the allegedly infringing material, and proof of ownership. Upon receiving a valid complaint, we will review the claim and take appropriate action, which may include removing or disabling access to the content.
+              </p>
+              <p className="text-gray-600 mb-4">
+                Users or instructors who repeatedly violate intellectual property rights may have their accounts suspended or terminated. We also reserve the right to take legal action where necessary.
+              </p>
+              <p className="text-gray-600 mb-4">
+                If you believe your content was wrongly removed due to a mistake or misidentification, you may submit a counter-notification with supporting information.
+              </p>
+              <p className="text-gray-600">
+                For all copyright-related concerns, please contact <a href="mailto:admin@unishaala.com" className="text-teal-600 hover:underline">admin@unishaala.com</a>.
+              </p>
+            </section>
+
           </article>
         </div>
       </main>
@@ -174,6 +155,8 @@ export default function PrivacyPolicyPage() {
             <Link href="/privacy-policy" className="hover:text-gray-600">Privacy Policy</Link>
             <span className="mx-2">•</span>
             <Link href="/terms-of-service" className="hover:text-gray-600">Terms of Service</Link>
+            <span className="mx-2">•</span>
+            <Link href="/refund-policy" className="hover:text-gray-600">Refund Policy</Link>
           </p>
         </div>
       </footer>

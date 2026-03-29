@@ -424,6 +424,8 @@ function Footer() {
             <Link href="/privacy-policy" className="hover:text-gray-600">Privacy Policy</Link>
             <span className="mx-2">•</span>
             <Link href="/terms-of-service" className="hover:text-gray-600">Terms of Service</Link>
+            <span className="mx-2">•</span>
+            <Link href="/refund-policy" className="hover:text-gray-600">Refund Policy</Link>
           </p>
         </div>
       </div>
