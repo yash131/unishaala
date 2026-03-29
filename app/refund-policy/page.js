@@ -26,36 +26,36 @@ export default function RefundPolicyPage() {
           </header>
 
           {/* Content */}
-          <article className="prose prose-gray max-w-none">
+          <article className="max-w-none">
             
             <section className="mb-10">
-              <p className="text-gray-600 mb-6 text-lg">
+              <p className="text-gray-600 mb-6 text-lg text-justify">
                 At Unishaala, we strive to ensure a high-quality learning experience for all users. This Refund and Cancellation Policy outlines the terms under which users may request refunds or cancel purchases made on the Platform.
               </p>
             </section>
 
             <section className="mb-10">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Purchase Agreement</h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 mb-4 text-justify">
                 When you purchase a course or subscription on Unishaala, you agree to the pricing, payment terms, and applicable refund conditions displayed at the time of purchase.
               </p>
             </section>
 
             <section className="mb-10">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Refund Eligibility</h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 mb-4 text-justify">
                 Refund eligibility may vary depending on the nature of the course, including whether it is a live class, recorded content, or part of a bundled offering. In general:
               </p>
               <ul className="list-disc pl-6 text-gray-600 space-y-2 mb-4">
-                <li>Users may request a refund within a limited period from the date of purchase, provided that the course has not been substantially consumed.</li>
-                <li>A course may be considered "substantially consumed" if a significant portion of the content has been accessed or completed.</li>
-                <li>For live classes, refunds may not be available once the session has commenced or been attended.</li>
+                <li className="text-justify">Users may request a refund within a limited period from the date of purchase, provided that the course has not been substantially consumed.</li>
+                <li className="text-justify">A course may be considered "substantially consumed" if a significant portion of the content has been accessed or completed.</li>
+                <li className="text-justify">For live classes, refunds may not be available once the session has commenced or been attended.</li>
               </ul>
             </section>
 
             <section className="mb-10">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">How to Request a Refund</h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 mb-4 text-justify">
                 Refund requests must be submitted through the official support channels of Unishaala and will be reviewed on a case-by-case basis. Approved refunds will be processed using the original payment method within a reasonable timeframe, subject to applicable banking or payment provider processing times.
               </p>
               <div className="bg-gray-50 p-6 rounded-lg">
@@ -68,14 +68,14 @@ export default function RefundPolicyPage() {
 
             <section className="mb-10">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Subscription Cancellations</h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 mb-4 text-justify">
                 Subscriptions, where applicable, may be canceled at any time; however, cancellation will typically take effect at the end of the current billing cycle, and partial refunds for unused periods may not be provided unless explicitly stated otherwise.
               </p>
             </section>
 
             <section className="mb-10">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Refund Denial</h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 mb-4 text-justify">
                 Unishaala reserves the right to deny refund requests in cases of:
               </p>
               <ul className="list-disc pl-6 text-gray-600 space-y-2">
@@ -88,14 +88,14 @@ export default function RefundPolicyPage() {
 
             <section className="mb-10">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Policy Updates</h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 mb-4 text-justify">
                 We reserve the right to modify this policy at any time, with updates being posted on the Platform. Continued use of our services after policy changes constitutes acceptance of the revised terms.
               </p>
             </section>
 
             <section className="pt-8 border-t border-gray-200">
               <h2 className="text-2xl font-semibold text-gray-900 mb-4">Contact Us</h2>
-              <p className="text-gray-600 mb-4">
+              <p className="text-gray-600 mb-4 text-justify">
                 For any refund or cancellation-related queries, users may contact us at:
               </p>
               <div className="bg-gray-50 p-6 rounded-lg">
@@ -114,7 +114,7 @@ export default function RefundPolicyPage() {
           <p className="mt-2 text-xs text-gray-400">
             <Link href="/privacy-policy" className="hover:text-gray-600">Privacy Policy</Link>
             <span className="mx-2">•</span>
-            <Link href="/terms-of-service" className="hover:text-gray-600">Terms of Service</Link>
+            <Link href="/terms-of-service" className="hover:text-gray-600">Terms & Conditions</Link>
             <span className="mx-2">•</span>
             <Link href="/refund-policy" className="hover:text-gray-600">Refund Policy</Link>
           </p>
