@@ -239,6 +239,30 @@ function ResponseSheetPredictor() {
       <div className="lg:col-span-2 space-y-4" id="rp-result">
         {result ? (
           <>
+            {/* No-match warning */}
+            {Array.isArray(result.unmatchedCsvIds) && result.unmatchedCsvIds.length > 0 && result.correct === 0 && result.wrong === 0 && (
+              <Card className="border-red-300 bg-red-50">
+                <CardContent className="p-4 text-sm">
+                  <p className="font-semibold text-red-700 mb-1">⚠ No Question IDs matched!</p>
+                  <p className="text-red-700">None of the Question IDs in the answer key matched the ones in your response sheet. Please verify that the admin's CSV uses the <span className="font-semibold">same Question IDs</span> as your exam.</p>
+                  {Array.isArray(result.extractedQuestionIds) && result.extractedQuestionIds.length > 0 && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-xs text-red-800 underline">View IDs extracted from your sheet ({result.extractedQuestionIds.length})</summary>
+                      <div className="mt-1 max-h-28 overflow-y-auto bg-white border border-red-200 rounded p-2 text-xs font-mono">
+                        {result.extractedQuestionIds.join(', ')}
+                      </div>
+                    </details>
+                  )}
+                  <details className="mt-2">
+                    <summary className="cursor-pointer text-xs text-red-800 underline">View CSV Question IDs ({result.unmatchedCsvIds.length})</summary>
+                    <div className="mt-1 max-h-28 overflow-y-auto bg-white border border-red-200 rounded p-2 text-xs font-mono">
+                      {result.unmatchedCsvIds.join(', ')}
+                    </div>
+                  </details>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Marks hero */}
             <Card className="shadow-lg border-0 bg-gradient-to-br from-teal-500 to-cyan-600 text-white">
               <CardContent className="p-6 text-center">

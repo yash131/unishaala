@@ -97,15 +97,20 @@ function parseResponseSheetHTML(html) {
     }
   }
 
-  const textPlain = h.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
+  const textPlain = h.replace(/&nbsp;/g, ' ').replace(/[\u200B-\u200F\uFEFF]/g, '').replace(/\s+/g, ' ');
   const text = textPlain.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
-  // PRIMARY: TCS iON format
-  const qidIter = /Question\s*ID\s*[:\-]\s*([0-9A-Za-z]+)/gi;
+  // PRIMARY: TCS iON format — "Question ID" followed by ":" and the numeric id.
+  // Accept optional whitespace, nbsp, zero-width chars inside the ID (trimmed by regex).
+  const qidIter = /Question\s*ID\s*[:\-]\s*([0-9A-Za-z][0-9A-Za-z\s\-]*?)(?=\s*(?:Option\s*[0-9]\s*ID|Correct\s*Option|Question\s*Type|Status|Chosen|Given|<|$))/gi;
   const matches = [];
   let m;
   while ((m = qidIter.exec(text)) !== null) {
-    matches.push({ qid: String(m[1]), start: m.index, end: m.index + m[0].length });
+    // Clean the ID: keep only alphanumerics
+    const rawId = m[1].replace(/[^0-9A-Za-z]/g, '');
+    if (rawId) {
+      matches.push({ qid: String(rawId), start: m.index, end: m.index + m[0].length });
+    }
   }
 
   if (matches.length > 0) {
@@ -282,66 +287,88 @@ function classifyCorrect(correctRaw) {
 }
 
 // Evaluate extracted answers against the answer key with advanced answer type support.
+// Match strategy (question-ID driven, per user requirement):
+//   1. Exact match on raw question_id vs extracted byId
+//   2. Trimmed/normalized match on question_id
+//   3. For short numeric CSV IDs only (like "1","2","3" or "Q1"), allow byIndex positional match
+//   4. Otherwise — no match → unattempted
 function evaluateAnswers(extracted, answerKey, positiveMarks, negativeMarks) {
   const pos = Number(positiveMarks) || 0;
   const neg = Number(negativeMarks) || 0;
   let correct = 0, wrong = 0, unattempted = 0, marks = 0;
   const details = [];
+  const unmatchedIds = [];
 
   const byId = extracted?.byId || {};
   const byIndex = extracted?.byIndex || {};
   const keyAnswers = answerKey.answers || [];
 
+  // Normalize byId keys (trim, strip zero-width chars)
+  const byIdNorm = {};
+  for (const [k, v] of Object.entries(byId)) {
+    const nk = String(k).replace(/[\u200B-\u200F\uFEFF\s]+/g, '');
+    byIdNorm[nk] = v;
+  }
+
   for (let i = 0; i < keyAnswers.length; i++) {
     const item = keyAnswers[i];
     const rawCorrect = item.correct_answer;
     const classified = classifyCorrect(rawCorrect);
-    const qidNorm = normalizeQid(item.question_id);
+    const qidRaw = String(item.question_id);
+    const qidClean = qidRaw.replace(/[\u200B-\u200F\uFEFF\s]+/g, '');
+    const qidNorm = normalizeQid(qidRaw);
 
-    // Look up user's entry
+    // Detect if CSV is using long internal IDs (≥ 4 digits, pure numeric)
+    const isLongId = /^[0-9]{4,}$/.test(qidClean) || /^[0-9]{4,}$/.test(qidNorm);
+
+    // Lookup order: raw id → cleaned id → normalized id → index (only for short IDs)
     let entry = undefined;
-    if (byId[item.question_id] !== undefined) entry = byId[item.question_id];
-    else if (byId[qidNorm] !== undefined) entry = byId[qidNorm];
-    else if (byIndex[qidNorm] !== undefined) entry = byIndex[qidNorm];
-    else if (byIndex[String(i + 1)] !== undefined) entry = byIndex[String(i + 1)];
+    let matchedBy = 'none';
+
+    if (byId[qidRaw] !== undefined) { entry = byId[qidRaw]; matchedBy = 'id-exact'; }
+    else if (byIdNorm[qidClean] !== undefined) { entry = byIdNorm[qidClean]; matchedBy = 'id-normalized'; }
+    else if (byId[qidNorm] !== undefined) { entry = byId[qidNorm]; matchedBy = 'id-stripped'; }
+    else if (!isLongId) {
+      // Short sequential IDs — allow positional fallback
+      if (byIndex[qidNorm] !== undefined) { entry = byIndex[qidNorm]; matchedBy = 'index-explicit'; }
+      else if (byIndex[String(i + 1)] !== undefined) { entry = byIndex[String(i + 1)]; matchedBy = 'index-position'; }
+    }
+
+    if (!entry && isLongId) {
+      unmatchedIds.push(qidRaw);
+    }
 
     const userAnswer = entry?.answer ?? '';
     const userStatus = entry?.status ?? '';
 
     let status;
 
-    // MAT/Bonus: credit if user attempted (status = Answered OR non-empty answer)
+    // MAT/Bonus: credit ONLY if user provided a non-empty answer
     if (classified.type === 'MAT') {
-      const attempted = userStatus === 'Answered' || (userAnswer && String(userAnswer).trim() !== '');
-      if (attempted) {
+      const hasAnswer = userAnswer && String(userAnswer).trim() !== '';
+      if (hasAnswer) {
         correct++; marks += pos; status = 'correct';
       } else {
         unattempted++; status = 'unattempted';
       }
     }
-    // Unattempted
     else if (!userAnswer || String(userAnswer).trim() === '' || userStatus === 'Not Answered') {
       unattempted++; status = 'unattempted';
     }
-    // NAT — numeric comparison with ±0.01 tolerance
     else if (classified.type === 'NAT') {
       const u = parseFloat(userAnswer);
       if (Number.isNaN(u)) { wrong++; marks -= neg; status = 'wrong'; }
       else if (Math.abs(u - classified.value) <= 0.01) { correct++; marks += pos; status = 'correct'; }
       else { wrong++; marks -= neg; status = 'wrong'; }
     }
-    // RANGE — user's value must fall within [lo, hi]
     else if (classified.type === 'RANGE') {
       const u = parseFloat(userAnswer);
       if (Number.isNaN(u)) { wrong++; marks -= neg; status = 'wrong'; }
       else if (u >= classified.value[0] && u <= classified.value[1]) { correct++; marks += pos; status = 'correct'; }
       else { wrong++; marks -= neg; status = 'wrong'; }
     }
-    // MSQ — user set must exactly equal correct set (no partial credit by default)
     else if (classified.type === 'MSQ') {
-      // Normalize user answer to sorted A,B,C form
       let uStr = String(userAnswer).toUpperCase();
-      // Handle numeric multi-select: "1,3" -> "A,C"
       if (/^[0-9](,[0-9])+$/.test(uStr)) {
         uStr = uStr.split(',').map(n => String.fromCharCode(64 + parseInt(n.trim()))).sort().join(',');
       } else {
@@ -350,7 +377,6 @@ function evaluateAnswers(extracted, answerKey, positiveMarks, negativeMarks) {
       if (uStr === classified.value) { correct++; marks += pos; status = 'correct'; }
       else { wrong++; marks -= neg; status = 'wrong'; }
     }
-    // MCQ — straight comparison (MSQ for GATE often has no negative marking but we apply whatever admin set)
     else {
       if (String(userAnswer).toUpperCase() === String(classified.value).toUpperCase()) {
         correct++; marks += pos; status = 'correct';
@@ -364,6 +390,7 @@ function evaluateAnswers(extracted, answerKey, positiveMarks, negativeMarks) {
       type: classified.type,
       correct_answer: String(rawCorrect),
       user_answer: userAnswer || null,
+      matched_by: matchedBy,
       status
     });
   }
@@ -372,7 +399,7 @@ function evaluateAnswers(extracted, answerKey, positiveMarks, negativeMarks) {
   const attempted = correct + wrong;
   const maxMarks = +(totalQuestions * pos).toFixed(2);
   marks = +marks.toFixed(2);
-  return { correct, wrong, unattempted, attempted, marks, totalQuestions, maxMarks, details };
+  return { correct, wrong, unattempted, attempted, marks, totalQuestions, maxMarks, details, unmatchedIds };
 }
 
 
@@ -1794,6 +1821,22 @@ export async function POST(request) {
         // Evaluate
         const result = evaluateAnswers(extracted, key, key.positiveMarks ?? 1, key.negativeMarks ?? 0);
 
+        // --- Debug logging for ID matching ---
+        const extractedIds = Object.keys(extracted.byId || {});
+        const csvIds = (key.answers || []).map(a => String(a.question_id));
+        console.log('[predict-rank] source:', source, '| extracted IDs:', extractedIds.length, '| CSV IDs:', csvIds.length);
+        if (extractedIds.length && csvIds.length) {
+          const csvSet = new Set(csvIds);
+          const matched = extractedIds.filter(id => csvSet.has(id)).length;
+          console.log(`[predict-rank] matched ${matched}/${csvIds.length} by Question ID`);
+          if (matched === 0) {
+            console.log('[predict-rank] ⚠ NO ID MATCHES - sample extracted:', extractedIds.slice(0, 3), 'vs CSV:', csvIds.slice(0, 3));
+          }
+        }
+        if (result.unmatchedIds && result.unmatchedIds.length > 0) {
+          console.log('[predict-rank] Unmatched CSV IDs:', result.unmatchedIds.length, 'of', csvIds.length);
+        }
+
         // Store submission (remove previous by same email+key)
         const user = await getAuthUser(request);
         const predictionsCol = await getCollection('rank_predictions');
@@ -1856,6 +1899,8 @@ export async function POST(request) {
             totalParticipants,
             percentile,
             extractedAnswerCount: extracted.totalFound,
+            extractedQuestionIds: extractedIds.slice(0, 200),
+            unmatchedCsvIds: result.unmatchedIds || [],
             source,
             details: result.details
           }
