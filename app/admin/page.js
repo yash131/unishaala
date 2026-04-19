@@ -82,6 +82,7 @@ function AdminSidebar({ activeTab, setActiveTab }) {
     { id: 'tests', label: 'Tests', icon: <ClipboardList className="w-5 h-5" /> },
     { id: 'questions', label: 'Questions', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'blogs', label: 'Blogs', icon: <FileText className="w-5 h-5" /> },
+    { id: 'answer-keys', label: 'Answer Keys', icon: <ClipboardList className="w-5 h-5" /> },
     { id: 'transactions', label: 'Transactions', icon: <CreditCard className="w-5 h-5" /> },
     { id: 'jobs', label: 'Jobs', icon: <Briefcase className="w-5 h-5" /> },
     { id: 'colleges', label: 'Colleges', icon: <Building className="w-5 h-5" /> },
@@ -3533,6 +3534,351 @@ function ContactsTab() {
   );
 }
 
+// ====================== ANSWER KEYS TAB ======================
+function AnswerKeysTab() {
+  const [keys, setKeys] = useState([]);
+  const [exams, setExams] = useState([]);
+  const [submissions, setSubmissions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [csvDialogOpen, setCsvDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [active, setActive] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const emptyForm = { title: '', description: '', examId: 'none', positiveMarks: 1, negativeMarks: 0.33 };
+  const [form, setForm] = useState(emptyForm);
+  const [csvText, setCsvText] = useState('');
+  const [csvUploading, setCsvUploading] = useState(false);
+
+  const fetchKeys = async () => {
+    setLoading(true);
+    try {
+      const [keysRes, examsRes, subsRes] = await Promise.all([
+        fetch('/api/admin/answer-keys', { credentials: 'include' }),
+        fetch('/api/admin/exams', { credentials: 'include' }),
+        fetch('/api/admin/rank-predictions', { credentials: 'include' })
+      ]);
+      const kd = await keysRes.json();
+      const ed = await examsRes.json();
+      const sd = await subsRes.json();
+      if (kd.success) setKeys(kd.data || []);
+      if (ed.success) setExams(ed.data || []);
+      if (sd.success) setSubmissions(sd.data || []);
+    } catch (e) { toast.error('Failed to load answer keys'); }
+    setLoading(false);
+  };
+  useEffect(() => { fetchKeys(); }, []);
+
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setDialogOpen(true); };
+  const openEdit = (k) => {
+    setEditing(k);
+    setForm({
+      title: k.title || '',
+      description: k.description || '',
+      examId: k.examId || 'none',
+      positiveMarks: k.positiveMarks ?? 1,
+      negativeMarks: k.negativeMarks ?? 0.33
+    });
+    setDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.title.trim()) { toast.error('Title is required'); return; }
+    setSaving(true);
+    try {
+      const payload = {
+        title: form.title,
+        description: form.description,
+        examId: form.examId === 'none' ? null : form.examId,
+        positiveMarks: parseFloat(form.positiveMarks),
+        negativeMarks: parseFloat(form.negativeMarks)
+      };
+      const url = editing ? `/api/admin/answer-keys/${editing.id}` : '/api/admin/answer-keys';
+      const method = editing ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method, headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', body: JSON.stringify(payload)
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success(editing ? 'Answer key updated' : 'Answer key created');
+        setDialogOpen(false);
+        // If just created (no answers yet), open CSV upload
+        if (!editing) {
+          setActive(d.data);
+          setCsvText('');
+          setCsvDialogOpen(true);
+        }
+        fetchKeys();
+      } else toast.error(d.error || 'Save failed');
+    } catch (e) { toast.error('Save failed'); }
+    setSaving(false);
+  };
+
+  const handleDelete = async (k) => {
+    if (!confirm(`Delete "${k.title}"? All associated rank submissions will also be deleted.`)) return;
+    const res = await fetch(`/api/admin/answer-keys/${k.id}`, { method: 'DELETE', credentials: 'include' });
+    const d = await res.json();
+    if (d.success) { toast.success('Answer key deleted'); fetchKeys(); } else toast.error('Delete failed');
+  };
+
+  const openCsvUpload = (k) => { setActive(k); setCsvText(''); setCsvDialogOpen(true); };
+  const openView = (k) => { setActive(k); setViewDialogOpen(true); };
+
+  const handleCsvFile = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => { setCsvText(ev.target.result); };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleCsvUpload = async () => {
+    if (!csvText.trim()) { toast.error('Please paste or upload CSV content'); return; }
+    setCsvUploading(true);
+    try {
+      const res = await fetch(`/api/admin/answer-keys/${active.id}/upload-csv`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', body: JSON.stringify({ csv: csvText })
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success(`Imported ${d.stats.imported} answers${d.stats.errors.length ? ` (${d.stats.errors.length} errors)` : ''}`);
+        if (d.stats.errors.length > 0) console.warn('CSV errors:', d.stats.errors);
+        setCsvDialogOpen(false);
+        fetchKeys();
+      } else toast.error(d.error || 'Upload failed');
+    } catch (e) { toast.error('Upload failed'); }
+    setCsvUploading(false);
+  };
+
+  const filtered = keys.filter(k => (k.title || '').toLowerCase().includes(search.toLowerCase()));
+
+  const countSubsFor = (id) => submissions.filter(s => s.answerKeyId === id).length;
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Answer Key Management</h2>
+          <p className="text-sm text-gray-500">Create answer keys and configure marking scheme for rank prediction</p>
+        </div>
+        <div className="flex gap-2">
+          <a href="/api/rank-predictor/sample-csv" download>
+            <Button variant="outline"><Download className="w-4 h-4 mr-2" /> Sample CSV</Button>
+          </a>
+          <Button onClick={openCreate} className="bg-teal-600 hover:bg-teal-700">
+            <Plus className="w-4 h-4 mr-2" /> New Answer Key
+          </Button>
+        </div>
+      </div>
+
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Input className="pl-9" placeholder="Search by title..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-teal-600" /></div>
+          ) : filtered.length === 0 ? (
+            <div className="p-12 text-center">
+              <ClipboardList className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500">{keys.length === 0 ? 'No answer keys yet. Create one to start.' : 'No matches.'}</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Linked Exam</TableHead>
+                  <TableHead>Questions</TableHead>
+                  <TableHead>Marking</TableHead>
+                  <TableHead>Submissions</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((k) => {
+                  const exam = exams.find(e => e.id === k.examId);
+                  return (
+                    <TableRow key={k.id}>
+                      <TableCell>
+                        <div className="font-medium text-gray-900">{k.title}</div>
+                        {k.description && <div className="text-xs text-gray-500 line-clamp-1">{k.description}</div>}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">{exam?.name || '—'}</TableCell>
+                      <TableCell>
+                        {k.totalQuestions > 0 ? (
+                          <Badge className="bg-teal-100 text-teal-700">{k.totalQuestions}</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-amber-600 border-amber-300">No CSV</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">
+                        <span className="text-green-600">+{k.positiveMarks}</span>
+                        {' / '}
+                        <span className="text-red-600">−{k.negativeMarks}</span>
+                      </TableCell>
+                      <TableCell className="text-sm text-gray-600">{countSubsFor(k.id)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" onClick={() => openView(k)} title="View"><Eye className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => openCsvUpload(k)} title="Upload CSV"><Upload className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(k)} title="Edit"><Edit className="w-4 h-4" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(k)} title="Delete"><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Create / Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!saving) setDialogOpen(o); }}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader><DialogTitle>{editing ? 'Edit Answer Key' : 'Create New Answer Key'}</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div>
+              <Label>Title *</Label>
+              <Input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. GATE CS 2024 (Set 1)" />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea rows={2} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Short description shown to users" />
+            </div>
+            <div>
+              <Label>Linked Test Series (optional)</Label>
+              <Select value={form.examId} onValueChange={v => setForm(p => ({ ...p, examId: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  {exams.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <Label>Positive Marks *</Label>
+                <Input type="number" step="0.01" value={form.positiveMarks} onChange={e => setForm(p => ({ ...p, positiveMarks: e.target.value }))} placeholder="e.g. 1" />
+                <p className="text-xs text-gray-500 mt-1">Awarded for each correct answer.</p>
+              </div>
+              <div>
+                <Label>Negative Marks *</Label>
+                <Input type="number" step="0.01" value={form.negativeMarks} onChange={e => setForm(p => ({ ...p, negativeMarks: e.target.value }))} placeholder="e.g. 0.33" />
+                <p className="text-xs text-gray-500 mt-1">Deducted for each wrong answer (positive value).</p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700" onClick={handleSave} disabled={saving}>
+              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : <><Save className="w-4 h-4 mr-2" /> {editing ? 'Update' : 'Create & Continue'}</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* CSV Upload Dialog */}
+      <Dialog open={csvDialogOpen} onOpenChange={(o) => { if (!csvUploading) setCsvDialogOpen(o); }}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Upload Answer Key CSV</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="bg-teal-50 border border-teal-200 rounded-md p-3 text-sm text-teal-900">
+              <p className="font-medium mb-1">Expected CSV format:</p>
+              <pre className="bg-white border rounded p-2 text-xs overflow-auto">question_id,correct_answer{'\n'}Q1,A{'\n'}Q2,C{'\n'}Q3,B</pre>
+              <p className="text-xs mt-2">For numeric answer types (NAT), put the numeric value instead of A/B/C/D.</p>
+              <a href="/api/rank-predictor/sample-csv" download className="inline-flex items-center text-teal-700 hover:underline text-xs mt-2">
+                <Download className="w-3 h-3 mr-1" /> Download sample CSV
+              </a>
+            </div>
+            <div>
+              <Label>Upload CSV File</Label>
+              <Input type="file" accept=".csv,text/csv" onChange={handleCsvFile} />
+            </div>
+            <div>
+              <Label>OR Paste CSV Content</Label>
+              <Textarea rows={8} value={csvText} onChange={(e) => setCsvText(e.target.value)} placeholder="Paste CSV content here..." className="font-mono text-sm" />
+            </div>
+            {active && (
+              <p className="text-xs text-gray-500">This will <span className="font-semibold">replace</span> the existing answers on "{active.title}".</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCsvDialogOpen(false)} disabled={csvUploading}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700" onClick={handleCsvUpload} disabled={csvUploading || !csvText.trim()}>
+              {csvUploading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading...</> : <><Upload className="w-4 h-4 mr-2" /> Import CSV</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View/Edit Answers Dialog */}
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[88vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{active?.title || 'Answer Key'}</DialogTitle></DialogHeader>
+          {active && (
+            <div className="py-2">
+              <div className="grid md:grid-cols-4 gap-3 mb-4">
+                <div className="bg-gray-50 rounded p-3">
+                  <p className="text-xs text-gray-500">Questions</p>
+                  <p className="text-xl font-bold">{active.totalQuestions || 0}</p>
+                </div>
+                <div className="bg-green-50 rounded p-3">
+                  <p className="text-xs text-gray-500">Positive marks</p>
+                  <p className="text-xl font-bold text-green-600">+{active.positiveMarks}</p>
+                </div>
+                <div className="bg-red-50 rounded p-3">
+                  <p className="text-xs text-gray-500">Negative marks</p>
+                  <p className="text-xl font-bold text-red-600">−{active.negativeMarks}</p>
+                </div>
+                <div className="bg-teal-50 rounded p-3">
+                  <p className="text-xs text-gray-500">Submissions</p>
+                  <p className="text-xl font-bold text-teal-600">{countSubsFor(active.id)}</p>
+                </div>
+              </div>
+              {active.answers && active.answers.length > 0 ? (
+                <div className="border rounded">
+                  <div className="max-h-80 overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow><TableHead>Question ID</TableHead><TableHead>Correct Answer</TableHead></TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {active.answers.map((a, i) => (
+                          <TableRow key={i}><TableCell className="font-mono">Q{a.question_id}</TableCell><TableCell className="font-mono">{a.correct_answer}</TableCell></TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              ) : (
+                <div className="border-2 border-dashed rounded p-8 text-center">
+                  <p className="text-gray-500 mb-3">No answers uploaded yet.</p>
+                  <Button onClick={() => { setViewDialogOpen(false); openCsvUpload(active); }} className="bg-teal-600 hover:bg-teal-700">
+                    <Upload className="w-4 h-4 mr-2" /> Upload CSV
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewDialogOpen(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 // Main Admin Page
 export default function AdminPage() {
   const router = useRouter();
@@ -3646,6 +3992,7 @@ export default function AdminPage() {
           {activeTab === 'tests' && <TestsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'questions' && <QuestionsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'blogs' && <BlogsTab />}
+          {activeTab === 'answer-keys' && <AnswerKeysTab />}
           {activeTab === 'transactions' && <TransactionsTab />}
           {activeTab === 'jobs' && <JobsTab />}
           {activeTab === 'colleges' && <CollegesTab />}

@@ -36,6 +36,138 @@ function getPath(request) {
   return pathname;
 }
 
+// ============ RANK PREDICTOR HELPERS ============
+
+// Normalize question ID to lowercase without "q" prefix, e.g. "Q1" -> "1", "1" -> "1"
+function normalizeQid(q) {
+  if (q === null || q === undefined) return '';
+  return String(q).trim().toUpperCase().replace(/^Q\.?\s*/i, '').replace(/\s+/g, '');
+}
+
+// Normalize answer: numeric "1"-"4" -> "A"-"D"; "a"-"d" -> uppercase; keep text unchanged for NAT
+function normalizeAnswer(a) {
+  if (a === null || a === undefined) return '';
+  let v = String(a).trim();
+  if (!v || v === '--' || v === '-' || v.toLowerCase() === 'not attempted' || v.toLowerCase() === 'no answer' || v.toLowerCase() === 'null') return '';
+  // Numeric single digit 1-8 -> A-H
+  if (/^[1-8]$/.test(v)) return String.fromCharCode(64 + parseInt(v));
+  // "Option X" or "Option 1"
+  const m = v.match(/^(?:option\s*)?([a-hA-H1-8])$/);
+  if (m) {
+    const ch = m[1];
+    if (/[1-8]/.test(ch)) return String.fromCharCode(64 + parseInt(ch));
+    return ch.toUpperCase();
+  }
+  // For MSQ multi-select "1,3" -> "A,C"
+  if (/^[1-8](,\s*[1-8])+$/.test(v)) {
+    return v.split(',').map(n => String.fromCharCode(64 + parseInt(n.trim()))).join(',');
+  }
+  // NAT or full text -> return as-is (trimmed, uppercased if pure letters)
+  if (/^[A-H](,[A-H])+$/i.test(v)) return v.toUpperCase();
+  if (/^[A-H]$/i.test(v)) return v.toUpperCase();
+  // Assume it's a NAT numeric answer — keep as-is
+  return v;
+}
+
+// Parse response sheet HTML and extract { question_id: selected_answer } map.
+// Supports common GATE-style formats. Resilient to markup variations.
+function parseResponseSheetHTML(html) {
+  if (!html || typeof html !== 'string') return {};
+  const answers = {};
+
+  // Strip scripts/styles
+  let h = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
+
+  // Approach 1: label-based "Question Number/ID: X" & "Chosen Option/Answer: Y" in same block
+  // Convert HTML to tagless text preserving order
+  const text = h.replace(/<\/(tr|div|p|li|section)[^>]*>/gi, '\n').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
+  // Try block regex: sliding window
+  const qRegex = /(?:Question\s*(?:Number|No\.?|ID)|Q\.?\s*No\.?|Q\.?\s*ID)\s*[:\-]?\s*([A-Za-z0-9]+)[\s\S]{0,400}?(?:Chosen\s*Option|Option\s*Chosen|Answer\s*Chosen|Candidate\s*Answer|Chosen\s*Answer|Chosen\s*Response|Selected\s*Option|Your\s*Answer|Response|Answer)\s*[:\-]?\s*([A-Za-z0-9,\-\s\.]{0,30}?)(?=\s*(?:Section|Question\s*Type|Correct|Marks|Status|Q\.?\s*No|Question\s*Number|Question\s*ID|$))/gi;
+  let m;
+  while ((m = qRegex.exec(text)) !== null) {
+    const qid = normalizeQid(m[1]);
+    const ans = normalizeAnswer(m[2]);
+    if (qid) answers[qid] = ans;
+  }
+
+  // Approach 2: table-row parse. Extract rows and look for [qid, ..., chosen] columns
+  if (Object.keys(answers).length === 0) {
+    // Gather <tr>...</tr> rows
+    const rows = h.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+    // First, try to find a header row to identify column indexes
+    let qIdx = -1, chosenIdx = -1;
+    for (const row of rows) {
+      const cells = (row.match(/<t[hd][\s\S]*?<\/t[hd]>/gi) || []).map(c => c.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim());
+      if (!cells.length) continue;
+      const lower = cells.map(c => c.toLowerCase());
+      const qi = lower.findIndex(c => /question\s*(number|no|id)|^q\.?\s*(no|id)/i.test(c) || c === 'q.no' || c === 'q no');
+      const ci = lower.findIndex(c => /chosen|selected|candidate\s*answer|your\s*answer|response|given\s*answer/.test(c));
+      if (qi !== -1 && ci !== -1) {
+        qIdx = qi; chosenIdx = ci;
+        break;
+      }
+    }
+    if (qIdx !== -1 && chosenIdx !== -1) {
+      for (const row of rows) {
+        const cells = (row.match(/<t[hd][\s\S]*?<\/t[hd]>/gi) || []).map(c => c.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim());
+        if (cells.length <= Math.max(qIdx, chosenIdx)) continue;
+        // Skip header
+        if (/question/i.test(cells[qIdx]) && /chosen|selected/i.test(cells[chosenIdx])) continue;
+        const qid = normalizeQid(cells[qIdx]);
+        const ans = normalizeAnswer(cells[chosenIdx]);
+        if (qid && /^\d+$/.test(qid)) answers[qid] = ans;
+      }
+    }
+  }
+
+  return answers;
+}
+
+// Parse simple user-typed answers like "1:A, 2:B, 3:--" or "Q1=A, Q2=C"
+function parseSimpleAnswers(text) {
+  if (!text || typeof text !== 'string') return {};
+  const out = {};
+  const parts = text.split(/[\n,;]+/);
+  for (const p of parts) {
+    const m = p.match(/^\s*Q?\.?\s*(\d+)\s*[:=\-]\s*(.+?)\s*$/i);
+    if (m) {
+      out[normalizeQid(m[1])] = normalizeAnswer(m[2]);
+    }
+  }
+  return out;
+}
+
+// Evaluate user answers against the answer key
+function evaluateAnswers(userAnswers, answerKey, positiveMarks, negativeMarks) {
+  const pos = Number(positiveMarks) || 0;
+  const neg = Number(negativeMarks) || 0;
+  let correct = 0, wrong = 0, unattempted = 0, marks = 0;
+
+  for (const item of answerKey.answers || []) {
+    const qid = normalizeQid(item.question_id);
+    const correctAns = normalizeAnswer(item.correct_answer);
+    const userAns = userAnswers[qid];
+    if (userAns === undefined || userAns === null || userAns === '') {
+      unattempted++;
+      continue;
+    }
+    if (String(userAns).toUpperCase() === String(correctAns).toUpperCase()) {
+      correct++;
+      marks += pos;
+    } else {
+      wrong++;
+      marks -= neg;
+    }
+  }
+
+  const totalQuestions = (answerKey.answers || []).length;
+  const attempted = correct + wrong;
+  const maxMarks = +(totalQuestions * pos).toFixed(2);
+  marks = +marks.toFixed(2);
+  return { correct, wrong, unattempted, attempted, marks, totalQuestions, maxMarks };
+}
+
+
 // Helper function to check ICICI transaction status via Command API
 async function checkICICITransactionStatus(merchantTxnNo) {
   try {
@@ -148,6 +280,28 @@ export async function GET(request) {
         publishDate: { $lte: new Date() }
       }).sort({ publishDate: -1 }).toArray();
       return jsonResponse({ success: true, data: publishedBlogs });
+    }
+
+    // Public - Get active answer keys (for user rank predictor)
+    if (path === '/answer-keys') {
+      const keys = await getCollection('answer_keys');
+      const all = await keys.find({ status: { $ne: 'inactive' } })
+        .project({ id: 1, title: 1, description: 1, examId: 1, positiveMarks: 1, negativeMarks: 1, totalQuestions: 1, createdAt: 1 })
+        .sort({ createdAt: -1 })
+        .toArray();
+      return jsonResponse({ success: true, data: all });
+    }
+
+    // Public - Sample CSV download for answer key
+    if (path === '/rank-predictor/sample-csv') {
+      const csv = 'question_id,correct_answer\nQ1,A\nQ2,C\nQ3,B\nQ4,D\nQ5,A\n';
+      return new NextResponse(csv, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/csv; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="answer-key-sample.csv"',
+        },
+      });
     }
 
     // Public - Get single blog by slug
@@ -780,6 +934,29 @@ export async function GET(request) {
         const transactions = await getCollection('transactions');
         return jsonResponse({ success: true, data: await transactions.find({}).sort({ createdAt: -1 }).toArray() });
       }
+
+      // Admin - Get all answer keys
+      if (path === '/admin/answer-keys') {
+        const keys = await getCollection('answer_keys');
+        const all = await keys.find({}).sort({ createdAt: -1 }).toArray();
+        return jsonResponse({ success: true, data: all });
+      }
+
+      // Admin - Get single answer key (with answers)
+      if (path.startsWith('/admin/answer-keys/')) {
+        const akId = path.split('/admin/answer-keys/')[1];
+        const keys = await getCollection('answer_keys');
+        const k = await keys.findOne({ id: akId });
+        if (!k) return jsonResponse({ success: false, error: 'Answer key not found' }, 404);
+        return jsonResponse({ success: true, data: k });
+      }
+
+      // Admin - Get rank prediction submissions
+      if (path === '/admin/rank-predictions') {
+        const rp = await getCollection('rank_predictions');
+        const data = await rp.find({}, { projection: { userAnswers: 0 } }).sort({ createdAt: -1 }).limit(500).toArray();
+        return jsonResponse({ success: true, data });
+      }
     }
 
     return jsonResponse({ success: true, message: 'Unishaala API' });
@@ -1309,6 +1486,133 @@ export async function POST(request) {
       });
 
       return jsonResponse({ success: true, message: 'Message sent successfully' });
+    }
+
+    // Public - Submit rank prediction
+    if (path === '/predict-rank') {
+      try {
+        const { answerKeyId, name, email, phone, category, responseHtml, responseUrl, manualAnswers } = body;
+
+        if (!answerKeyId) return jsonResponse({ success: false, error: 'answerKeyId is required' }, 400);
+        if (!name || !String(name).trim()) return jsonResponse({ success: false, error: 'Name is required' }, 400);
+        if (!email || !String(email).trim()) return jsonResponse({ success: false, error: 'Email is required' }, 400);
+
+        const keys = await getCollection('answer_keys');
+        const key = await keys.findOne({ id: answerKeyId });
+        if (!key) return jsonResponse({ success: false, error: 'Answer key not found' }, 404);
+        if (!key.answers || key.answers.length === 0) {
+          return jsonResponse({ success: false, error: 'Selected answer key has no questions uploaded yet' }, 400);
+        }
+
+        // Gather user answers: priority manualAnswers -> responseHtml -> responseUrl
+        let userAnswers = {};
+        let source = 'manual';
+
+        if (manualAnswers && typeof manualAnswers === 'object' && Object.keys(manualAnswers).length > 0) {
+          for (const [k, v] of Object.entries(manualAnswers)) {
+            userAnswers[normalizeQid(k)] = normalizeAnswer(v);
+          }
+          source = 'manual';
+        } else if (manualAnswers && typeof manualAnswers === 'string') {
+          userAnswers = parseSimpleAnswers(manualAnswers);
+          source = 'manual-text';
+        } else if (responseHtml) {
+          userAnswers = parseResponseSheetHTML(responseHtml);
+          source = 'html-upload';
+        } else if (responseUrl) {
+          try {
+            const res = await fetch(responseUrl, {
+              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; UnishaalaRankBot/1.0)' },
+              redirect: 'follow'
+            });
+            if (!res.ok) {
+              return jsonResponse({ success: false, error: `Could not fetch response sheet URL (status ${res.status}). Try downloading and uploading the HTML file instead.` }, 400);
+            }
+            const html = await res.text();
+            userAnswers = parseResponseSheetHTML(html);
+            source = 'url';
+          } catch (e) {
+            return jsonResponse({ success: false, error: 'Could not fetch response sheet URL. It may require login — please save the page and upload the HTML file.' }, 400);
+          }
+        } else {
+          return jsonResponse({ success: false, error: 'Please provide responseHtml, responseUrl, or manualAnswers' }, 400);
+        }
+
+        if (Object.keys(userAnswers).length === 0) {
+          return jsonResponse({ success: false, error: 'Could not extract any answers from the response sheet. Please check the format.' }, 400);
+        }
+
+        // Evaluate
+        const result = evaluateAnswers(userAnswers, key, key.positiveMarks ?? 1, key.negativeMarks ?? 0);
+
+        // Store submission (upsert by email+answerKey to keep latest score)
+        const user = await getAuthUser(request);
+        const predictionsCol = await getCollection('rank_predictions');
+        const normCategory = (category || 'General').trim();
+        const submission = {
+          id: uuidv4(),
+          userId: user?.id || null,
+          name: String(name).trim(),
+          email: String(email).trim().toLowerCase(),
+          phone: phone || '',
+          category: normCategory,
+          answerKeyId,
+          answerKeyTitle: key.title,
+          totalQuestions: result.totalQuestions,
+          attempted: result.attempted,
+          correct: result.correct,
+          wrong: result.wrong,
+          unattempted: result.unattempted,
+          marks: result.marks,
+          maxMarks: result.maxMarks,
+          percentage: result.maxMarks ? +((result.marks / result.maxMarks) * 100).toFixed(2) : 0,
+          userAnswers,
+          source,
+          createdAt: new Date()
+        };
+
+        // Remove previous submissions of same email for this key so ranking is per-user latest attempt
+        await predictionsCol.deleteMany({ answerKeyId, email: submission.email });
+        await predictionsCol.insertOne(submission);
+
+        // Compute ranks
+        const allSubs = await predictionsCol.find({ answerKeyId }).project({ marks: 1, category: 1, email: 1 }).toArray();
+        const totalParticipants = allSubs.length;
+        const higher = allSubs.filter(s => s.marks > result.marks).length;
+        const overallRank = higher + 1;
+        const categorySubs = allSubs.filter(s => (s.category || 'General') === normCategory);
+        const categoryTotal = categorySubs.length;
+        const catHigher = categorySubs.filter(s => s.marks > result.marks).length;
+        const categoryRank = catHigher + 1;
+        const percentile = totalParticipants > 1 ? +(((totalParticipants - overallRank) / (totalParticipants - 1)) * 100).toFixed(2) : 100;
+
+        return jsonResponse({
+          success: true,
+          data: {
+            submissionId: submission.id,
+            marks: result.marks,
+            maxMarks: result.maxMarks,
+            percentage: submission.percentage,
+            totalQuestions: result.totalQuestions,
+            attempted: result.attempted,
+            correct: result.correct,
+            wrong: result.wrong,
+            unattempted: result.unattempted,
+            positiveMarks: key.positiveMarks ?? 1,
+            negativeMarks: key.negativeMarks ?? 0,
+            overallRank,
+            categoryRank,
+            category: normCategory,
+            categoryTotal,
+            totalParticipants,
+            percentile,
+            extractedAnswerCount: Object.keys(userAnswers).length
+          }
+        });
+      } catch (e) {
+        console.error('predict-rank error:', e);
+        return jsonResponse({ success: false, error: e.message || 'Failed to predict rank' }, 500);
+      }
     }
 
     // Process ICICI payment callback (called from client-side page)
@@ -2680,6 +2984,87 @@ export async function POST(request) {
         return jsonResponse({ success: true, data: examData });
       }
 
+      // Create Answer Key
+      if (path === '/admin/answer-keys') {
+        const { title, description, examId, positiveMarks, negativeMarks, answers } = body;
+        if (!title || !String(title).trim()) {
+          return jsonResponse({ success: false, error: 'Title is required' }, 400);
+        }
+        const normalizedAnswers = Array.isArray(answers)
+          ? answers
+              .filter(a => a && a.question_id !== undefined && a.correct_answer !== undefined)
+              .map(a => ({
+                question_id: normalizeQid(a.question_id),
+                correct_answer: normalizeAnswer(a.correct_answer)
+              }))
+          : [];
+        const akData = {
+          id: uuidv4(),
+          title: String(title).trim(),
+          description: description || '',
+          examId: examId || null,
+          positiveMarks: positiveMarks !== undefined ? parseFloat(positiveMarks) : 1,
+          negativeMarks: negativeMarks !== undefined ? parseFloat(negativeMarks) : 0,
+          totalQuestions: normalizedAnswers.length,
+          answers: normalizedAnswers,
+          status: 'active',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        const keys = await getCollection('answer_keys');
+        await keys.insertOne(akData);
+        return jsonResponse({ success: true, data: akData });
+      }
+
+      // Upload CSV for an answer key (replaces answers)
+      if (path.match(/^\/admin\/answer-keys\/[^/]+\/upload-csv$/)) {
+        const akId = path.split('/')[3];
+        const keys = await getCollection('answer_keys');
+        const key = await keys.findOne({ id: akId });
+        if (!key) return jsonResponse({ success: false, error: 'Answer key not found' }, 404);
+
+        const { csv } = body;
+        if (!csv || typeof csv !== 'string') {
+          return jsonResponse({ success: false, error: 'CSV content is required' }, 400);
+        }
+
+        const lines = csv.replace(/\r/g, '').split('\n').filter(l => l.trim());
+        if (lines.length < 1) return jsonResponse({ success: false, error: 'CSV is empty' }, 400);
+
+        // Detect header
+        const firstCols = lines[0].split(',').map(c => c.trim().toLowerCase());
+        const hasHeader = firstCols.includes('question_id') || firstCols.includes('correct_answer') || firstCols.includes('answer');
+        const startIdx = hasHeader ? 1 : 0;
+        const qIdx = hasHeader ? firstCols.indexOf('question_id') : 0;
+        let aIdx = hasHeader ? firstCols.findIndex(c => c === 'correct_answer' || c === 'answer') : 1;
+        if (qIdx === -1 || aIdx === -1) { aIdx = 1; }
+
+        const answers = [];
+        const errors = [];
+        const seen = new Set();
+        for (let i = startIdx; i < lines.length; i++) {
+          const cols = lines[i].split(',').map(c => c.trim());
+          if (cols.length < 2) continue;
+          const qid = normalizeQid(cols[qIdx] ?? cols[0]);
+          const ans = normalizeAnswer(cols[aIdx] ?? cols[1]);
+          if (!qid) { errors.push(`Row ${i + 1}: invalid question_id`); continue; }
+          if (seen.has(qid)) { errors.push(`Row ${i + 1}: duplicate question_id ${qid}`); continue; }
+          seen.add(qid);
+          answers.push({ question_id: qid, correct_answer: ans });
+        }
+
+        await keys.updateOne(
+          { id: akId },
+          { $set: { answers, totalQuestions: answers.length, updatedAt: new Date() } }
+        );
+        const updated = await keys.findOne({ id: akId });
+        return jsonResponse({
+          success: true,
+          data: updated,
+          stats: { imported: answers.length, errors }
+        });
+      }
+
       // Create Job
       if (path === '/admin/jobs') {
         const jobData = {
@@ -3026,6 +3411,33 @@ export async function PUT(request) {
         return jsonResponse({ success: true, data: updated });
       }
 
+      // Update Answer Key
+      if (path.startsWith('/admin/answer-keys/')) {
+        const akId = path.split('/admin/answer-keys/')[1];
+        const keys = await getCollection('answer_keys');
+        const updateData = { updatedAt: new Date() };
+        if (body.title !== undefined) updateData.title = String(body.title).trim();
+        if (body.description !== undefined) updateData.description = body.description;
+        if (body.examId !== undefined) updateData.examId = body.examId || null;
+        if (body.positiveMarks !== undefined) updateData.positiveMarks = parseFloat(body.positiveMarks);
+        if (body.negativeMarks !== undefined) updateData.negativeMarks = parseFloat(body.negativeMarks);
+        if (body.status !== undefined) updateData.status = body.status;
+        if (Array.isArray(body.answers)) {
+          const normalized = body.answers
+            .filter(a => a && a.question_id !== undefined && a.correct_answer !== undefined)
+            .map(a => ({
+              question_id: normalizeQid(a.question_id),
+              correct_answer: normalizeAnswer(a.correct_answer)
+            }));
+          updateData.answers = normalized;
+          updateData.totalQuestions = normalized.length;
+        }
+        const r = await keys.updateOne({ id: akId }, { $set: updateData });
+        if (r.matchedCount === 0) return jsonResponse({ success: false, error: 'Answer key not found' }, 404);
+        const updated = await keys.findOne({ id: akId });
+        return jsonResponse({ success: true, data: updated });
+      }
+
       // Update Blog Post
       if (path.startsWith('/admin/blogs/')) {
         const blogId = path.split('/admin/blogs/')[1];
@@ -3173,6 +3585,16 @@ export async function DELETE(request) {
       const contacts = await getCollection('contact_leads');
       await contacts.deleteOne({ id: contactId });
       return jsonResponse({ success: true, message: 'Contact lead deleted' });
+    }
+
+    // Delete Answer Key (and associated rank predictions)
+    if (path.startsWith('/admin/answer-keys/')) {
+      const akId = path.split('/admin/answer-keys/')[1];
+      const keys = await getCollection('answer_keys');
+      const predictions = await getCollection('rank_predictions');
+      await keys.deleteOne({ id: akId });
+      const delRes = await predictions.deleteMany({ answerKeyId: akId });
+      return jsonResponse({ success: true, message: `Answer key deleted (${delRes.deletedCount} associated submissions removed)` });
     }
 
     return jsonResponse({ success: false, error: 'Endpoint not found' }, 404);
