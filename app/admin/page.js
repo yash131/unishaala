@@ -57,7 +57,12 @@ import {
   Heading2,
   Quote,
   Code,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Star,
+  Mail,
+  Phone,
+  MapPin,
+  ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -2690,6 +2695,844 @@ function BlogsTab() {
   );
 }
 
+// ====================== JOBS TAB ======================
+function JobsTab() {
+  const [jobs, setJobs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const emptyForm = {
+    title: '', organization: '', location: '', category: '',
+    vacancies: '', salary: '', qualification: '', description: '',
+    applyLink: '', lastDate: '', status: 'Active'
+  };
+  const [form, setForm] = useState(emptyForm);
+
+  const fetchJobs = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/jobs', { credentials: 'include' });
+      const d = await res.json();
+      if (d.success) setJobs(d.data || []);
+    } catch (e) { toast.error('Failed to load jobs'); }
+    setLoading(false);
+  };
+  useEffect(() => { fetchJobs(); }, []);
+
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setDialogOpen(true); };
+  const openEdit = (j) => {
+    setEditing(j);
+    setForm({
+      title: j.title || '', organization: j.organization || '', location: j.location || '',
+      category: j.category || '', vacancies: j.vacancies ?? '',
+      salary: j.salary || '', qualification: j.qualification || '',
+      description: j.description || '', applyLink: j.applyLink || '',
+      lastDate: j.lastDate ? String(j.lastDate).slice(0, 10) : '',
+      status: j.status || 'Active'
+    });
+    setDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.title.trim()) { toast.error('Title is required'); return; }
+    if (!form.organization.trim()) { toast.error('Organization is required'); return; }
+    setSaving(true);
+    try {
+      const payload = { ...form, vacancies: form.vacancies === '' ? 0 : parseInt(form.vacancies) };
+      const url = editing ? `/api/admin/jobs/${editing.id}` : '/api/admin/jobs';
+      const method = editing ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method, headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', body: JSON.stringify(payload)
+      });
+      const d = await res.json();
+      if (d.success) { toast.success(editing ? 'Job updated' : 'Job created'); setDialogOpen(false); fetchJobs(); }
+      else toast.error(d.error || 'Save failed');
+    } catch (e) { toast.error('Save failed'); }
+    setSaving(false);
+  };
+
+  const handleDelete = async (j) => {
+    if (!confirm(`Delete "${j.title}"?`)) return;
+    const res = await fetch(`/api/admin/jobs/${j.id}`, { method: 'DELETE', credentials: 'include' });
+    const d = await res.json();
+    if (d.success) { toast.success('Job deleted'); fetchJobs(); } else toast.error('Delete failed');
+  };
+
+  const filtered = jobs.filter(j => {
+    if (statusFilter !== 'all' && j.status !== statusFilter) return false;
+    if (search && !(j.title || '').toLowerCase().includes(search.toLowerCase())
+        && !(j.organization || '').toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Jobs</h2>
+          <p className="text-sm text-gray-500">Manage job listings shown on the Jobs page</p>
+        </div>
+        <Button onClick={openCreate} className="bg-teal-600 hover:bg-teal-700">
+          <Plus className="w-4 h-4 mr-2" /> New Job
+        </Button>
+      </div>
+      <div className="flex flex-col md:flex-row gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input className="pl-9" placeholder="Search by title or organization..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full md:w-48"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="Active">Active</SelectItem>
+            <SelectItem value="Closed">Closed</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-teal-600" /></div>
+          ) : filtered.length === 0 ? (
+            <div className="p-12 text-center">
+              <Briefcase className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500">{jobs.length === 0 ? 'No jobs yet. Click "New Job" to create one.' : 'No jobs match your filters.'}</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Organization</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Vacancies</TableHead>
+                  <TableHead>Last Date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((j) => (
+                  <TableRow key={j.id}>
+                    <TableCell className="font-medium">{j.title}</TableCell>
+                    <TableCell>{j.organization}</TableCell>
+                    <TableCell className="text-sm text-gray-600">{j.location || '—'}</TableCell>
+                    <TableCell>{j.vacancies ?? '—'}</TableCell>
+                    <TableCell className="text-sm text-gray-600">{j.lastDate ? String(j.lastDate).slice(0, 10) : '—'}</TableCell>
+                    <TableCell>
+                      <Badge className={j.status === 'Active' ? 'bg-green-500' : 'bg-gray-500'}>{j.status || 'Active'}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(j)}><Edit className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(j)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!saving) setDialogOpen(o); }}>
+        <DialogContent className="sm:max-w-3xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{editing ? 'Edit Job' : 'Create New Job'}</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div><Label>Title *</Label><Input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} /></div>
+              <div><Label>Organization *</Label><Input value={form.organization} onChange={e => setForm(p => ({ ...p, organization: e.target.value }))} /></div>
+            </div>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div><Label>Location</Label><Input value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value }))} /></div>
+              <div><Label>Category</Label><Input value={form.category} onChange={e => setForm(p => ({ ...p, category: e.target.value }))} placeholder="e.g. Banking, Technical" /></div>
+              <div><Label>Vacancies</Label><Input type="number" min="0" value={form.vacancies} onChange={e => setForm(p => ({ ...p, vacancies: e.target.value }))} /></div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div><Label>Salary</Label><Input value={form.salary} onChange={e => setForm(p => ({ ...p, salary: e.target.value }))} placeholder="e.g. ₹50,000 - ₹70,000" /></div>
+              <div><Label>Qualification</Label><Input value={form.qualification} onChange={e => setForm(p => ({ ...p, qualification: e.target.value }))} /></div>
+            </div>
+            <div><Label>Description</Label><Textarea rows={4} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} /></div>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div><Label>Last Date</Label><Input type="date" value={form.lastDate} onChange={e => setForm(p => ({ ...p, lastDate: e.target.value }))} /></div>
+              <div><Label>Apply Link</Label><Input value={form.applyLink} onChange={e => setForm(p => ({ ...p, applyLink: e.target.value }))} placeholder="https://..." /></div>
+              <div>
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={v => setForm(p => ({ ...p, status: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700" onClick={handleSave} disabled={saving}>
+              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : <><Save className="w-4 h-4 mr-2" /> {editing ? 'Update' : 'Create'}</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ====================== COLLEGES TAB ======================
+function CollegesTab() {
+  const [colleges, setColleges] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const emptyForm = {
+    name: '', location: '', ranking: '', type: 'Government',
+    courses: '', fees: '', rating: '', acceptedExams: '',
+    description: '', website: '', image: ''
+  };
+  const [form, setForm] = useState(emptyForm);
+  const [uploading, setUploading] = useState(false);
+
+  const fetchColleges = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/colleges', { credentials: 'include' });
+      const d = await res.json();
+      if (d.success) setColleges(d.data || []);
+    } catch (e) { toast.error('Failed to load colleges'); }
+    setLoading(false);
+  };
+  useEffect(() => { fetchColleges(); }, []);
+
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setDialogOpen(true); };
+  const openEdit = (c) => {
+    setEditing(c);
+    setForm({
+      name: c.name || '', location: c.location || '',
+      ranking: c.ranking ?? '', type: c.type || 'Government',
+      courses: Array.isArray(c.courses) ? c.courses.join(', ') : (c.courses || ''),
+      fees: c.fees || '', rating: c.rating ?? '',
+      acceptedExams: Array.isArray(c.acceptedExams) ? c.acceptedExams.join(', ') : (c.acceptedExams || ''),
+      description: c.description || '', website: c.website || '', image: c.image || ''
+    });
+    setDialogOpen(true);
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error('Image too large (max 10MB)'); return; }
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const res = await fetch('/api/admin/upload-image', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ image: ev.target.result, filename: file.name })
+        });
+        const d = await res.json();
+        if (d.success) { setForm(p => ({ ...p, image: d.data.url })); toast.success('Image uploaded'); }
+        else toast.error(d.error || 'Upload failed');
+      } catch (err) { toast.error('Upload failed'); }
+      setUploading(false);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { toast.error('Name is required'); return; }
+    setSaving(true);
+    try {
+      const url = editing ? `/api/admin/colleges/${editing.id}` : '/api/admin/colleges';
+      const method = editing ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method, headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', body: JSON.stringify(form)
+      });
+      const d = await res.json();
+      if (d.success) { toast.success(editing ? 'College updated' : 'College created'); setDialogOpen(false); fetchColleges(); }
+      else toast.error(d.error || 'Save failed');
+    } catch (e) { toast.error('Save failed'); }
+    setSaving(false);
+  };
+
+  const handleDelete = async (c) => {
+    if (!confirm(`Delete "${c.name}"?`)) return;
+    const res = await fetch(`/api/admin/colleges/${c.id}`, { method: 'DELETE', credentials: 'include' });
+    const d = await res.json();
+    if (d.success) { toast.success('College deleted'); fetchColleges(); } else toast.error('Delete failed');
+  };
+
+  const filtered = colleges.filter(c =>
+    (c.name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (c.location || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Colleges</h2>
+          <p className="text-sm text-gray-500">Manage colleges shown in the college finder</p>
+        </div>
+        <Button onClick={openCreate} className="bg-teal-600 hover:bg-teal-700"><Plus className="w-4 h-4 mr-2" /> New College</Button>
+      </div>
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Input className="pl-9" placeholder="Search by name or location..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-teal-600" /></div>
+          ) : filtered.length === 0 ? (
+            <div className="p-12 text-center">
+              <Building className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500">{colleges.length === 0 ? 'No colleges yet.' : 'No matches.'}</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-16">Image</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Rank</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Rating</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((c) => (
+                  <TableRow key={c.id}>
+                    <TableCell>
+                      {c.image ? <img src={c.image} className="w-10 h-10 rounded object-cover" alt="" /> :
+                        <div className="w-10 h-10 rounded bg-gray-100 flex items-center justify-center"><Building className="w-5 h-5 text-gray-400" /></div>}
+                    </TableCell>
+                    <TableCell className="font-medium">{c.name}</TableCell>
+                    <TableCell className="text-sm text-gray-600">{c.location || '—'}</TableCell>
+                    <TableCell>{c.ranking ?? '—'}</TableCell>
+                    <TableCell>{c.type || '—'}</TableCell>
+                    <TableCell>{c.rating ? <span className="flex items-center gap-1"><Star className="w-3 h-3 fill-yellow-400 text-yellow-400" /> {c.rating}</span> : '—'}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(c)}><Edit className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(c)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!saving) setDialogOpen(o); }}>
+        <DialogContent className="sm:max-w-3xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{editing ? 'Edit College' : 'Create New College'}</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div><Label>Name *</Label><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></div>
+              <div><Label>Location</Label><Input value={form.location} onChange={e => setForm(p => ({ ...p, location: e.target.value }))} placeholder="City, State" /></div>
+            </div>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div><Label>Ranking</Label><Input type="number" min="1" value={form.ranking} onChange={e => setForm(p => ({ ...p, ranking: e.target.value }))} /></div>
+              <div>
+                <Label>Type</Label>
+                <Select value={form.type} onValueChange={v => setForm(p => ({ ...p, type: v }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Government">Government</SelectItem>
+                    <SelectItem value="Private">Private</SelectItem>
+                    <SelectItem value="Deemed">Deemed</SelectItem>
+                    <SelectItem value="Autonomous">Autonomous</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div><Label>Rating (0-5)</Label><Input type="number" step="0.1" min="0" max="5" value={form.rating} onChange={e => setForm(p => ({ ...p, rating: e.target.value }))} /></div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div><Label>Fees</Label><Input value={form.fees} onChange={e => setForm(p => ({ ...p, fees: e.target.value }))} placeholder="e.g. ₹2,00,000/year" /></div>
+              <div><Label>Website</Label><Input value={form.website} onChange={e => setForm(p => ({ ...p, website: e.target.value }))} placeholder="https://..." /></div>
+            </div>
+            <div><Label>Courses (comma-separated)</Label><Input value={form.courses} onChange={e => setForm(p => ({ ...p, courses: e.target.value }))} placeholder="B.Tech, M.Tech, Ph.D" /></div>
+            <div><Label>Accepted Exams (comma-separated)</Label><Input value={form.acceptedExams} onChange={e => setForm(p => ({ ...p, acceptedExams: e.target.value }))} placeholder="JEE Advanced, GATE" /></div>
+            <div><Label>Description</Label><Textarea rows={3} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} /></div>
+            <div>
+              <Label>College Image/Logo</Label>
+              <div className="flex items-center gap-3 mt-1">
+                {form.image ? (
+                  <div className="relative">
+                    <img src={form.image} className="w-24 h-16 rounded object-cover border" alt="" />
+                    <button type="button" onClick={() => setForm(p => ({ ...p, image: '' }))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center"><X className="w-3 h-3" /></button>
+                  </div>
+                ) : (
+                  <div className="w-24 h-16 rounded border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50"><ImageIcon className="w-5 h-5 text-gray-400" /></div>
+                )}
+                <label className="cursor-pointer">
+                  <div className="px-3 py-2 border rounded-md hover:bg-gray-50 flex items-center gap-2 text-sm">
+                    {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {uploading ? 'Uploading...' : form.image ? 'Replace' : 'Upload'}
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploading} />
+                </label>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700" onClick={handleSave} disabled={saving}>
+              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : <><Save className="w-4 h-4 mr-2" /> {editing ? 'Update' : 'Create'}</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ====================== TESTIMONIALS TAB ======================
+function TestimonialsTab() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const emptyForm = { name: '', exam: '', rank: '', image: '', testimonial: '', rating: 5 };
+  const [form, setForm] = useState(emptyForm);
+  const [uploading, setUploading] = useState(false);
+
+  const fetchItems = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/testimonials', { credentials: 'include' });
+      const d = await res.json();
+      if (d.success) setItems(d.data || []);
+    } catch (e) { toast.error('Failed to load testimonials'); }
+    setLoading(false);
+  };
+  useEffect(() => { fetchItems(); }, []);
+
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setDialogOpen(true); };
+  const openEdit = (t) => {
+    setEditing(t);
+    setForm({
+      name: t.name || '', exam: t.exam || '', rank: t.rank || '',
+      image: t.image || '', testimonial: t.testimonial || '',
+      rating: t.rating ?? 5
+    });
+    setDialogOpen(true);
+  };
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error('Image too large'); return; }
+    setUploading(true);
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const res = await fetch('/api/admin/upload-image', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ image: ev.target.result, filename: file.name })
+        });
+        const d = await res.json();
+        if (d.success) { setForm(p => ({ ...p, image: d.data.url })); toast.success('Image uploaded'); }
+        else toast.error(d.error || 'Upload failed');
+      } catch (err) { toast.error('Upload failed'); }
+      setUploading(false);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleSave = async () => {
+    if (!form.name.trim()) { toast.error('Name is required'); return; }
+    if (!form.testimonial.trim()) { toast.error('Testimonial is required'); return; }
+    setSaving(true);
+    try {
+      const url = editing ? `/api/admin/testimonials/${editing.id}` : '/api/admin/testimonials';
+      const method = editing ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method, headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', body: JSON.stringify(form)
+      });
+      const d = await res.json();
+      if (d.success) { toast.success(editing ? 'Testimonial updated' : 'Testimonial created'); setDialogOpen(false); fetchItems(); }
+      else toast.error(d.error || 'Save failed');
+    } catch (e) { toast.error('Save failed'); }
+    setSaving(false);
+  };
+
+  const handleDelete = async (t) => {
+    if (!confirm(`Delete testimonial from "${t.name}"?`)) return;
+    const res = await fetch(`/api/admin/testimonials/${t.id}`, { method: 'DELETE', credentials: 'include' });
+    const d = await res.json();
+    if (d.success) { toast.success('Testimonial deleted'); fetchItems(); } else toast.error('Delete failed');
+  };
+
+  const filtered = items.filter(t =>
+    (t.name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (t.exam || '').toLowerCase().includes(search.toLowerCase())
+  );
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Testimonials</h2>
+          <p className="text-sm text-gray-500">Manage student testimonials shown on the homepage</p>
+        </div>
+        <Button onClick={openCreate} className="bg-teal-600 hover:bg-teal-700"><Plus className="w-4 h-4 mr-2" /> New Testimonial</Button>
+      </div>
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <Input className="pl-9" placeholder="Search by name or exam..." value={search} onChange={(e) => setSearch(e.target.value)} />
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-teal-600" /></div>
+          ) : filtered.length === 0 ? (
+            <div className="p-12 text-center">
+              <MessageSquare className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500">{items.length === 0 ? 'No testimonials yet.' : 'No matches.'}</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-16">Photo</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Exam</TableHead>
+                  <TableHead>Rank</TableHead>
+                  <TableHead>Rating</TableHead>
+                  <TableHead>Testimonial</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((t) => (
+                  <TableRow key={t.id}>
+                    <TableCell>
+                      {t.image ? <img src={t.image} className="w-10 h-10 rounded-full object-cover" alt="" /> :
+                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">{(t.name || '?').charAt(0).toUpperCase()}</div>}
+                    </TableCell>
+                    <TableCell className="font-medium">{t.name}</TableCell>
+                    <TableCell className="text-sm text-gray-600">{t.exam || '—'}</TableCell>
+                    <TableCell className="text-sm text-gray-600">{t.rank || '—'}</TableCell>
+                    <TableCell>
+                      <div className="flex">
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <Star key={n} className={`w-3 h-3 ${n <= (t.rating || 0) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} />
+                        ))}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-600 max-w-xs truncate">{t.testimonial}</TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(t)}><Edit className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(t)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!saving) setDialogOpen(o); }}>
+        <DialogContent className="sm:max-w-2xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{editing ? 'Edit Testimonial' : 'Create New Testimonial'}</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div><Label>Name *</Label><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></div>
+              <div><Label>Exam</Label><Input value={form.exam} onChange={e => setForm(p => ({ ...p, exam: e.target.value }))} placeholder="e.g. GATE 2024" /></div>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div><Label>Rank / Achievement</Label><Input value={form.rank} onChange={e => setForm(p => ({ ...p, rank: e.target.value }))} placeholder="e.g. AIR 156" /></div>
+              <div>
+                <Label>Rating</Label>
+                <Select value={String(form.rating)} onValueChange={v => setForm(p => ({ ...p, rating: parseInt(v) }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {[1, 2, 3, 4, 5].map(n => <SelectItem key={n} value={String(n)}>{'★'.repeat(n)}{'☆'.repeat(5 - n)} ({n}/5)</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <Label>Photo</Label>
+              <div className="flex items-center gap-3 mt-1">
+                {form.image ? (
+                  <div className="relative">
+                    <img src={form.image} className="w-16 h-16 rounded-full object-cover border" alt="" />
+                    <button type="button" onClick={() => setForm(p => ({ ...p, image: '' }))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center"><X className="w-3 h-3" /></button>
+                  </div>
+                ) : (
+                  <div className="w-16 h-16 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50"><ImageIcon className="w-5 h-5 text-gray-400" /></div>
+                )}
+                <label className="cursor-pointer">
+                  <div className="px-3 py-2 border rounded-md hover:bg-gray-50 flex items-center gap-2 text-sm">
+                    {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {uploading ? 'Uploading...' : form.image ? 'Replace' : 'Upload Photo'}
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploading} />
+                </label>
+              </div>
+            </div>
+            <div>
+              <Label>Testimonial *</Label>
+              <Textarea rows={4} value={form.testimonial} onChange={e => setForm(p => ({ ...p, testimonial: e.target.value }))} placeholder="What the student said about Unishaala..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700" onClick={handleSave} disabled={saving}>
+              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : <><Save className="w-4 h-4 mr-2" /> {editing ? 'Update' : 'Create'}</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// ====================== CONTACT LEADS TAB ======================
+function ContactsTab() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [active, setActive] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ status: 'New', notes: '' });
+
+  const fetchItems = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/contacts', { credentials: 'include' });
+      const d = await res.json();
+      if (d.success) setItems(d.data || []);
+    } catch (e) { toast.error('Failed to load contacts'); }
+    setLoading(false);
+  };
+  useEffect(() => { fetchItems(); }, []);
+
+  const openDetail = (c) => { setActive(c); setDetailOpen(true); };
+  const openEdit = (c) => {
+    setActive(c);
+    setForm({ status: c.status || 'New', notes: c.notes || '' });
+    setEditOpen(true);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/admin/contacts/${active.id}`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', body: JSON.stringify(form)
+      });
+      const d = await res.json();
+      if (d.success) { toast.success('Lead updated'); setEditOpen(false); fetchItems(); }
+      else toast.error(d.error || 'Update failed');
+    } catch (e) { toast.error('Update failed'); }
+    setSaving(false);
+  };
+
+  const handleDelete = async (c) => {
+    if (!confirm(`Delete lead from "${c.name}"?`)) return;
+    const res = await fetch(`/api/admin/contacts/${c.id}`, { method: 'DELETE', credentials: 'include' });
+    const d = await res.json();
+    if (d.success) { toast.success('Lead deleted'); fetchItems(); } else toast.error('Delete failed');
+  };
+
+  const statusBadge = (s) => {
+    const map = { New: 'bg-blue-500', Contacted: 'bg-amber-500', Resolved: 'bg-green-500', Spam: 'bg-gray-500' };
+    return <Badge className={map[s] || 'bg-blue-500'}>{s || 'New'}</Badge>;
+  };
+
+  const filtered = items.filter(c => {
+    if (statusFilter !== 'all' && (c.status || 'New') !== statusFilter) return false;
+    const q = search.toLowerCase();
+    if (!q) return true;
+    return [c.name, c.email, c.phone, c.subject, c.message]
+      .some(v => String(v || '').toLowerCase().includes(q));
+  });
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Contact Leads</h2>
+          <p className="text-sm text-gray-500">View and manage messages submitted via the Contact form</p>
+        </div>
+      </div>
+      <div className="flex flex-col md:flex-row gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input className="pl-9" placeholder="Search by name, email, phone, subject..." value={search} onChange={(e) => setSearch(e.target.value)} />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full md:w-48"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="New">New</SelectItem>
+            <SelectItem value="Contacted">Contacted</SelectItem>
+            <SelectItem value="Resolved">Resolved</SelectItem>
+            <SelectItem value="Spam">Spam</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-teal-600" /></div>
+          ) : filtered.length === 0 ? (
+            <div className="p-12 text-center">
+              <Mail className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500">{items.length === 0 ? 'No contact leads yet.' : 'No matches.'}</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Message</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Received</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((c) => (
+                  <TableRow key={c.id} className="cursor-pointer hover:bg-gray-50" onClick={() => openDetail(c)}>
+                    <TableCell className="font-medium">{c.name}</TableCell>
+                    <TableCell className="text-sm"><a href={`mailto:${c.email}`} onClick={e => e.stopPropagation()} className="text-teal-600 hover:underline">{c.email}</a></TableCell>
+                    <TableCell className="text-sm text-gray-600">{c.phone || '—'}</TableCell>
+                    <TableCell className="text-sm text-gray-600 max-w-[160px] truncate">{c.subject || '—'}</TableCell>
+                    <TableCell className="text-sm text-gray-600 max-w-[220px] truncate">{c.message}</TableCell>
+                    <TableCell>{statusBadge(c.status)}</TableCell>
+                    <TableCell className="text-xs text-gray-500">{c.createdAt ? new Date(c.createdAt).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</TableCell>
+                    <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(c)}><Edit className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(c)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Detail dialog */}
+      <Dialog open={detailOpen} onOpenChange={setDetailOpen}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader><DialogTitle>Contact Lead Details</DialogTitle></DialogHeader>
+          {active && (
+            <div className="space-y-3 py-2">
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <span className="text-gray-500">Name</span>
+                <span className="col-span-2 font-medium">{active.name}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <span className="text-gray-500">Email</span>
+                <span className="col-span-2"><a className="text-teal-600 hover:underline" href={`mailto:${active.email}`}>{active.email}</a></span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <span className="text-gray-500">Phone</span>
+                <span className="col-span-2">{active.phone ? <a className="text-teal-600 hover:underline" href={`tel:${active.phone}`}>{active.phone}</a> : '—'}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <span className="text-gray-500">Subject</span>
+                <span className="col-span-2">{active.subject || '—'}</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <span className="text-gray-500">Message</span>
+                <div className="col-span-2 whitespace-pre-wrap bg-gray-50 border rounded p-3 text-gray-800">{active.message}</div>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-sm">
+                <span className="text-gray-500">Status</span>
+                <span className="col-span-2">{statusBadge(active.status)}</span>
+              </div>
+              {active.notes && (
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <span className="text-gray-500">Notes</span>
+                  <div className="col-span-2 whitespace-pre-wrap bg-amber-50 border border-amber-200 rounded p-3">{active.notes}</div>
+                </div>
+              )}
+              <div className="grid grid-cols-3 gap-2 text-xs text-gray-500">
+                <span>Received</span>
+                <span className="col-span-2">{active.createdAt ? new Date(active.createdAt).toLocaleString() : '—'}</span>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDetailOpen(false)}>Close</Button>
+            {active && (
+              <Button className="bg-teal-600 hover:bg-teal-700" onClick={() => { setDetailOpen(false); openEdit(active); }}>
+                <Edit className="w-4 h-4 mr-2" /> Edit
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit dialog (status + notes) */}
+      <Dialog open={editOpen} onOpenChange={(o) => { if (!saving) setEditOpen(o); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Update Lead</DialogTitle></DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div>
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={v => setForm(p => ({ ...p, status: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="New">New</SelectItem>
+                  <SelectItem value="Contacted">Contacted</SelectItem>
+                  <SelectItem value="Resolved">Resolved</SelectItem>
+                  <SelectItem value="Spam">Spam</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Internal Notes</Label>
+              <Textarea rows={4} value={form.notes} onChange={e => setForm(p => ({ ...p, notes: e.target.value }))} placeholder="Add notes about follow-up, outcome, etc." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={saving}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700" onClick={handleSave} disabled={saving}>
+              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : <><Save className="w-4 h-4 mr-2" /> Update</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 // Main Admin Page
 export default function AdminPage() {
   const router = useRouter();
@@ -2804,11 +3647,11 @@ export default function AdminPage() {
           {activeTab === 'questions' && <QuestionsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'blogs' && <BlogsTab />}
           {activeTab === 'transactions' && <TransactionsTab />}
-          {activeTab === 'jobs' && <CRUDTable title="Jobs" data={data.jobs} columns={[{ key: 'title', label: 'Title' }, { key: 'organization', label: 'Org' }, { key: 'vacancies', label: 'Vacancies' }, { key: 'status', label: 'Status', render: v => <Badge className={v === 'Active' ? 'bg-green-500' : 'bg-gray-500'}>{v}</Badge> }]} onDelete={id => handleDelete('jobs', id)} loading={loading} />}
-          {activeTab === 'colleges' && <CRUDTable title="Colleges" data={data.colleges} columns={[{ key: 'name', label: 'Name' }, { key: 'location', label: 'Location' }, { key: 'ranking', label: 'Rank' }]} onDelete={id => handleDelete('colleges', id)} loading={loading} />}
+          {activeTab === 'jobs' && <JobsTab />}
+          {activeTab === 'colleges' && <CollegesTab />}
           {activeTab === 'users' && <CRUDTable title="Users" data={data.users} columns={[{ key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone' }, { key: 'phoneVerified', label: 'Phone Verified', render: v => v ? <Badge className="bg-green-500">✓ Verified</Badge> : <Badge className="bg-gray-400">Not Verified</Badge> }, { key: 'authProvider', label: 'Auth', render: v => <Badge variant="outline">{v === 'google' ? '🔵 Google' : '📧 Email'}</Badge> }, { key: 'role', label: 'Role', render: v => <Badge>{v}</Badge> }]} loading={loading} />}
-          {activeTab === 'testimonials' && <CRUDTable title="Testimonials" data={data.testimonials} columns={[{ key: 'name', label: 'Testimonial Name' }, { key: 'exam', label: 'Exam' }, { key: 'rank', label: 'Rank' }]} onDelete={id => handleDelete('testimonials', id)} loading={loading} />}
-          {activeTab === 'contacts' && <CRUDTable title="Contact Leads" data={data.contacts} columns={[{ key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'subject', label: 'Subject' }]} loading={loading} />}
+          {activeTab === 'testimonials' && <TestimonialsTab />}
+          {activeTab === 'contacts' && <ContactsTab />}
         </main>
       </div>
     </div>

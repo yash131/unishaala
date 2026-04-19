@@ -1,537 +1,486 @@
 #!/usr/bin/env python3
+"""
+Backend API Testing Script for Unishaala CRUD Endpoints
+Tests Jobs, Colleges, Testimonials, and Contact Leads CRUD operations
+"""
 
 import requests
 import json
-import time
-import base64
-from datetime import datetime, timedelta
+import sys
+from datetime import datetime
 
 # Configuration
 BASE_URL = "https://content-hub-admin-5.preview.emergentagent.com"
+API_BASE = f"{BASE_URL}/api"
+
+# Test credentials
 ADMIN_EMAIL = "admin@unishaala.com"
 ADMIN_PASSWORD = "Shivani@1234"
 
-# Test data
-SAMPLE_BLOG_DATA = {
-    "title": "Complete Guide to GATE 2024 Preparation",
-    "description": "A comprehensive guide covering all aspects of GATE exam preparation including study plan, important topics, and exam strategy.",
-    "content": "<h1>GATE 2024 Preparation Guide</h1><p>The Graduate Aptitude Test in Engineering (GATE) is one of the most competitive exams in India. This comprehensive guide will help you prepare effectively for GATE 2024.</p><h2>Study Plan</h2><p>A well-structured study plan is crucial for GATE success. Here's a recommended approach:</p><ul><li>Start preparation at least 6-8 months before the exam</li><li>Allocate time for each subject based on weightage</li><li>Regular revision and practice tests</li></ul>",
-    "image": "https://example.com/gate-preparation.jpg",
-    "publishDate": (datetime.now() + timedelta(days=1)).isoformat(),
-    "status": "draft"
-}
-
-SAMPLE_IMAGE_DATA = {
-    "image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
-    "filename": "test-image.png"
-}
-
-class BlogAPITester:
+class TestRunner:
     def __init__(self):
         self.session = requests.Session()
-        self.auth_token = None
-        self.created_blog_id = None
-        self.created_image_id = None
+        self.auth_cookie = None
+        self.test_results = []
         
-    def login_admin(self):
-        """Login as admin and get auth token"""
-        print("🔐 Testing Admin Login...")
+    def log_test(self, test_name, success, details=""):
+        """Log test result"""
+        status = "✅ PASS" if success else "❌ FAIL"
+        self.test_results.append({
+            'test': test_name,
+            'success': success,
+            'details': details
+        })
+        print(f"{status}: {test_name}")
+        if details:
+            print(f"   Details: {details}")
+        print()
+    
+    def authenticate(self):
+        """Login and get auth cookie"""
+        print("=== AUTHENTICATION TEST ===")
         try:
-            response = self.session.post(f"{BASE_URL}/api/auth/login", json={
+            response = self.session.post(f"{API_BASE}/auth/login", json={
                 "email": ADMIN_EMAIL,
                 "password": ADMIN_PASSWORD
             })
             
             if response.status_code == 200:
                 data = response.json()
-                if data.get('success'):
-                    self.auth_token = data['data']['token']
-                    print(f"✅ Admin login successful. Role: {data['data']['user']['role']}")
+                if data.get('success') and 'auth_token' in response.cookies:
+                    self.auth_cookie = response.cookies['auth_token']
+                    user_role = data.get('user', {}).get('role', 'Unknown')
+                    self.log_test("Admin Authentication", True, f"Login successful, role: {user_role}")
                     return True
                 else:
-                    print(f"❌ Login failed: {data.get('error')}")
+                    self.log_test("Admin Authentication", False, f"Login failed: {data}")
                     return False
             else:
-                print(f"❌ Login failed with status {response.status_code}: {response.text}")
+                self.log_test("Admin Authentication", False, f"HTTP {response.status_code}: {response.text}")
                 return False
+                
         except Exception as e:
-            print(f"❌ Login error: {str(e)}")
+            self.log_test("Admin Authentication", False, f"Exception: {str(e)}")
             return False
     
-    def test_admin_blog_crud(self):
-        """Test all admin blog CRUD operations"""
-        print("\n📝 Testing Admin Blog CRUD APIs...")
+    def test_jobs_crud(self):
+        """Test Jobs CRUD operations"""
+        print("=== JOBS CRUD TESTS ===")
         
-        # Test 1: Create Blog (POST /api/admin/blogs)
-        print("\n1️⃣ Testing Blog Creation...")
+        # Test POST /api/admin/jobs
+        job_data = {
+            "title": "Senior Software Engineer",
+            "organization": "Tech Corp India",
+            "location": "Bangalore, Karnataka",
+            "category": "Software Development",
+            "vacancies": 5,
+            "salary": "15-25 LPA",
+            "qualification": "B.Tech/M.Tech in Computer Science",
+            "description": "Looking for experienced software engineers with expertise in full-stack development.",
+            "applyLink": "https://techcorp.com/careers/senior-engineer",
+            "lastDate": "2024-02-15",
+            "status": "Active"
+        }
+        
         try:
-            response = self.session.post(f"{BASE_URL}/api/admin/blogs", json=SAMPLE_BLOG_DATA)
-            
+            # CREATE
+            response = self.session.post(f"{API_BASE}/admin/jobs", json=job_data)
             if response.status_code == 200:
                 data = response.json()
-                if data.get('success'):
-                    self.created_blog_id = data['data']['id']
-                    blog = data['data']
-                    print(f"✅ Blog created successfully")
-                    print(f"   - ID: {blog['id']}")
-                    print(f"   - Title: {blog['title']}")
-                    print(f"   - Slug: {blog['slug']}")
-                    print(f"   - Status: {blog['status']}")
-                    print(f"   - Views: {blog['views']}")
-                    
-                    # Verify slug auto-generation
-                    expected_slug = "complete-guide-to-gate-2024-preparation"
-                    if blog['slug'] == expected_slug:
-                        print(f"✅ Slug auto-generation working correctly: {blog['slug']}")
+                if data.get('success') and 'data' in data:
+                    job_id = data['data']['id']
+                    vacancies_stored = data['data'].get('vacancies')
+                    if isinstance(vacancies_stored, int) and vacancies_stored == 5:
+                        self.log_test("POST /api/admin/jobs", True, f"Job created with ID: {job_id}, vacancies stored as integer: {vacancies_stored}")
                     else:
-                        print(f"⚠️ Slug generation issue. Expected: {expected_slug}, Got: {blog['slug']}")
+                        self.log_test("POST /api/admin/jobs", False, f"Vacancies not stored as integer: {vacancies_stored}")
+                        return
                 else:
-                    print(f"❌ Blog creation failed: {data.get('error')}")
-                    return False
+                    self.log_test("POST /api/admin/jobs", False, f"Unexpected response: {data}")
+                    return
             else:
-                print(f"❌ Blog creation failed with status {response.status_code}: {response.text}")
-                return False
-        except Exception as e:
-            print(f"❌ Blog creation error: {str(e)}")
-            return False
-        
-        # Test 2: Get All Blogs (GET /api/admin/blogs)
-        print("\n2️⃣ Testing Get All Blogs...")
-        try:
-            response = self.session.get(f"{BASE_URL}/api/admin/blogs")
+                self.log_test("POST /api/admin/jobs", False, f"HTTP {response.status_code}: {response.text}")
+                return
             
+            # READ - GET list
+            response = self.session.get(f"{API_BASE}/admin/jobs")
             if response.status_code == 200:
                 data = response.json()
-                if data.get('success'):
-                    blogs = data['data']
-                    print(f"✅ Retrieved {len(blogs)} blogs")
-                    
-                    # Find our created blog
-                    created_blog = next((b for b in blogs if b['id'] == self.created_blog_id), None)
-                    if created_blog:
-                        print(f"✅ Created blog found in list")
-                    else:
-                        print(f"❌ Created blog not found in list")
-                        return False
-                else:
-                    print(f"❌ Get blogs failed: {data.get('error')}")
-                    return False
+                jobs = data.get('data', [])
+                found_job = any(job.get('id') == job_id for job in jobs)
+                self.log_test("GET /api/admin/jobs", found_job, f"Found {len(jobs)} jobs, new job in list: {found_job}")
             else:
-                print(f"❌ Get blogs failed with status {response.status_code}: {response.text}")
-                return False
-        except Exception as e:
-            print(f"❌ Get blogs error: {str(e)}")
-            return False
-        
-        # Test 3: Get Single Blog (GET /api/admin/blogs/:id)
-        print("\n3️⃣ Testing Get Single Blog...")
-        try:
-            response = self.session.get(f"{BASE_URL}/api/admin/blogs/{self.created_blog_id}")
+                self.log_test("GET /api/admin/jobs", False, f"HTTP {response.status_code}: {response.text}")
             
-            if response.status_code == 200:
-                data = response.json()
-                if data.get('success'):
-                    blog = data['data']
-                    print(f"✅ Retrieved single blog: {blog['title']}")
-                    print(f"   - Content length: {len(blog['content'])} characters")
-                else:
-                    print(f"❌ Get single blog failed: {data.get('error')}")
-                    return False
-            else:
-                print(f"❌ Get single blog failed with status {response.status_code}: {response.text}")
-                return False
-        except Exception as e:
-            print(f"❌ Get single blog error: {str(e)}")
-            return False
-        
-        # Test 4: Update Blog (PUT /api/admin/blogs/:id)
-        print("\n4️⃣ Testing Blog Update...")
-        try:
+            # UPDATE
             update_data = {
-                "title": "Updated GATE 2024 Preparation Guide",
-                "status": "published",
-                "publishDate": datetime.now().isoformat()
+                "salary": "20-30 LPA",
+                "vacancies": 3
             }
-            
-            response = self.session.put(f"{BASE_URL}/api/admin/blogs/{self.created_blog_id}", json=update_data)
-            
+            response = self.session.put(f"{API_BASE}/admin/jobs/{job_id}", json=update_data)
             if response.status_code == 200:
                 data = response.json()
-                if data.get('success'):
-                    blog = data['data']
-                    print(f"✅ Blog updated successfully")
-                    print(f"   - New title: {blog['title']}")
-                    print(f"   - New status: {blog['status']}")
-                    
-                    # Check if slug was regenerated due to title change
-                    expected_new_slug = "updated-gate-2024-preparation-guide"
-                    if blog['slug'] == expected_new_slug:
-                        print(f"✅ Slug regenerated correctly: {blog['slug']}")
-                    else:
-                        print(f"⚠️ Slug regeneration issue. Expected: {expected_new_slug}, Got: {blog['slug']}")
+                if data.get('success') and 'data' in data:
+                    updated_job = data['data']
+                    salary_updated = updated_job.get('salary') == "20-30 LPA"
+                    vacancies_updated = updated_job.get('vacancies') == 3
+                    self.log_test("PUT /api/admin/jobs/:id", salary_updated and vacancies_updated, 
+                                f"Updated job returned: salary={updated_job.get('salary')}, vacancies={updated_job.get('vacancies')}")
                 else:
-                    print(f"❌ Blog update failed: {data.get('error')}")
-                    return False
+                    self.log_test("PUT /api/admin/jobs/:id", False, f"Expected updated object, got: {data}")
             else:
-                print(f"❌ Blog update failed with status {response.status_code}: {response.text}")
-                return False
-        except Exception as e:
-            print(f"❌ Blog update error: {str(e)}")
-            return False
-        
-        return True
-    
-    def test_public_blog_api(self):
-        """Test public blog APIs"""
-        print("\n🌐 Testing Public Blog APIs...")
-        
-        # Test 1: Get Published Blogs (GET /api/blogs)
-        print("\n1️⃣ Testing Get Published Blogs...")
-        try:
-            # Use a new session without auth cookies for public API
-            public_session = requests.Session()
-            response = public_session.get(f"{BASE_URL}/api/blogs")
+                self.log_test("PUT /api/admin/jobs/:id", False, f"HTTP {response.status_code}: {response.text}")
             
+            # DELETE
+            response = self.session.delete(f"{API_BASE}/admin/jobs/{job_id}")
             if response.status_code == 200:
                 data = response.json()
-                if data.get('success'):
-                    blogs = data['data']
-                    print(f"✅ Retrieved {len(blogs)} published blogs")
-                    
-                    # Check if our published blog appears
-                    published_blog = next((b for b in blogs if b['id'] == self.created_blog_id), None)
-                    if published_blog:
-                        print(f"✅ Our published blog appears in public list")
-                        print(f"   - Title: {published_blog['title']}")
-                        print(f"   - Status: {published_blog['status']}")
-                        print(f"   - Publish Date: {published_blog['publishDate']}")
-                    else:
-                        print(f"⚠️ Our published blog not found in public list (may be due to publishDate filter)")
-                    
-                    # Verify only published blogs are returned
-                    draft_blogs = [b for b in blogs if b['status'] != 'published']
-                    if len(draft_blogs) == 0:
-                        print(f"✅ Only published blogs returned")
-                    else:
-                        print(f"❌ Found {len(draft_blogs)} non-published blogs in public API")
-                        return False
-                else:
-                    print(f"❌ Get published blogs failed: {data.get('error')}")
-                    return False
+                self.log_test("DELETE /api/admin/jobs/:id", data.get('success', False), f"Delete response: {data}")
             else:
-                print(f"❌ Get published blogs failed with status {response.status_code}: {response.text}")
-                return False
-        except Exception as e:
-            print(f"❌ Get published blogs error: {str(e)}")
-            return False
-        
-        # Test 2: Get Blog by Slug (GET /api/blogs/:slug)
-        print("\n2️⃣ Testing Get Blog by Slug...")
-        try:
-            # First get the current slug of our blog
-            response = self.session.get(f"{BASE_URL}/api/admin/blogs/{self.created_blog_id}")
-            if response.status_code == 200:
-                blog_data = response.json()['data']
-                blog_slug = blog_data['slug']
-                initial_views = blog_data['views']
+                self.log_test("DELETE /api/admin/jobs/:id", False, f"HTTP {response.status_code}: {response.text}")
                 
-                # Now test public access by slug
-                public_session = requests.Session()
-                response = public_session.get(f"{BASE_URL}/api/blogs/{blog_slug}")
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    if data.get('success'):
-                        blog = data['data']
-                        print(f"✅ Retrieved blog by slug: {blog['title']}")
-                        print(f"   - Slug: {blog['slug']}")
-                        print(f"   - Views: {blog['views']}")
-                        
-                        # Test views increment
-                        time.sleep(1)  # Small delay
-                        response2 = public_session.get(f"{BASE_URL}/api/blogs/{blog_slug}")
-                        if response2.status_code == 200:
-                            blog2 = response2.json()['data']
-                            if blog2['views'] > blog['views']:
-                                print(f"✅ Views counter incremented: {blog['views']} → {blog2['views']}")
-                            else:
-                                print(f"❌ Views counter not incremented")
-                                return False
-                    else:
-                        print(f"❌ Get blog by slug failed: {data.get('error')}")
-                        return False
-                else:
-                    print(f"❌ Get blog by slug failed with status {response.status_code}: {response.text}")
-                    return False
-            else:
-                print(f"❌ Could not get blog slug for testing")
-                return False
         except Exception as e:
-            print(f"❌ Get blog by slug error: {str(e)}")
-            return False
-        
-        # Test 3: Test 404 for non-existent slug
-        print("\n3️⃣ Testing 404 for Non-existent Slug...")
-        try:
-            public_session = requests.Session()
-            response = public_session.get(f"{BASE_URL}/api/blogs/non-existent-blog-slug")
-            
-            if response.status_code == 404:
-                data = response.json()
-                if not data.get('success'):
-                    print(f"✅ Correctly returned 404 for non-existent slug")
-                else:
-                    print(f"❌ Should return error for non-existent slug")
-                    return False
-            else:
-                print(f"❌ Expected 404, got {response.status_code}")
-                return False
-        except Exception as e:
-            print(f"❌ Test 404 error: {str(e)}")
-            return False
-        
-        return True
+            self.log_test("Jobs CRUD", False, f"Exception: {str(e)}")
     
-    def test_image_upload_api(self):
-        """Test image upload API"""
-        print("\n🖼️ Testing Image Upload API...")
+    def test_colleges_crud(self):
+        """Test Colleges CRUD operations"""
+        print("=== COLLEGES CRUD TESTS ===")
         
-        # Test 1: Upload Image (POST /api/admin/upload-image)
-        print("\n1️⃣ Testing Image Upload...")
+        # Test POST /api/admin/colleges
+        college_data = {
+            "name": "Test Engineering College",
+            "location": "Mumbai, Maharashtra",
+            "ranking": 50,
+            "type": "Private",
+            "courses": "B.Tech, M.Tech, MBA",
+            "acceptedExams": "GATE, JEE, CAT",
+            "fees": "2.5 Lakhs per year",
+            "rating": 4.2,
+            "description": "Premier engineering college with excellent placement record.",
+            "website": "https://testcollege.edu.in",
+            "image": "https://example.com/college.jpg"
+        }
+        
         try:
-            response = self.session.post(f"{BASE_URL}/api/admin/upload-image", json=SAMPLE_IMAGE_DATA)
-            
+            # CREATE
+            response = self.session.post(f"{API_BASE}/admin/colleges", json=college_data)
             if response.status_code == 200:
                 data = response.json()
-                if data.get('success'):
-                    self.created_image_id = data['data']['id']
-                    image_url = data['data']['url']
-                    print(f"✅ Image uploaded successfully")
-                    print(f"   - ID: {self.created_image_id}")
-                    print(f"   - URL: {image_url}")
+                if data.get('success') and 'data' in data:
+                    college_id = data['data']['id']
+                    courses = data['data'].get('courses', [])
+                    accepted_exams = data['data'].get('acceptedExams', [])
+                    ranking = data['data'].get('ranking')
+                    rating = data['data'].get('rating')
                     
-                    # Verify URL format
-                    expected_url = f"/api/images/{self.created_image_id}"
-                    if image_url == expected_url:
-                        print(f"✅ Image URL format correct")
-                    else:
-                        print(f"❌ Image URL format incorrect. Expected: {expected_url}, Got: {image_url}")
-                        return False
+                    courses_array = isinstance(courses, list) and len(courses) == 3
+                    exams_array = isinstance(accepted_exams, list) and len(accepted_exams) == 3
+                    ranking_int = isinstance(ranking, int) and ranking == 50
+                    rating_float = isinstance(rating, float) and rating == 4.2
+                    
+                    self.log_test("POST /api/admin/colleges", courses_array and exams_array and ranking_int and rating_float,
+                                f"College created: courses={courses}, exams={accepted_exams}, ranking={ranking} (int: {ranking_int}), rating={rating} (float: {rating_float})")
                 else:
-                    print(f"❌ Image upload failed: {data.get('error')}")
-                    return False
+                    self.log_test("POST /api/admin/colleges", False, f"Unexpected response: {data}")
+                    return
             else:
-                print(f"❌ Image upload failed with status {response.status_code}: {response.text}")
-                return False
-        except Exception as e:
-            print(f"❌ Image upload error: {str(e)}")
-            return False
-        
-        # Test 2: Test Invalid Data URI
-        print("\n2️⃣ Testing Invalid Data URI...")
-        try:
-            invalid_data = {
-                "image": "invalid-data-uri",
-                "filename": "test.png"
-            }
+                self.log_test("POST /api/admin/colleges", False, f"HTTP {response.status_code}: {response.text}")
+                return
             
-            response = self.session.post(f"{BASE_URL}/api/admin/upload-image", json=invalid_data)
-            
+            # Test missing name (should return 400)
+            response = self.session.post(f"{API_BASE}/admin/colleges", json={"location": "Test"})
             if response.status_code == 400:
-                data = response.json()
-                if not data.get('success'):
-                    print(f"✅ Correctly rejected invalid data URI")
-                else:
-                    print(f"❌ Should reject invalid data URI")
-                    return False
+                self.log_test("POST /api/admin/colleges (missing name)", True, "Correctly returned 400 for missing name")
             else:
-                print(f"❌ Expected 400, got {response.status_code}")
-                return False
-        except Exception as e:
-            print(f"❌ Test invalid data URI error: {str(e)}")
-            return False
-        
-        # Test 3: Test Image Retrieval (GET /api/images/:id)
-        print("\n3️⃣ Testing Image Retrieval...")
-        try:
-            if self.created_image_id:
-                response = self.session.get(f"{BASE_URL}/api/images/{self.created_image_id}")
+                self.log_test("POST /api/admin/colleges (missing name)", False, f"Expected 400, got {response.status_code}")
+            
+            # UPDATE
+            update_data = {"rating": 4.5}
+            response = self.session.put(f"{API_BASE}/admin/colleges/{college_id}", json=update_data)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('success') and 'data' in data:
+                    updated_rating = data['data'].get('rating')
+                    self.log_test("PUT /api/admin/colleges/:id", updated_rating == 4.5, f"Updated rating: {updated_rating}")
+                else:
+                    self.log_test("PUT /api/admin/colleges/:id", False, f"Expected updated object: {data}")
+            else:
+                self.log_test("PUT /api/admin/colleges/:id", False, f"HTTP {response.status_code}: {response.text}")
+            
+            # Test PUT on non-existent ID
+            response = self.session.put(f"{API_BASE}/admin/colleges/non-existent-id", json={"rating": 3.0})
+            if response.status_code == 404:
+                self.log_test("PUT /api/admin/colleges/:id (non-existent)", True, "Correctly returned 404 for non-existent college")
+            else:
+                self.log_test("PUT /api/admin/colleges/:id (non-existent)", False, f"Expected 404, got {response.status_code}")
+            
+            # DELETE
+            response = self.session.delete(f"{API_BASE}/admin/colleges/{college_id}")
+            if response.status_code == 200:
+                data = response.json()
+                self.log_test("DELETE /api/admin/colleges/:id", data.get('success', False), f"Delete response: {data}")
+            else:
+                self.log_test("DELETE /api/admin/colleges/:id", False, f"HTTP {response.status_code}: {response.text}")
                 
-                if response.status_code == 200:
-                    content_type = response.headers.get('Content-Type', '')
-                    if content_type.startswith('image/'):
-                        print(f"✅ Image retrieved successfully")
-                        print(f"   - Content-Type: {content_type}")
-                        print(f"   - Content-Length: {len(response.content)} bytes")
+        except Exception as e:
+            self.log_test("Colleges CRUD", False, f"Exception: {str(e)}")
+    
+    def test_testimonials_crud(self):
+        """Test Testimonials CRUD operations"""
+        print("=== TESTIMONIALS CRUD TESTS ===")
+        
+        # Test POST /api/admin/testimonials
+        testimonial_data = {
+            "name": "Rajesh Kumar",
+            "testimonial": "Unishaala helped me crack GATE with AIR 15. The mock tests were excellent!",
+            "exam": "GATE",
+            "rank": "AIR 15",
+            "image": "https://example.com/rajesh.jpg",
+            "rating": 5
+        }
+        
+        try:
+            # CREATE
+            response = self.session.post(f"{API_BASE}/admin/testimonials", json=testimonial_data)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('success') and 'data' in data:
+                    testimonial_id = data['data']['id']
+                    rating = data['data'].get('rating')
+                    self.log_test("POST /api/admin/testimonials", True, f"Testimonial created with ID: {testimonial_id}, rating: {rating}")
+                else:
+                    self.log_test("POST /api/admin/testimonials", False, f"Unexpected response: {data}")
+                    return
+            else:
+                self.log_test("POST /api/admin/testimonials", False, f"HTTP {response.status_code}: {response.text}")
+                return
+            
+            # Test missing required fields
+            response = self.session.post(f"{API_BASE}/admin/testimonials", json={"exam": "GATE"})
+            if response.status_code == 400:
+                self.log_test("POST /api/admin/testimonials (missing required)", True, "Correctly returned 400 for missing name/testimonial")
+            else:
+                self.log_test("POST /api/admin/testimonials (missing required)", False, f"Expected 400, got {response.status_code}")
+            
+            # Test default rating
+            response = self.session.post(f"{API_BASE}/admin/testimonials", json={
+                "name": "Test User",
+                "testimonial": "Great platform!"
+            })
+            if response.status_code == 200:
+                data = response.json()
+                default_rating = data.get('data', {}).get('rating')
+                self.log_test("POST /api/admin/testimonials (default rating)", default_rating == 5, f"Default rating: {default_rating}")
+                # Clean up
+                test_id = data.get('data', {}).get('id')
+                if test_id:
+                    self.session.delete(f"{API_BASE}/admin/testimonials/{test_id}")
+            else:
+                self.log_test("POST /api/admin/testimonials (default rating)", False, f"HTTP {response.status_code}")
+            
+            # UPDATE
+            update_data = {"rating": 4, "rank": "AIR 10"}
+            response = self.session.put(f"{API_BASE}/admin/testimonials/{testimonial_id}", json=update_data)
+            if response.status_code == 200:
+                data = response.json()
+                if data.get('success') and 'data' in data:
+                    updated_testimonial = data['data']
+                    rating_updated = updated_testimonial.get('rating') == 4
+                    rank_updated = updated_testimonial.get('rank') == "AIR 10"
+                    self.log_test("PUT /api/admin/testimonials/:id", rating_updated and rank_updated,
+                                f"Updated testimonial: rating={updated_testimonial.get('rating')}, rank={updated_testimonial.get('rank')}")
+                else:
+                    self.log_test("PUT /api/admin/testimonials/:id", False, f"Expected updated object: {data}")
+            else:
+                self.log_test("PUT /api/admin/testimonials/:id", False, f"HTTP {response.status_code}: {response.text}")
+            
+            # Test PUT on non-existent ID
+            response = self.session.put(f"{API_BASE}/admin/testimonials/non-existent-id", json={"rating": 3})
+            if response.status_code == 404:
+                self.log_test("PUT /api/admin/testimonials/:id (non-existent)", True, "Correctly returned 404 for non-existent testimonial")
+            else:
+                self.log_test("PUT /api/admin/testimonials/:id (non-existent)", False, f"Expected 404, got {response.status_code}")
+            
+            # DELETE
+            response = self.session.delete(f"{API_BASE}/admin/testimonials/{testimonial_id}")
+            if response.status_code == 200:
+                data = response.json()
+                self.log_test("DELETE /api/admin/testimonials/:id", data.get('success', False), f"Delete response: {data}")
+            else:
+                self.log_test("DELETE /api/admin/testimonials/:id", False, f"HTTP {response.status_code}: {response.text}")
+                
+        except Exception as e:
+            self.log_test("Testimonials CRUD", False, f"Exception: {str(e)}")
+    
+    def test_contact_leads_crud(self):
+        """Test Contact Leads CRUD operations"""
+        print("=== CONTACT LEADS CRUD TESTS ===")
+        
+        try:
+            # First create a contact lead via public API
+            contact_data = {
+                "name": "Priya Sharma",
+                "email": "priya.sharma@example.com",
+                "phone": "+91-9876543210",
+                "subject": "Course Inquiry",
+                "message": "I am interested in GATE preparation courses. Please provide more details."
+            }
+            
+            # CREATE via public endpoint
+            response = self.session.post(f"{API_BASE}/contact", json=contact_data)
+            if response.status_code == 200:
+                data = response.json()
+                self.log_test("POST /api/contact (public)", data.get('success', False), f"Contact form submission: {data}")
+            else:
+                self.log_test("POST /api/contact (public)", False, f"HTTP {response.status_code}: {response.text}")
+                return
+            
+            # READ - GET all contacts via admin API
+            response = self.session.get(f"{API_BASE}/admin/contacts")
+            if response.status_code == 200:
+                data = response.json()
+                contacts = data.get('data', [])
+                if contacts:
+                    # Find our contact
+                    our_contact = None
+                    for contact in contacts:
+                        if contact.get('email') == contact_data['email']:
+                            our_contact = contact
+                            break
+                    
+                    if our_contact:
+                        contact_id = our_contact['id']
+                        # Check all 5 fields are present
+                        required_fields = ['name', 'email', 'phone', 'subject', 'message']
+                        all_fields_present = all(field in our_contact for field in required_fields)
+                        has_status = 'status' in our_contact
+                        has_created_at = 'createdAt' in our_contact
+                        
+                        self.log_test("GET /api/admin/contacts", all_fields_present and has_status and has_created_at,
+                                    f"Found contact with all fields: {list(our_contact.keys())}")
                     else:
-                        print(f"❌ Invalid Content-Type: {content_type}")
-                        return False
+                        self.log_test("GET /api/admin/contacts", False, "Could not find our test contact")
+                        return
                 else:
-                    print(f"❌ Image retrieval failed with status {response.status_code}")
-                    print(f"   This might indicate the GET /api/images/:id endpoint is not implemented")
-                    return False
+                    self.log_test("GET /api/admin/contacts", False, "No contacts found")
+                    return
             else:
-                print(f"❌ No image ID to test retrieval")
-                return False
-        except Exception as e:
-            print(f"❌ Image retrieval error: {str(e)}")
-            return False
-        
-        return True
-    
-    def test_auth_requirements(self):
-        """Test authentication requirements"""
-        print("\n🔒 Testing Authentication Requirements...")
-        
-        # Test admin endpoints without auth
-        print("\n1️⃣ Testing Admin Endpoints Without Auth...")
-        try:
-            unauth_session = requests.Session()
+                self.log_test("GET /api/admin/contacts", False, f"HTTP {response.status_code}: {response.text}")
+                return
             
-            endpoints_to_test = [
-                ("GET", "/api/admin/blogs"),
-                ("POST", "/api/admin/blogs"),
-                ("GET", f"/api/admin/blogs/{self.created_blog_id or 'test-id'}"),
-                ("PUT", f"/api/admin/blogs/{self.created_blog_id or 'test-id'}"),
-                ("DELETE", f"/api/admin/blogs/{self.created_blog_id or 'test-id'}"),
-                ("POST", "/api/admin/upload-image")
-            ]
-            
-            all_unauthorized = True
-            for method, endpoint in endpoints_to_test:
-                if method == "GET":
-                    response = unauth_session.get(f"{BASE_URL}{endpoint}")
-                elif method == "POST":
-                    response = unauth_session.post(f"{BASE_URL}{endpoint}", json={})
-                elif method == "PUT":
-                    response = unauth_session.put(f"{BASE_URL}{endpoint}", json={})
-                elif method == "DELETE":
-                    response = unauth_session.delete(f"{BASE_URL}{endpoint}")
-                
-                if response.status_code == 401:
-                    print(f"✅ {method} {endpoint} correctly requires auth (401)")
-                else:
-                    print(f"❌ {method} {endpoint} should require auth, got {response.status_code}")
-                    all_unauthorized = False
-            
-            if all_unauthorized:
-                print(f"✅ All admin endpoints correctly require authentication")
-            else:
-                print(f"❌ Some admin endpoints don't require authentication")
-                return False
-                
-        except Exception as e:
-            print(f"❌ Auth test error: {str(e)}")
-            return False
-        
-        return True
-    
-    def test_regression_check(self):
-        """Test existing endpoints to ensure they still work"""
-        print("\n🔄 Testing Regression Check...")
-        
-        # Test 1: Home API
-        print("\n1️⃣ Testing Home API...")
-        try:
-            response = self.session.get(f"{BASE_URL}/api/home")
+            # UPDATE
+            update_data = {
+                "status": "Contacted",
+                "notes": "Spoke on phone, interested in GATE course"
+            }
+            response = self.session.put(f"{API_BASE}/admin/contacts/{contact_id}", json=update_data)
             if response.status_code == 200:
                 data = response.json()
-                if data.get('success') and 'exams' in data['data']:
-                    print(f"✅ Home API working")
+                if data.get('success') and 'data' in data:
+                    updated_contact = data['data']
+                    status_updated = updated_contact.get('status') == "Contacted"
+                    notes_updated = updated_contact.get('notes') == "Spoke on phone, interested in GATE course"
+                    self.log_test("PUT /api/admin/contacts/:id", status_updated and notes_updated,
+                                f"Updated contact: status={updated_contact.get('status')}, notes={updated_contact.get('notes')}")
                 else:
-                    print(f"❌ Home API response invalid")
-                    return False
+                    self.log_test("PUT /api/admin/contacts/:id", False, f"Expected updated object: {data}")
             else:
-                print(f"❌ Home API failed with status {response.status_code}")
-                return False
-        except Exception as e:
-            print(f"❌ Home API error: {str(e)}")
-            return False
-        
-        # Test 2: Auth API
-        print("\n2️⃣ Testing Auth API...")
-        try:
-            # We already tested login, so just verify the token works
-            response = self.session.get(f"{BASE_URL}/api/admin/stats")
+                self.log_test("PUT /api/admin/contacts/:id", False, f"HTTP {response.status_code}: {response.text}")
+            
+            # DELETE
+            response = self.session.delete(f"{API_BASE}/admin/contacts/{contact_id}")
             if response.status_code == 200:
                 data = response.json()
-                if data.get('success'):
-                    print(f"✅ Auth API working (admin stats accessible)")
-                else:
-                    print(f"❌ Auth API response invalid")
-                    return False
+                self.log_test("DELETE /api/admin/contacts/:id", data.get('success', False), f"Delete response: {data}")
             else:
-                print(f"❌ Auth API failed with status {response.status_code}")
-                return False
+                self.log_test("DELETE /api/admin/contacts/:id", False, f"HTTP {response.status_code}: {response.text}")
+                
         except Exception as e:
-            print(f"❌ Auth API error: {str(e)}")
-            return False
-        
-        return True
+            self.log_test("Contact Leads CRUD", False, f"Exception: {str(e)}")
     
-    def cleanup(self):
-        """Clean up created test data"""
-        print("\n🧹 Cleaning up test data...")
+    def test_auth_security(self):
+        """Test authentication security for admin endpoints"""
+        print("=== AUTHENTICATION SECURITY TESTS ===")
         
-        # Delete created blog
-        if self.created_blog_id:
+        # Create a session without auth cookie
+        unauth_session = requests.Session()
+        
+        endpoints_to_test = [
+            ("POST", "/admin/jobs", {"title": "Test Job"}),
+            ("PUT", "/admin/jobs/test-id", {"title": "Updated"}),
+            ("DELETE", "/admin/jobs/test-id", {}),
+            ("POST", "/admin/colleges", {"name": "Test College"}),
+            ("PUT", "/admin/colleges/test-id", {"name": "Updated"}),
+            ("DELETE", "/admin/colleges/test-id", {}),
+            ("POST", "/admin/testimonials", {"name": "Test", "testimonial": "Great"}),
+            ("PUT", "/admin/testimonials/test-id", {"rating": 4}),
+            ("DELETE", "/admin/testimonials/test-id", {}),
+            ("PUT", "/admin/contacts/test-id", {"status": "Contacted"}),
+            ("DELETE", "/admin/contacts/test-id", {})
+        ]
+        
+        all_protected = True
+        for method, endpoint, data in endpoints_to_test:
             try:
-                response = self.session.delete(f"{BASE_URL}/api/admin/blogs/{self.created_blog_id}")
-                if response.status_code == 200:
-                    print(f"✅ Test blog deleted")
-                else:
-                    print(f"⚠️ Could not delete test blog: {response.status_code}")
+                if method == "POST":
+                    response = unauth_session.post(f"{API_BASE}{endpoint}", json=data)
+                elif method == "PUT":
+                    response = unauth_session.put(f"{API_BASE}{endpoint}", json=data)
+                elif method == "DELETE":
+                    response = unauth_session.delete(f"{API_BASE}{endpoint}")
+                
+                if response.status_code != 401:
+                    all_protected = False
+                    self.log_test(f"Auth Security - {method} {endpoint}", False, f"Expected 401, got {response.status_code}")
+                    break
+                    
             except Exception as e:
-                print(f"⚠️ Error deleting test blog: {str(e)}")
+                all_protected = False
+                self.log_test(f"Auth Security - {method} {endpoint}", False, f"Exception: {str(e)}")
+                break
+        
+        if all_protected:
+            self.log_test("Authentication Security", True, f"All {len(endpoints_to_test)} admin endpoints properly protected with 401")
     
     def run_all_tests(self):
-        """Run all blog management tests"""
-        print("🚀 Starting Blog Management API Tests")
-        print("=" * 60)
+        """Run all tests"""
+        print("Starting Unishaala CRUD API Tests...")
+        print("=" * 50)
         
-        # Login first
-        if not self.login_admin():
-            print("❌ Cannot proceed without admin login")
+        # Authenticate first
+        if not self.authenticate():
+            print("❌ Authentication failed. Cannot proceed with tests.")
             return False
         
-        # Run all test suites
-        test_results = []
+        # Run all CRUD tests
+        self.test_jobs_crud()
+        self.test_colleges_crud()
+        self.test_testimonials_crud()
+        self.test_contact_leads_crud()
+        self.test_auth_security()
         
-        test_results.append(("Admin Blog CRUD", self.test_admin_blog_crud()))
-        test_results.append(("Public Blog API", self.test_public_blog_api()))
-        test_results.append(("Image Upload API", self.test_image_upload_api()))
-        test_results.append(("Authentication Requirements", self.test_auth_requirements()))
-        test_results.append(("Regression Check", self.test_regression_check()))
+        # Summary
+        print("=" * 50)
+        print("TEST SUMMARY")
+        print("=" * 50)
         
-        # Cleanup
-        self.cleanup()
+        passed = sum(1 for result in self.test_results if result['success'])
+        total = len(self.test_results)
         
-        # Print summary
-        print("\n" + "=" * 60)
-        print("📊 TEST SUMMARY")
-        print("=" * 60)
+        print(f"Total Tests: {total}")
+        print(f"Passed: {passed}")
+        print(f"Failed: {total - passed}")
+        print(f"Success Rate: {(passed/total)*100:.1f}%")
         
-        passed = 0
-        failed = 0
+        if total - passed > 0:
+            print("\nFailed Tests:")
+            for result in self.test_results:
+                if not result['success']:
+                    print(f"  ❌ {result['test']}: {result['details']}")
         
-        for test_name, result in test_results:
-            status = "✅ PASSED" if result else "❌ FAILED"
-            print(f"{test_name:<30} {status}")
-            if result:
-                passed += 1
-            else:
-                failed += 1
-        
-        print(f"\nTotal: {passed + failed} | Passed: {passed} | Failed: {failed}")
-        
-        if failed == 0:
-            print("🎉 All tests passed!")
-            return True
-        else:
-            print(f"💥 {failed} test(s) failed!")
-            return False
+        return passed == total
 
 if __name__ == "__main__":
-    tester = BlogAPITester()
-    success = tester.run_all_tests()
-    exit(0 if success else 1)
+    runner = TestRunner()
+    success = runner.run_all_tests()
+    sys.exit(0 if success else 1)

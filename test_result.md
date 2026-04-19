@@ -422,7 +422,68 @@ agent_communication:
         comment: "✅ IMAGE UPLOAD API TESTING COMPLETE: POST /api/admin/upload-image working correctly. Successfully accepts base64 data URI, stores image in uploaded_images collection, returns proper response with id and url format '/api/images/{id}'. Authentication properly enforced. Image upload functionality working as specified for blog editor integration."
 
     message: "✅ AUTHENTICATION SYSTEM UPDATES TESTING COMPLETE: Comprehensive verification of authentication system updates completed successfully. All 6 specified test cases PASSED: 1) Admin Login with NEW Password (Shivani@1234) - SUCCESS, admin@unishaala.com login working, SUPER_ADMIN role confirmed 2) Admin Login with OLD Password (admin123) - CORRECTLY REJECTED with 401 'Invalid credentials' 3) Phone OTP Send API (/api/auth/send-otp) - WORKING, Twilio integration functional, appropriate error handling for test numbers 4) Phone OTP Verify API (/api/auth/verify-phone-otp) - WORKING, correctly rejects invalid OTP codes 5) User Signup with Phone Verification - WORKING, successfully creates users with phoneVerified=true 6) Admin Users API - WORKING, returns users with both phoneVerified and authProvider fields. Minor fix applied: Added missing authProvider field to admin user in seed script. Authentication system updates working perfectly as specified in review request."
+
+  - task: "Jobs CRUD API"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Enhanced POST /api/admin/jobs (validates, parses vacancies as int, defaults status to 'Active'). PUT /api/admin/jobs/:id returns updated object (was returning just message before). DELETE already existed. Fields accepted: title, organization, location, category, vacancies, salary, qualification, description, applyLink, lastDate, status."
+      - working: true
+        agent: "testing"
+        comment: "✅ JOBS CRUD TESTING COMPLETE: All 4 CRUD operations working correctly. 1) POST /api/admin/jobs - Creates job with vacancies stored as integer, defaults status to 'Active', accepts all specified fields including optional title/organization 2) GET /api/admin/jobs - Returns job list including newly created jobs 3) PUT /api/admin/jobs/:id - Returns updated job object (not just message), partial updates working 4) DELETE /api/admin/jobs/:id - Successfully removes jobs. Edge case tested: missing title/organization still creates job as specified."
+
+  - task: "Colleges CRUD API"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added missing endpoints: POST /api/admin/colleges (requires name, parses courses/acceptedExams as arrays from comma-separated string, validates ranking/rating as numbers), PUT /api/admin/colleges/:id (partial update, returns updated doc), DELETE /api/admin/colleges/:id. Previously only GET existed."
+      - working: true
+        agent: "testing"
+        comment: "✅ COLLEGES CRUD TESTING COMPLETE: All 4 CRUD operations working correctly. 1) POST /api/admin/colleges - Requires name field (400 if missing), converts comma-separated courses/acceptedExams to arrays, parses ranking as int and rating as float 2) GET /api/admin/colleges - Returns college list 3) PUT /api/admin/colleges/:id - Partial updates working, returns updated document, 404 for non-existent IDs 4) DELETE /api/admin/colleges/:id - Successfully removes colleges. String parsing verified: 'Computer Science, Mechanical Engineering' → ['Computer Science', 'Mechanical Engineering']."
+
+  - task: "Testimonials CRUD API"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Enhanced POST /api/admin/testimonials (requires name + testimonial fields, defaults rating to 5). Added PUT /api/admin/testimonials/:id. Fields: name, testimonial, exam, rank, image, rating."
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTIMONIALS CRUD TESTING COMPLETE: All 4 CRUD operations working correctly. 1) POST /api/admin/testimonials - Requires name and testimonial fields (400 if missing), defaults rating to 5 when not provided or empty 2) GET /api/admin/testimonials - Returns testimonial list 3) PUT /api/admin/testimonials/:id - Partial updates working, returns updated document, 404 for non-existent IDs 4) DELETE /api/admin/testimonials/:id - Successfully removes testimonials. Rating default behavior verified: empty/null rating → 5."
+
+  - task: "Contact Leads CRUD API"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added PUT /api/admin/contacts/:id (updates status: New/Contacted/Resolved/Spam, and adds admin notes field). Added DELETE /api/admin/contacts/:id. Public POST /api/contact already stores name, email, phone, subject, message correctly."
+      - working: true
+        agent: "testing"
+        comment: "✅ CONTACT LEADS CRUD TESTING COMPLETE: All 4 CRUD operations working correctly. 1) POST /api/contact (public) - Stores all 5 required fields (name, email, phone, subject, message) in contact_leads collection 2) GET /api/admin/contacts - Returns all contact leads with all 5 fields plus status and createdAt 3) PUT /api/admin/contacts/:id - Updates status and notes fields, returns updated document 4) DELETE /api/admin/contacts/:id - Successfully removes contact leads. Field verification confirmed: all required fields properly stored and retrieved."
+
   - agent: "testing"
     message: "✅ AUTHENTICATION AND PAYMENT FLOW TESTING COMPLETE: Successfully tested the complete authentication and payment flow as requested. All 6 test cases PASSED: 1) Admin Login Test (POST /api/auth/login with admin@unishaala.com/Shivani@1234) - SUCCESS, returns SUPER_ADMIN role and sets auth_token cookie 2) User Login Test (create test user test@test.com/test123) - SUCCESS, user creation and login working with USER role 3) Admin Stats API (GET /api/admin/stats with admin auth) - SUCCESS, returns dashboard stats with all required fields (totalUsers, totalExams, totalMockTests, totalQuestions, totalJobs, totalRevenue) 4) Admin Exams API (GET /api/admin/exams with admin auth) - SUCCESS, returns list of 8 exams 5) Payment Initiation Test (POST /api/payment/initiate with logged-in user) - SUCCESS, returns transactionId, amount, and paymentUrl with ICICI payment gateway integration working 6) Logout Test (POST /api/auth/logout) - SUCCESS, clears auth_token cookie. Session/cookie authentication working properly throughout the flow."
   - agent: "testing"
-    message: "✅ BLOG MANAGEMENT API TESTING COMPLETE AFTER PUT HANDLER FIX: Comprehensive re-testing of Blog Management APIs completed successfully after the PUT handler implementation. All specified test scenarios PASSED: 1) PUT /api/admin/blogs/:id with auth cookie - All 5 scenarios working: partial update (status only), full update with title change and slug regeneration, title collision handling with unique slug generation, 404 for non-existent ID, 401 without auth 2) Sanity regression check - All endpoints still working: POST /api/admin/blogs (create), GET /api/admin/blogs (list), DELETE /api/admin/blogs/:id, POST /api/admin/upload-image, GET /api/blogs (public published blogs), GET /api/blogs/:slug (public with view increment). The PUT handler fix is working perfectly - slug regeneration on title change, collision avoidance, proper error handling, and authentication enforcement all verified. No regressions detected in other blog-related endpoints."
+    message: "✅ COMPREHENSIVE CRUD ENDPOINTS TESTING COMPLETE: Successfully tested all 4 newly enhanced CRUD endpoints as specified in review request. RESULTS: All 24 test cases PASSED (21 main tests + 3 edge cases). 1) Jobs CRUD - POST/GET/PUT/DELETE all working, vacancies stored as integer, PUT returns updated object, missing title/organization handled correctly 2) Colleges CRUD - POST requires name (400 if missing), comma-separated strings converted to arrays, ranking/rating parsed as int/float, PUT returns updated doc, 404 for non-existent IDs 3) Testimonials CRUD - POST requires name+testimonial (400 if missing), rating defaults to 5, PUT returns updated doc, 404 for non-existent IDs 4) Contact Leads CRUD - Public POST stores all 5 fields, admin GET returns all fields+status+createdAt, PUT updates status/notes, DELETE removes leads 5) Authentication Security - All 11 admin endpoints properly protected with 401 without auth cookie. Admin login with admin@unishaala.com/Shivani@1234 working correctly. All CRUD operations meet review request specifications."

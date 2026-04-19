@@ -2685,12 +2685,43 @@ export async function POST(request) {
         const jobData = {
           id: uuidv4(),
           ...body,
+          vacancies: parseInt(body.vacancies) || 0,
+          status: body.status || 'Active',
           createdAt: new Date(),
           updatedAt: new Date()
         };
         const jobs = await getCollection('jobs');
         await jobs.insertOne(jobData);
         return jsonResponse({ success: true, data: jobData });
+      }
+
+      // Create College
+      if (path === '/admin/colleges') {
+        const { name, location } = body;
+        if (!name) {
+          return jsonResponse({ success: false, error: 'Name is required' }, 400);
+        }
+        const collegeData = {
+          id: uuidv4(),
+          name,
+          location: location || '',
+          ranking: body.ranking !== undefined ? parseInt(body.ranking) : null,
+          type: body.type || 'Government',
+          courses: Array.isArray(body.courses) ? body.courses
+            : (body.courses ? String(body.courses).split(',').map(s => s.trim()).filter(Boolean) : []),
+          fees: body.fees || '',
+          rating: body.rating !== undefined ? parseFloat(body.rating) : null,
+          acceptedExams: Array.isArray(body.acceptedExams) ? body.acceptedExams
+            : (body.acceptedExams ? String(body.acceptedExams).split(',').map(s => s.trim()).filter(Boolean) : []),
+          description: body.description || '',
+          website: body.website || '',
+          image: body.image || '',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        const colleges = await getCollection('colleges');
+        await colleges.insertOne(collegeData);
+        return jsonResponse({ success: true, data: collegeData });
       }
 
       // Create Domain
@@ -2809,10 +2840,21 @@ export async function POST(request) {
 
       // Create Testimonial
       if (path === '/admin/testimonials') {
+        const { name, testimonial } = body;
+        if (!name || !testimonial) {
+          return jsonResponse({ success: false, error: 'Name and testimonial are required' }, 400);
+        }
         const testimonialData = {
           id: uuidv4(),
-          ...body,
-          createdAt: new Date()
+          name,
+          testimonial,
+          exam: body.exam || '',
+          rank: body.rank || '',
+          image: body.image || '',
+          rating: body.rating !== undefined && body.rating !== null && body.rating !== ''
+            ? parseInt(body.rating) : 5,
+          createdAt: new Date(),
+          updatedAt: new Date()
         };
         const testimonials = await getCollection('testimonials');
         await testimonials.insertOne(testimonialData);
@@ -2924,11 +2966,64 @@ export async function PUT(request) {
       if (path.startsWith('/admin/jobs/')) {
         const jobId = path.split('/admin/jobs/')[1];
         const jobs = await getCollection('jobs');
+        const updateData = { ...body, updatedAt: new Date() };
+        if (body.vacancies !== undefined) updateData.vacancies = parseInt(body.vacancies) || 0;
         await jobs.updateOne(
           { id: jobId },
-          { $set: { ...body, updatedAt: new Date() } }
+          { $set: updateData }
         );
-        return jsonResponse({ success: true, message: 'Job updated' });
+        const updated = await jobs.findOne({ id: jobId });
+        return jsonResponse({ success: true, data: updated });
+      }
+
+      // Update College
+      if (path.startsWith('/admin/colleges/')) {
+        const collegeId = path.split('/admin/colleges/')[1];
+        const colleges = await getCollection('colleges');
+        const updateData = { updatedAt: new Date() };
+        const allowed = ['name', 'location', 'type', 'fees', 'description', 'website', 'image'];
+        allowed.forEach(k => { if (body[k] !== undefined) updateData[k] = body[k]; });
+        if (body.ranking !== undefined) updateData.ranking = body.ranking !== null && body.ranking !== '' ? parseInt(body.ranking) : null;
+        if (body.rating !== undefined) updateData.rating = body.rating !== null && body.rating !== '' ? parseFloat(body.rating) : null;
+        if (body.courses !== undefined) {
+          updateData.courses = Array.isArray(body.courses) ? body.courses
+            : (body.courses ? String(body.courses).split(',').map(s => s.trim()).filter(Boolean) : []);
+        }
+        if (body.acceptedExams !== undefined) {
+          updateData.acceptedExams = Array.isArray(body.acceptedExams) ? body.acceptedExams
+            : (body.acceptedExams ? String(body.acceptedExams).split(',').map(s => s.trim()).filter(Boolean) : []);
+        }
+        const r = await colleges.updateOne({ id: collegeId }, { $set: updateData });
+        if (r.matchedCount === 0) return jsonResponse({ success: false, error: 'College not found' }, 404);
+        const updated = await colleges.findOne({ id: collegeId });
+        return jsonResponse({ success: true, data: updated });
+      }
+
+      // Update Testimonial
+      if (path.startsWith('/admin/testimonials/')) {
+        const tid = path.split('/admin/testimonials/')[1];
+        const testimonials = await getCollection('testimonials');
+        const updateData = { updatedAt: new Date() };
+        const allowed = ['name', 'testimonial', 'exam', 'rank', 'image'];
+        allowed.forEach(k => { if (body[k] !== undefined) updateData[k] = body[k]; });
+        if (body.rating !== undefined) updateData.rating = parseInt(body.rating) || 5;
+        const r = await testimonials.updateOne({ id: tid }, { $set: updateData });
+        if (r.matchedCount === 0) return jsonResponse({ success: false, error: 'Testimonial not found' }, 404);
+        const updated = await testimonials.findOne({ id: tid });
+        return jsonResponse({ success: true, data: updated });
+      }
+
+      // Update Contact Lead
+      if (path.startsWith('/admin/contacts/')) {
+        const cid = path.split('/admin/contacts/')[1];
+        const contacts = await getCollection('contact_leads');
+        const updateData = { updatedAt: new Date() };
+        const allowed = ['name', 'email', 'phone', 'subject', 'message', 'status', 'notes'];
+        allowed.forEach(k => { if (body[k] !== undefined) updateData[k] = body[k]; });
+        const r = await contacts.updateOne({ id: cid }, { $set: updateData });
+        if (r.matchedCount === 0) return jsonResponse({ success: false, error: 'Contact lead not found' }, 404);
+        const updated = await contacts.findOne({ id: cid });
+        return jsonResponse({ success: true, data: updated });
       }
 
       // Update Blog Post
@@ -3062,6 +3157,22 @@ export async function DELETE(request) {
       const testimonials = await getCollection('testimonials');
       await testimonials.deleteOne({ id: testimonialId });
       return jsonResponse({ success: true, message: 'Testimonial deleted' });
+    }
+
+    // Delete College
+    if (path.startsWith('/admin/colleges/')) {
+      const collegeId = path.split('/admin/colleges/')[1];
+      const colleges = await getCollection('colleges');
+      await colleges.deleteOne({ id: collegeId });
+      return jsonResponse({ success: true, message: 'College deleted' });
+    }
+
+    // Delete Contact Lead
+    if (path.startsWith('/admin/contacts/')) {
+      const contactId = path.split('/admin/contacts/')[1];
+      const contacts = await getCollection('contact_leads');
+      await contacts.deleteOne({ id: contactId });
+      return jsonResponse({ success: true, message: 'Contact lead deleted' });
     }
 
     return jsonResponse({ success: false, error: 'Endpoint not found' }, 404);
