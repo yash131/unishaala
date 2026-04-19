@@ -67,7 +67,8 @@ export function MainNavbar() {
 
   const navLinks = [
     { href: '/', label: 'Home' },
-    { href: '/exams', label: 'Exams' },
+    { href: '/exams', label: 'Test Series' },
+    { href: '/blogs', label: 'Blogs' },
     { href: '/jobs', label: 'Jobs' },
     { href: '/rank-predictor', label: 'Rank Predictor' },
     { href: '/about', label: 'About' },

@@ -258,7 +258,7 @@ export default function ExamDetailPage() {
       <div className="min-h-screen bg-gray-50">
         <MainNavbar />
         <div className="pt-24 text-center">
-          <p className="text-gray-500">Exam not found</p>
+          <p className="text-gray-500">Test series not found</p>
         </div>
       </div>
     );
@@ -365,7 +365,7 @@ export default function ExamDetailPage() {
             </button>
           ) : (
             <Link href="/exams" className="inline-flex items-center text-teal-600 hover:text-teal-700 mb-4">
-              <ArrowLeft className="w-4 h-4 mr-2" /> All Exams
+              <ArrowLeft className="w-4 h-4 mr-2" /> All Test Series
             </Link>
           )}
           
@@ -486,7 +486,7 @@ export default function ExamDetailPage() {
                   <div className="border-2 border-amber-400 rounded-lg p-4 bg-amber-50">
                     <div className="flex items-center justify-between mb-2">
                       <div>
-                        <h4 className="font-semibold text-gray-900">Full Exam Access</h4>
+                        <h4 className="font-semibold text-gray-900">Full Test Series Access</h4>
                         <Badge className="bg-amber-200 text-amber-800 text-xs">Best Value</Badge>
                       </div>
                       <span className="text-xl font-bold text-amber-600">₹{exam.price}</span>
@@ -496,7 +496,7 @@ export default function ExamDetailPage() {
                       className="w-full bg-amber-500 hover:bg-amber-600"
                       onClick={() => handlePayment('exam')}
                     >
-                      Pay ₹{exam.price} for Full Exam
+                      Pay ₹{exam.price} for Full Test Series
                     </Button>
                   </div>
                 )}

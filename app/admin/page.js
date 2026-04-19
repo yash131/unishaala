@@ -45,7 +45,19 @@ import {
   AlertTriangle,
   History,
   IndianRupee,
-  Layers
+  Layers,
+  Bold,
+  Italic,
+  Underline,
+  List,
+  ListOrdered,
+  Link2,
+  Image as ImageIcon,
+  Heading1,
+  Heading2,
+  Quote,
+  Code,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -60,10 +72,11 @@ const TEST_TYPES = [
 function AdminSidebar({ activeTab, setActiveTab }) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
-    { id: 'exams', label: 'Exams', icon: <GraduationCap className="w-5 h-5" /> },
+    { id: 'exams', label: 'Test Series', icon: <GraduationCap className="w-5 h-5" /> },
     { id: 'domains', label: 'Domains', icon: <Layers className="w-5 h-5" /> },
     { id: 'tests', label: 'Tests', icon: <ClipboardList className="w-5 h-5" /> },
     { id: 'questions', label: 'Questions', icon: <BookOpen className="w-5 h-5" /> },
+    { id: 'blogs', label: 'Blogs', icon: <FileText className="w-5 h-5" /> },
     { id: 'transactions', label: 'Transactions', icon: <CreditCard className="w-5 h-5" /> },
     { id: 'jobs', label: 'Jobs', icon: <Briefcase className="w-5 h-5" /> },
     { id: 'colleges', label: 'Colleges', icon: <Building className="w-5 h-5" /> },
@@ -2080,6 +2093,603 @@ function CRUDTable({ title, data, columns, onDelete, loading }) {
   );
 }
 
+// ====================== BLOGS TAB ======================
+// Rich Text Editor using contenteditable + execCommand
+function RichTextEditor({ value, onChange, placeholder }) {
+  const editorRef = useRef(null);
+  const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [linkUrl, setLinkUrl] = useState('');
+  const savedSelection = useRef(null);
+
+  useEffect(() => {
+    if (editorRef.current && value !== editorRef.current.innerHTML) {
+      editorRef.current.innerHTML = value || '';
+    }
+  }, []);
+
+  const handleInput = () => {
+    if (editorRef.current) {
+      onChange(editorRef.current.innerHTML);
+    }
+  };
+
+  const exec = (cmd, arg = null) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, arg);
+    handleInput();
+  };
+
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      savedSelection.current = sel.getRangeAt(0);
+    }
+  };
+
+  const restoreSelection = () => {
+    if (savedSelection.current) {
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(savedSelection.current);
+    }
+  };
+
+  const handleLinkClick = () => {
+    saveSelection();
+    setLinkUrl('');
+    setLinkDialogOpen(true);
+  };
+
+  const applyLink = () => {
+    restoreSelection();
+    if (linkUrl) {
+      exec('createLink', linkUrl);
+      // Open link in new tab by default
+      setTimeout(() => {
+        const links = editorRef.current?.querySelectorAll('a');
+        links?.forEach(a => {
+          a.setAttribute('target', '_blank');
+          a.setAttribute('rel', 'noopener noreferrer');
+        });
+        handleInput();
+      }, 10);
+    }
+    setLinkDialogOpen(false);
+  };
+
+  const handleImageInsert = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image too large (max 10MB)');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const base64 = ev.target.result;
+      try {
+        const res = await fetch('/api/admin/upload-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ image: base64, filename: file.name })
+        });
+        const d = await res.json();
+        if (d.success) {
+          editorRef.current?.focus();
+          exec('insertImage', d.data.url);
+          toast.success('Image inserted');
+        } else {
+          toast.error(d.error || 'Upload failed');
+        }
+      } catch (err) {
+        toast.error('Upload failed');
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const ToolButton = ({ onClick, title, children }) => (
+    <button
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={onClick}
+      title={title}
+      className="p-2 rounded hover:bg-teal-50 text-gray-700 hover:text-teal-700 transition-colors"
+    >
+      {children}
+    </button>
+  );
+
+  return (
+    <div className="border border-gray-300 rounded-lg overflow-hidden bg-white focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20">
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-1 px-2 py-1.5 border-b bg-gray-50">
+        <ToolButton onClick={() => exec('bold')} title="Bold (Ctrl+B)"><Bold className="w-4 h-4" /></ToolButton>
+        <ToolButton onClick={() => exec('italic')} title="Italic (Ctrl+I)"><Italic className="w-4 h-4" /></ToolButton>
+        <ToolButton onClick={() => exec('underline')} title="Underline (Ctrl+U)"><Underline className="w-4 h-4" /></ToolButton>
+        <div className="w-px h-5 bg-gray-300 mx-1" />
+        <ToolButton onClick={() => exec('formatBlock', '<h1>')} title="Heading 1"><Heading1 className="w-4 h-4" /></ToolButton>
+        <ToolButton onClick={() => exec('formatBlock', '<h2>')} title="Heading 2"><Heading2 className="w-4 h-4" /></ToolButton>
+        <ToolButton onClick={() => exec('formatBlock', '<p>')} title="Paragraph"><span className="text-xs font-semibold">P</span></ToolButton>
+        <div className="w-px h-5 bg-gray-300 mx-1" />
+        <ToolButton onClick={() => exec('insertUnorderedList')} title="Bullet List"><List className="w-4 h-4" /></ToolButton>
+        <ToolButton onClick={() => exec('insertOrderedList')} title="Numbered List"><ListOrdered className="w-4 h-4" /></ToolButton>
+        <ToolButton onClick={() => exec('formatBlock', '<blockquote>')} title="Quote"><Quote className="w-4 h-4" /></ToolButton>
+        <ToolButton onClick={() => exec('formatBlock', '<pre>')} title="Code Block"><Code className="w-4 h-4" /></ToolButton>
+        <div className="w-px h-5 bg-gray-300 mx-1" />
+        <ToolButton onClick={handleLinkClick} title="Insert Link"><Link2 className="w-4 h-4" /></ToolButton>
+        <label className="p-2 rounded hover:bg-teal-50 text-gray-700 hover:text-teal-700 transition-colors cursor-pointer" title="Insert Image">
+          <ImageIcon className="w-4 h-4" />
+          <input type="file" accept="image/*" className="hidden" onChange={handleImageInsert} />
+        </label>
+        <div className="w-px h-5 bg-gray-300 mx-1" />
+        <ToolButton onClick={() => exec('removeFormat')} title="Clear Formatting"><X className="w-4 h-4" /></ToolButton>
+      </div>
+
+      {/* Editor */}
+      <div
+        ref={editorRef}
+        contentEditable
+        onInput={handleInput}
+        onBlur={handleInput}
+        suppressContentEditableWarning
+        className="rich-editor min-h-[300px] max-h-[500px] overflow-y-auto p-4 focus:outline-none prose max-w-none"
+        data-placeholder={placeholder || 'Start writing your blog post...'}
+      />
+
+      <style jsx>{`
+        .rich-editor:empty:before {
+          content: attr(data-placeholder);
+          color: #9ca3af;
+          pointer-events: none;
+        }
+        .rich-editor h1 { font-size: 1.875rem; font-weight: 700; margin: 0.75em 0 0.4em; }
+        .rich-editor h2 { font-size: 1.5rem; font-weight: 700; margin: 0.75em 0 0.4em; }
+        .rich-editor h3 { font-size: 1.25rem; font-weight: 600; margin: 0.75em 0 0.4em; }
+        .rich-editor p { margin: 0.5em 0; line-height: 1.7; }
+        .rich-editor ul { list-style: disc; padding-left: 1.5em; margin: 0.5em 0; }
+        .rich-editor ol { list-style: decimal; padding-left: 1.5em; margin: 0.5em 0; }
+        .rich-editor li { margin: 0.25em 0; }
+        .rich-editor a { color: #0d9488; text-decoration: underline; }
+        .rich-editor blockquote { border-left: 4px solid #14b8a6; padding: 0.25em 0.75em; margin: 0.75em 0; color: #4b5563; background: #f0fdfa; }
+        .rich-editor pre { background: #0f172a; color: #e2e8f0; padding: 0.75em; border-radius: 0.375em; overflow-x: auto; }
+        .rich-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 0.5em 0; }
+        .rich-editor strong { font-weight: 700; }
+      `}</style>
+
+      {/* Link dialog */}
+      <Dialog open={linkDialogOpen} onOpenChange={setLinkDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Insert Link</DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <Label>URL</Label>
+            <Input
+              autoFocus
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              placeholder="https://example.com"
+              onKeyDown={(e) => { if (e.key === 'Enter') applyLink(); }}
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>Cancel</Button>
+            <Button className="bg-teal-600 hover:bg-teal-700" onClick={applyLink}>Insert</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function BlogsTab() {
+  const [blogs, setBlogs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    content: '',
+    image: '',
+    publishDate: '',
+    status: 'draft'
+  });
+  const [uploadingCover, setUploadingCover] = useState(false);
+
+  const fetchBlogs = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/blogs', { credentials: 'include' });
+      const d = await res.json();
+      if (d.success) setBlogs(d.data || []);
+    } catch (e) {
+      toast.error('Failed to load blogs');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchBlogs(); }, []);
+
+  const resetForm = () => {
+    setForm({
+      title: '',
+      description: '',
+      content: '',
+      image: '',
+      publishDate: new Date().toISOString().slice(0, 10),
+      status: 'draft'
+    });
+    setEditing(null);
+  };
+
+  const openCreate = () => {
+    resetForm();
+    setDialogOpen(true);
+  };
+
+  const openEdit = (blog) => {
+    setEditing(blog);
+    setForm({
+      title: blog.title || '',
+      description: blog.description || '',
+      content: blog.content || '',
+      image: blog.image || '',
+      publishDate: blog.publishDate ? new Date(blog.publishDate).toISOString().slice(0, 10) : '',
+      status: blog.status || 'draft'
+    });
+    setDialogOpen(true);
+  };
+
+  const handleCoverUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Image too large (max 10MB)');
+      return;
+    }
+    setUploadingCover(true);
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const res = await fetch('/api/admin/upload-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ image: ev.target.result, filename: file.name })
+        });
+        const d = await res.json();
+        if (d.success) {
+          setForm(p => ({ ...p, image: d.data.url }));
+          toast.success('Cover image uploaded');
+        } else {
+          toast.error(d.error || 'Upload failed');
+        }
+      } catch (err) {
+        toast.error('Upload failed');
+      }
+      setUploadingCover(false);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const validate = () => {
+    if (!form.title.trim()) { toast.error('Title is required'); return false; }
+    if (!form.content || !form.content.replace(/<[^>]+>/g, '').trim()) {
+      toast.error('Content is required'); return false;
+    }
+    return true;
+  };
+
+  const handleSave = async () => {
+    if (!validate()) return;
+    setSaving(true);
+    try {
+      const payload = {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        content: form.content,
+        image: form.image || null,
+        publishDate: form.publishDate || new Date().toISOString(),
+        status: form.status
+      };
+      const url = editing ? `/api/admin/blogs/${editing.id}` : '/api/admin/blogs';
+      const method = editing ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success(editing ? 'Blog updated' : 'Blog created');
+        setDialogOpen(false);
+        resetForm();
+        fetchBlogs();
+      } else {
+        toast.error(d.error || 'Save failed');
+      }
+    } catch (e) {
+      toast.error('Save failed');
+    }
+    setSaving(false);
+  };
+
+  const handleDelete = async (blog) => {
+    if (!confirm(`Delete "${blog.title}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/admin/blogs/${blog.id}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success('Blog deleted');
+        fetchBlogs();
+      } else {
+        toast.error(d.error || 'Delete failed');
+      }
+    } catch (e) {
+      toast.error('Delete failed');
+    }
+  };
+
+  const togglePublish = async (blog) => {
+    try {
+      const newStatus = blog.status === 'published' ? 'draft' : 'published';
+      const res = await fetch(`/api/admin/blogs/${blog.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ status: newStatus })
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success(newStatus === 'published' ? 'Blog published' : 'Moved to draft');
+        fetchBlogs();
+      } else {
+        toast.error(d.error || 'Update failed');
+      }
+    } catch (e) {
+      toast.error('Update failed');
+    }
+  };
+
+  const filtered = blogs.filter(b => {
+    if (statusFilter !== 'all' && b.status !== statusFilter) return false;
+    if (search && !b.title.toLowerCase().includes(search.toLowerCase())) return false;
+    return true;
+  });
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Blog Posts</h2>
+          <p className="text-sm text-gray-500">Create and manage blog content shown on the website</p>
+        </div>
+        <Button onClick={openCreate} className="bg-teal-600 hover:bg-teal-700">
+          <Plus className="w-4 h-4 mr-2" /> New Blog Post
+        </Button>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col md:flex-row gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            className="pl-9"
+            placeholder="Search by title..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full md:w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            <SelectItem value="published">Published</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Table */}
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-12 flex justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="p-12 text-center">
+              <FileText className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500">
+                {blogs.length === 0 ? 'No blog posts yet. Click "New Blog Post" to create one.' : 'No blogs match your filters.'}
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-16">Cover</TableHead>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Publish Date</TableHead>
+                  <TableHead>Views</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((b) => (
+                  <TableRow key={b.id}>
+                    <TableCell>
+                      {b.image ? (
+                        <img src={b.image} alt="" className="w-12 h-12 rounded object-cover" />
+                      ) : (
+                        <div className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center">
+                          <FileText className="w-5 h-5 text-gray-400" />
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium text-gray-900 line-clamp-1">{b.title}</div>
+                      <div className="text-xs text-gray-500 line-clamp-1">/blogs/{b.slug}</div>
+                    </TableCell>
+                    <TableCell>
+                      {b.status === 'published' ? (
+                        <Badge className="bg-green-500">Published</Badge>
+                      ) : (
+                        <Badge variant="secondary">Draft</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-600">
+                      {b.publishDate ? new Date(b.publishDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-600">{b.views || 0}</TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => togglePublish(b)}
+                          title={b.status === 'published' ? 'Unpublish' : 'Publish'}
+                        >
+                          {b.status === 'published' ? <EyeOff className="w-4 h-4" /> : <Send className="w-4 h-4" />}
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => openEdit(b)} title="Edit">
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button variant="ghost" size="sm" onClick={() => handleDelete(b)} title="Delete">
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Create/Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!saving) setDialogOpen(o); }}>
+        <DialogContent className="sm:max-w-4xl max-h-[92vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editing ? 'Edit Blog Post' : 'Create New Blog Post'}</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            <div>
+              <Label>Title *</Label>
+              <Input
+                value={form.title}
+                onChange={(e) => setForm(p => ({ ...p, title: e.target.value }))}
+                placeholder="Enter an attention-grabbing title"
+              />
+            </div>
+
+            <div>
+              <Label>Short Description</Label>
+              <Textarea
+                value={form.description}
+                onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))}
+                placeholder="Brief summary shown on the blog list (1-2 lines)"
+                rows={2}
+              />
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <Label>Publish Date</Label>
+                <Input
+                  type="date"
+                  value={form.publishDate}
+                  onChange={(e) => setForm(p => ({ ...p, publishDate: e.target.value }))}
+                />
+              </div>
+              <div>
+                <Label>Status</Label>
+                <Select value={form.status} onValueChange={(v) => setForm(p => ({ ...p, status: v }))}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="draft">Draft</SelectItem>
+                    <SelectItem value="published">Published</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div>
+              <Label>Cover Image</Label>
+              <div className="flex items-center gap-3 mt-1">
+                {form.image ? (
+                  <div className="relative">
+                    <img src={form.image} alt="cover" className="w-32 h-20 rounded object-cover border" />
+                    <button
+                      type="button"
+                      onClick={() => setForm(p => ({ ...p, image: '' }))}
+                      className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-600"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-32 h-20 rounded border-2 border-dashed border-gray-300 flex items-center justify-center bg-gray-50">
+                    <ImageIcon className="w-6 h-6 text-gray-400" />
+                  </div>
+                )}
+                <label className="cursor-pointer">
+                  <div className="px-3 py-2 border rounded-md hover:bg-gray-50 flex items-center gap-2 text-sm">
+                    {uploadingCover ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                    {uploadingCover ? 'Uploading...' : form.image ? 'Replace' : 'Upload Cover'}
+                  </div>
+                  <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} disabled={uploadingCover} />
+                </label>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Recommended: 1200 × 630 px. Max 10 MB.</p>
+            </div>
+
+            <div>
+              <Label>Content *</Label>
+              <RichTextEditor
+                value={form.content}
+                onChange={(html) => setForm(p => ({ ...p, content: html }))}
+                placeholder="Start writing your blog post..."
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button className="bg-teal-600 hover:bg-teal-700" onClick={handleSave} disabled={saving}>
+              {saving ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
+              ) : (
+                <><Save className="w-4 h-4 mr-2" /> {editing ? 'Update Post' : 'Create Post'}</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
 // Main Admin Page
 export default function AdminPage() {
   const router = useRouter();
@@ -2192,11 +2802,12 @@ export default function AdminPage() {
           {activeTab === 'domains' && <DomainsTab exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'tests' && <TestsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'questions' && <QuestionsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
+          {activeTab === 'blogs' && <BlogsTab />}
           {activeTab === 'transactions' && <TransactionsTab />}
           {activeTab === 'jobs' && <CRUDTable title="Jobs" data={data.jobs} columns={[{ key: 'title', label: 'Title' }, { key: 'organization', label: 'Org' }, { key: 'vacancies', label: 'Vacancies' }, { key: 'status', label: 'Status', render: v => <Badge className={v === 'Active' ? 'bg-green-500' : 'bg-gray-500'}>{v}</Badge> }]} onDelete={id => handleDelete('jobs', id)} loading={loading} />}
           {activeTab === 'colleges' && <CRUDTable title="Colleges" data={data.colleges} columns={[{ key: 'name', label: 'Name' }, { key: 'location', label: 'Location' }, { key: 'ranking', label: 'Rank' }]} onDelete={id => handleDelete('colleges', id)} loading={loading} />}
           {activeTab === 'users' && <CRUDTable title="Users" data={data.users} columns={[{ key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone' }, { key: 'phoneVerified', label: 'Phone Verified', render: v => v ? <Badge className="bg-green-500">✓ Verified</Badge> : <Badge className="bg-gray-400">Not Verified</Badge> }, { key: 'authProvider', label: 'Auth', render: v => <Badge variant="outline">{v === 'google' ? '🔵 Google' : '📧 Email'}</Badge> }, { key: 'role', label: 'Role', render: v => <Badge>{v}</Badge> }]} loading={loading} />}
-          {activeTab === 'testimonials' && <CRUDTable title="Testimonials" data={data.testimonials} columns={[{ key: 'name', label: 'Name' }, { key: 'exam', label: 'Exam' }, { key: 'rank', label: 'Rank' }]} onDelete={id => handleDelete('testimonials', id)} loading={loading} />}
+          {activeTab === 'testimonials' && <CRUDTable title="Testimonials" data={data.testimonials} columns={[{ key: 'name', label: 'Testimonial Name' }, { key: 'exam', label: 'Exam' }, { key: 'rank', label: 'Rank' }]} onDelete={id => handleDelete('testimonials', id)} loading={loading} />}
           {activeTab === 'contacts' && <CRUDTable title="Contact Leads" data={data.contacts} columns={[{ key: 'name', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'subject', label: 'Subject' }]} loading={loading} />}
         </main>
       </div>

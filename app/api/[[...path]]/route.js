@@ -140,6 +140,29 @@ export async function GET(request) {
       });
     }
 
+    // Public - Get all published blogs
+    if (path === '/blogs') {
+      const blogs = await getCollection('blogs');
+      const publishedBlogs = await blogs.find({ 
+        status: 'published',
+        publishDate: { $lte: new Date() }
+      }).sort({ publishDate: -1 }).toArray();
+      return jsonResponse({ success: true, data: publishedBlogs });
+    }
+
+    // Public - Get single blog by slug
+    if (path.startsWith('/blogs/')) {
+      const slug = path.split('/blogs/')[1];
+      const blogs = await getCollection('blogs');
+      const blog = await blogs.findOne({ slug, status: 'published' });
+      if (!blog) {
+        return jsonResponse({ success: false, error: 'Blog not found' }, 404);
+      }
+      // Increment view count
+      await blogs.updateOne({ id: blog.id }, { $inc: { views: 1 } });
+      return jsonResponse({ success: true, data: blog });
+    }
+
     // Single Exam by slug - return domains for this exam
     if (path.startsWith('/exams/')) {
       const slug = path.split('/exams/')[1];
@@ -680,6 +703,24 @@ export async function GET(request) {
         const query = examId ? { examId } : {};
         const domains = await domainsCollection.find(query).sort({ createdAt: 1 }).toArray();
         return jsonResponse({ success: true, data: domains });
+      }
+
+      // Admin - Get all blog posts
+      if (path === '/admin/blogs') {
+        const blogs = await getCollection('blogs');
+        const allBlogs = await blogs.find({}).sort({ createdAt: -1 }).toArray();
+        return jsonResponse({ success: true, data: allBlogs });
+      }
+
+      // Admin - Get single blog post
+      if (path.startsWith('/admin/blogs/')) {
+        const blogId = path.split('/admin/blogs/')[1];
+        const blogs = await getCollection('blogs');
+        const blog = await blogs.findOne({ id: blogId });
+        if (!blog) {
+          return jsonResponse({ success: false, error: 'Blog not found' }, 404);
+        }
+        return jsonResponse({ success: true, data: blog });
       }
 
       // Admin - Get all mock tests (including unpublished)
@@ -2695,6 +2736,105 @@ export async function POST(request) {
         return jsonResponse({ success: true, data: updated });
       }
 
+      // Create Blog Post
+      if (path === '/admin/blogs') {
+        const { title, description, content, image, publishDate, status } = body;
+        
+        if (!title || !content) {
+          return jsonResponse({ success: false, error: 'Title and content are required' }, 400);
+        }
+
+        // Generate slug from title
+        const slug = title.toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-')
+          .trim();
+
+        const blogs = await getCollection('blogs');
+        
+        // Check for duplicate slug
+        const existing = await blogs.findOne({ slug });
+        const finalSlug = existing ? `${slug}-${Date.now()}` : slug;
+
+        const blogData = {
+          id: uuidv4(),
+          title,
+          slug: finalSlug,
+          description: description || '',
+          content,
+          image: image || null,
+          publishDate: publishDate ? new Date(publishDate) : new Date(),
+          status: status || 'draft',
+          views: 0,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+
+        await blogs.insertOne(blogData);
+        return jsonResponse({ success: true, data: blogData });
+      }
+
+      // Update Blog Post
+      if (path.startsWith('/admin/blogs/')) {
+        const blogId = path.split('/admin/blogs/')[1];
+        const blogs = await getCollection('blogs');
+        
+        const { title, description, content, image, publishDate, status } = body;
+        const updateData = { updatedAt: new Date() };
+        
+        if (title !== undefined) {
+          updateData.title = title;
+          // Regenerate slug if title changed
+          updateData.slug = title.toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .trim();
+        }
+        if (description !== undefined) updateData.description = description;
+        if (content !== undefined) updateData.content = content;
+        if (image !== undefined) updateData.image = image;
+        if (publishDate !== undefined) updateData.publishDate = new Date(publishDate);
+        if (status !== undefined) updateData.status = status;
+
+        await blogs.updateOne({ id: blogId }, { $set: updateData });
+        const updated = await blogs.findOne({ id: blogId });
+        return jsonResponse({ success: true, data: updated });
+      }
+
+      // Upload single image (base64) - used by blog editor
+      if (path === '/admin/upload-image') {
+        const { image, filename } = body;
+        if (!image) {
+          return jsonResponse({ success: false, error: 'Image data is required' }, 400);
+        }
+
+        // Parse data URI: "data:image/png;base64,iVBORw0..."
+        const match = /^data:(image\/[a-zA-Z+]+);base64,(.+)$/.exec(image);
+        if (!match) {
+          return jsonResponse({ success: false, error: 'Invalid image data URI' }, 400);
+        }
+        const mimeType = match[1];
+        const base64Data = match[2];
+
+        const imageId = uuidv4();
+        const imagesCollection = await getCollection('uploaded_images');
+        await imagesCollection.insertOne({
+          id: imageId,
+          filename: filename || `blog-${imageId}`,
+          mimeType,
+          data: base64Data,
+          size: Math.ceil(base64Data.length * 0.75),
+          createdAt: new Date()
+        });
+
+        return jsonResponse({
+          success: true,
+          data: { id: imageId, url: `/api/images/${imageId}` }
+        });
+      }
+
       // Create Testimonial
       if (path === '/admin/testimonials') {
         const testimonialData = {
@@ -2848,6 +2988,14 @@ export async function DELETE(request) {
       await questions.deleteMany({ mockTestId: testId });
       
       return jsonResponse({ success: true, message: 'Mock test and questions deleted' });
+    }
+
+    // Delete Blog Post
+    if (path.startsWith('/admin/blogs/')) {
+      const blogId = path.split('/admin/blogs/')[1];
+      const blogs = await getCollection('blogs');
+      await blogs.deleteOne({ id: blogId });
+      return jsonResponse({ success: true, message: 'Blog deleted' });
     }
 
     // Delete Question

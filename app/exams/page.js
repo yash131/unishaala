@@ -74,14 +74,14 @@ export default function ExamsPage() {
       
       <div className="pt-20 pb-12 bg-gradient-to-b from-teal-50 to-white">
         <div className="container mx-auto px-4">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">All Exams</h1>
-          <p className="text-gray-600 mb-8">Choose from 50+ competitive exams and start your preparation</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">All Test Series</h1>
+          <p className="text-gray-600 mb-8">Choose from 50+ competitive test series and start your preparation</p>
           
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <Input
-                placeholder="Search exams..."
+                placeholder="Search test series..."
                 className="pl-10 h-12"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -138,7 +138,7 @@ export default function ExamsPage() {
 
         {filteredExams.length === 0 && (
           <div className="text-center py-12">
-            <p className="text-gray-500 text-lg">No exams found matching your criteria</p>
+            <p className="text-gray-500 text-lg">No test series found matching your criteria</p>
           </div>
         )}
       </div>

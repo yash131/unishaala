@@ -42,9 +42,9 @@ function HeroSection() {
       <div className="container mx-auto px-4 py-16">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
-            <Badge className="bg-teal-100 text-teal-700 mb-4">India's #1 Exam Preparation Platform</Badge>
+            <Badge className="bg-teal-100 text-teal-700 mb-4">India's #1 Test Series Preparation Platform</Badge>
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
-              Crack Your Dream Exam with <span className="text-teal-600">Unishaala</span>
+              Crack Your Dream Test Series with <span className="text-teal-600">Unishaala</span>
             </h1>
             <p className="text-lg text-gray-600 mb-8">
               Access thousands of mock tests, previous year papers, and expert-curated study materials for GATE, CAT, UPSC, JEE and more.
@@ -52,7 +52,7 @@ function HeroSection() {
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href="/exams">
                 <Button size="lg" className="bg-teal-600 hover:bg-teal-700 text-white w-full sm:w-auto">
-                  Explore Exams <ArrowRight className="ml-2 w-4 h-4" />
+                  Explore Test Series <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </Link>
               <Link href="/signup">
@@ -72,7 +72,7 @@ function HeroSection() {
               </div>
               <div className="text-center">
                 <p className="text-2xl font-bold text-teal-600">50+</p>
-                <p className="text-sm text-gray-600">Exams</p>
+                <p className="text-sm text-gray-600">Test Series</p>
               </div>
             </div>
           </div>
@@ -109,8 +109,8 @@ function ExamNotifications({ notifications }) {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900">Exam Notifications</h2>
-            <p className="text-gray-600 mt-2">Stay updated with latest exam announcements</p>
+            <h2 className="text-3xl font-bold text-gray-900">Test Series Notifications</h2>
+            <p className="text-gray-600 mt-2">Stay updated with latest test series announcements</p>
           </div>
           <Link href="/notifications">
             <Button variant="outline" className="hidden md:flex">
@@ -150,8 +150,8 @@ function PopularExams({ exams }) {
     <section className="py-16 bg-gray-50">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900">Popular Exams</h2>
-          <p className="text-gray-600 mt-2">Choose from 50+ competitive exams</p>
+          <h2 className="text-3xl font-bold text-gray-900">Popular Test Series</h2>
+          <p className="text-gray-600 mt-2">Choose from 50+ competitive test series</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-6">
@@ -177,7 +177,7 @@ function PopularExams({ exams }) {
         <div className="text-center mt-8">
           <Link href="/exams">
             <Button size="lg" className="bg-teal-600 hover:bg-teal-700">
-              View All Exams <ArrowRight className="ml-2 w-4 h-4" />
+              View All Test Series <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
           </Link>
         </div>
@@ -361,7 +361,7 @@ function Footer() {
               <Logo size="default" showText={false} />
             </div>
             <p className="text-gray-600 text-sm mb-4">
-              Your trusted partner for competitive exam preparation. Join millions of students achieving their dreams.
+              Your trusted partner for competitive test series preparation. Join millions of students achieving their dreams.
             </p>
             <div className="flex gap-4">
               <a href="#" className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center text-teal-600 hover:bg-teal-200">
@@ -382,7 +382,8 @@ function Footer() {
           <div>
             <h4 className="font-bold text-gray-900 mb-4">Quick Links</h4>
             <ul className="space-y-2 text-sm text-gray-600">
-              <li><Link href="/exams" className="hover:text-teal-600">Exams</Link></li>
+              <li><Link href="/exams" className="hover:text-teal-600">Test Series</Link></li>
+              <li><Link href="/blogs" className="hover:text-teal-600">Blogs</Link></li>
               <li><Link href="/jobs" className="hover:text-teal-600">Jobs</Link></li>
               <li><Link href="/rank-predictor" className="hover:text-teal-600">Rank Predictor</Link></li>
               <li><Link href="/colleges" className="hover:text-teal-600">College Finder</Link></li>
@@ -390,7 +391,7 @@ function Footer() {
           </div>
 
           <div>
-            <h4 className="font-bold text-gray-900 mb-4">Popular Exams</h4>
+            <h4 className="font-bold text-gray-900 mb-4">Popular Test Series</h4>
             <ul className="space-y-2 text-sm text-gray-600">
               <li><Link href="/exams/gate" className="hover:text-teal-600">GATE</Link></li>
               <li><Link href="/exams/cat" className="hover:text-teal-600">CAT</Link></li>

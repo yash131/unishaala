@@ -356,7 +356,10 @@ test_plan:
         comment: "✅ TESTED: Comprehensive leaderboard system testing completed successfully. All 4 test categories PASSED: 1) GET /api/leaderboard/gate (Public) - Returns proper leaderboard data with exam info, rankings in descending order by best score, participant count of 1, correct data structure with rank/name/bestScore/totalMarks/accuracy/attempts fields 2) GET /api/leaderboard/invalid-exam-xyz - Correctly returns 404 error for non-existent exam 3) GET /api/my-rank/gate - Authentication properly enforced (401 without auth, success with auth), returns user rank (1), bestScore (5.38), totalParticipants (1), percentile (0%) 4) Rank calculation consistency verified - participant counts match between endpoints, percentile calculation accurate. Dynamic ranking system working as specified in requirements."
 
 test_plan:
-  current_focus: []
+  current_focus:
+    - "Blog Management API (Admin CRUD)"
+    - "Public Blog API"
+    - "Image Upload API"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -375,6 +378,43 @@ agent_communication:
   - agent: "testing"
     message: "✅ LEADERBOARD SYSTEM TESTING COMPLETE: Comprehensive testing of the dynamic ranking/leaderboard system APIs completed successfully. All specified test cases PASSED: 1) GET /api/leaderboard/gate (Public endpoint) - Returns complete leaderboard data with proper exam info, rankings sorted by best scores, participant count (1), all required fields (rank, name, bestScore, totalMarks, accuracy, attempts) 2) GET /api/leaderboard/invalid-exam - Correctly returns 404 error for non-existent exams 3) GET /api/my-rank/gate - Authentication properly enforced (401 without auth cookie), with valid auth returns user's rank (1), bestScore (5.38), totalParticipants (1), percentile (0%) 4) Rank calculation consistency - Verified participant counts match between leaderboard and my-rank endpoints, percentile calculations accurate. The leaderboard system calculates rankings dynamically based on best scores from test attempts as required."
   - agent: "testing"
+
+  - task: "Blog Management API (Admin CRUD)"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added admin blog CRUD endpoints: GET /api/admin/blogs, GET /api/admin/blogs/:id, POST /api/admin/blogs (creates with auto-generated slug, handles duplicate slugs), PUT /api/admin/blogs/:id (regenerates slug on title change), DELETE /api/admin/blogs/:id. Auth required (SUPER_ADMIN/ADMIN/CONTENT_MANAGER). Fields: title, slug, description, content (HTML), image (URL), publishDate, status (draft/published), views, createdAt, updatedAt."
+
+  - task: "Public Blog API"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Public endpoints: GET /api/blogs (only status='published' and publishDate <= now, sorted desc). GET /api/blogs/:slug (single post, increments views counter, returns 404 if not found or draft)."
+
+  - task: "Image Upload API"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added POST /api/admin/upload-image. Accepts base64 data URI, stores in uploaded_images MongoDB collection, returns {id, url: /api/images/{id}}. Rejects invalid data URIs. Used by blog editor for cover image and inline images."
+
     message: "✅ AUTHENTICATION SYSTEM UPDATES TESTING COMPLETE: Comprehensive verification of authentication system updates completed successfully. All 6 specified test cases PASSED: 1) Admin Login with NEW Password (Shivani@1234) - SUCCESS, admin@unishaala.com login working, SUPER_ADMIN role confirmed 2) Admin Login with OLD Password (admin123) - CORRECTLY REJECTED with 401 'Invalid credentials' 3) Phone OTP Send API (/api/auth/send-otp) - WORKING, Twilio integration functional, appropriate error handling for test numbers 4) Phone OTP Verify API (/api/auth/verify-phone-otp) - WORKING, correctly rejects invalid OTP codes 5) User Signup with Phone Verification - WORKING, successfully creates users with phoneVerified=true 6) Admin Users API - WORKING, returns users with both phoneVerified and authProvider fields. Minor fix applied: Added missing authProvider field to admin user in seed script. Authentication system updates working perfectly as specified in review request."
   - agent: "testing"
     message: "✅ AUTHENTICATION AND PAYMENT FLOW TESTING COMPLETE: Successfully tested the complete authentication and payment flow as requested. All 6 test cases PASSED: 1) Admin Login Test (POST /api/auth/login with admin@unishaala.com/Shivani@1234) - SUCCESS, returns SUPER_ADMIN role and sets auth_token cookie 2) User Login Test (create test user test@test.com/test123) - SUCCESS, user creation and login working with USER role 3) Admin Stats API (GET /api/admin/stats with admin auth) - SUCCESS, returns dashboard stats with all required fields (totalUsers, totalExams, totalMockTests, totalQuestions, totalJobs, totalRevenue) 4) Admin Exams API (GET /api/admin/exams with admin auth) - SUCCESS, returns list of 8 exams 5) Payment Initiation Test (POST /api/payment/initiate with logged-in user) - SUCCESS, returns transactionId, amount, and paymentUrl with ICICI payment gateway integration working 6) Logout Test (POST /api/auth/logout) - SUCCESS, clears auth_token cookie. Session/cookie authentication working properly throughout the flow."
