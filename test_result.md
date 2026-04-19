@@ -356,10 +356,7 @@ test_plan:
         comment: "✅ TESTED: Comprehensive leaderboard system testing completed successfully. All 4 test categories PASSED: 1) GET /api/leaderboard/gate (Public) - Returns proper leaderboard data with exam info, rankings in descending order by best score, participant count of 1, correct data structure with rank/name/bestScore/totalMarks/accuracy/attempts fields 2) GET /api/leaderboard/invalid-exam-xyz - Correctly returns 404 error for non-existent exam 3) GET /api/my-rank/gate - Authentication properly enforced (401 without auth, success with auth), returns user rank (1), bestScore (5.38), totalParticipants (1), percentile (0%) 4) Rank calculation consistency verified - participant counts match between endpoints, percentile calculation accurate. Dynamic ranking system working as specified in requirements."
 
 test_plan:
-  current_focus:
-    - "Blog Management API (Admin CRUD)"
-    - "Public Blog API"
-    - "Image Upload API"
+  current_focus: []
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -381,40 +378,51 @@ agent_communication:
 
   - task: "Blog Management API (Admin CRUD)"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/app/api/[[...path]]/route.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Added admin blog CRUD endpoints: GET /api/admin/blogs, GET /api/admin/blogs/:id, POST /api/admin/blogs (creates with auto-generated slug, handles duplicate slugs), PUT /api/admin/blogs/:id (regenerates slug on title change), DELETE /api/admin/blogs/:id. Auth required (SUPER_ADMIN/ADMIN/CONTENT_MANAGER). Fields: title, slug, description, content (HTML), image (URL), publishDate, status (draft/published), views, createdAt, updatedAt."
+      - working: true
+        agent: "testing"
+        comment: "✅ BLOG PUT HANDLER TESTING COMPLETE: Comprehensive testing of the PUT /api/admin/blogs/:id endpoint after the fix. All 5 PUT test scenarios PASSED: 1) Partial Update (status only) - Successfully updated status to 'published' while preserving other fields 2) Title Change with Slug Regeneration - Title update correctly regenerated slug from 'original-test-blog-title' to 'updated-blog-title-for-slug-test' 3) Title Collision with Unique Slug Generation - When updating to existing title, system correctly generated unique slug with timestamp suffix to avoid collision 4) Non-existent Blog ID - Correctly returned 404 error for PUT on non-existent blog 5) Without Authentication - Correctly returned 401 error for unauthorized PUT requests. PUT handler working perfectly as specified in review request."
 
   - task: "Public Blog API"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/app/api/[[...path]]/route.js"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Public endpoints: GET /api/blogs (only status='published' and publishDate <= now, sorted desc). GET /api/blogs/:slug (single post, increments views counter, returns 404 if not found or draft)."
+      - working: true
+        agent: "testing"
+        comment: "✅ PUBLIC BLOG API TESTING COMPLETE: Both public blog endpoints working correctly. 1) GET /api/blogs - Returns only published blogs with publishDate <= now, found 3 published blogs in correct order 2) GET /api/blogs/:slug - Successfully retrieves individual blog posts by slug, view increment functionality working correctly (increments views in database after returning current count to user). Public API properly filters draft/unpublished content."
 
   - task: "Image Upload API"
     implemented: true
-    working: "NA"
+    working: true
     file: "/app/app/api/[[...path]]/route.js"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: "NA"
         agent: "main"
         comment: "Added POST /api/admin/upload-image. Accepts base64 data URI, stores in uploaded_images MongoDB collection, returns {id, url: /api/images/{id}}. Rejects invalid data URIs. Used by blog editor for cover image and inline images."
+      - working: true
+        agent: "testing"
+        comment: "✅ IMAGE UPLOAD API TESTING COMPLETE: POST /api/admin/upload-image working correctly. Successfully accepts base64 data URI, stores image in uploaded_images collection, returns proper response with id and url format '/api/images/{id}'. Authentication properly enforced. Image upload functionality working as specified for blog editor integration."
 
     message: "✅ AUTHENTICATION SYSTEM UPDATES TESTING COMPLETE: Comprehensive verification of authentication system updates completed successfully. All 6 specified test cases PASSED: 1) Admin Login with NEW Password (Shivani@1234) - SUCCESS, admin@unishaala.com login working, SUPER_ADMIN role confirmed 2) Admin Login with OLD Password (admin123) - CORRECTLY REJECTED with 401 'Invalid credentials' 3) Phone OTP Send API (/api/auth/send-otp) - WORKING, Twilio integration functional, appropriate error handling for test numbers 4) Phone OTP Verify API (/api/auth/verify-phone-otp) - WORKING, correctly rejects invalid OTP codes 5) User Signup with Phone Verification - WORKING, successfully creates users with phoneVerified=true 6) Admin Users API - WORKING, returns users with both phoneVerified and authProvider fields. Minor fix applied: Added missing authProvider field to admin user in seed script. Authentication system updates working perfectly as specified in review request."
   - agent: "testing"
     message: "✅ AUTHENTICATION AND PAYMENT FLOW TESTING COMPLETE: Successfully tested the complete authentication and payment flow as requested. All 6 test cases PASSED: 1) Admin Login Test (POST /api/auth/login with admin@unishaala.com/Shivani@1234) - SUCCESS, returns SUPER_ADMIN role and sets auth_token cookie 2) User Login Test (create test user test@test.com/test123) - SUCCESS, user creation and login working with USER role 3) Admin Stats API (GET /api/admin/stats with admin auth) - SUCCESS, returns dashboard stats with all required fields (totalUsers, totalExams, totalMockTests, totalQuestions, totalJobs, totalRevenue) 4) Admin Exams API (GET /api/admin/exams with admin auth) - SUCCESS, returns list of 8 exams 5) Payment Initiation Test (POST /api/payment/initiate with logged-in user) - SUCCESS, returns transactionId, amount, and paymentUrl with ICICI payment gateway integration working 6) Logout Test (POST /api/auth/logout) - SUCCESS, clears auth_token cookie. Session/cookie authentication working properly throughout the flow."
+  - agent: "testing"
+    message: "✅ BLOG MANAGEMENT API TESTING COMPLETE AFTER PUT HANDLER FIX: Comprehensive re-testing of Blog Management APIs completed successfully after the PUT handler implementation. All specified test scenarios PASSED: 1) PUT /api/admin/blogs/:id with auth cookie - All 5 scenarios working: partial update (status only), full update with title change and slug regeneration, title collision handling with unique slug generation, 404 for non-existent ID, 401 without auth 2) Sanity regression check - All endpoints still working: POST /api/admin/blogs (create), GET /api/admin/blogs (list), DELETE /api/admin/blogs/:id, POST /api/admin/upload-image, GET /api/blogs (public published blogs), GET /api/blogs/:slug (public with view increment). The PUT handler fix is working perfectly - slug regeneration on title change, collision avoidance, proper error handling, and authentication enforcement all verified. No regressions detected in other blog-related endpoints."

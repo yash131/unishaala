@@ -2775,34 +2775,6 @@ export async function POST(request) {
         return jsonResponse({ success: true, data: blogData });
       }
 
-      // Update Blog Post
-      if (path.startsWith('/admin/blogs/')) {
-        const blogId = path.split('/admin/blogs/')[1];
-        const blogs = await getCollection('blogs');
-        
-        const { title, description, content, image, publishDate, status } = body;
-        const updateData = { updatedAt: new Date() };
-        
-        if (title !== undefined) {
-          updateData.title = title;
-          // Regenerate slug if title changed
-          updateData.slug = title.toLowerCase()
-            .replace(/[^a-z0-9\s-]/g, '')
-            .replace(/\s+/g, '-')
-            .replace(/-+/g, '-')
-            .trim();
-        }
-        if (description !== undefined) updateData.description = description;
-        if (content !== undefined) updateData.content = content;
-        if (image !== undefined) updateData.image = image;
-        if (publishDate !== undefined) updateData.publishDate = new Date(publishDate);
-        if (status !== undefined) updateData.status = status;
-
-        await blogs.updateOne({ id: blogId }, { $set: updateData });
-        const updated = await blogs.findOne({ id: blogId });
-        return jsonResponse({ success: true, data: updated });
-      }
-
       // Upload single image (base64) - used by blog editor
       if (path === '/admin/upload-image') {
         const { image, filename } = body;
@@ -2957,6 +2929,39 @@ export async function PUT(request) {
           { $set: { ...body, updatedAt: new Date() } }
         );
         return jsonResponse({ success: true, message: 'Job updated' });
+      }
+
+      // Update Blog Post
+      if (path.startsWith('/admin/blogs/')) {
+        const blogId = path.split('/admin/blogs/')[1];
+        const blogs = await getCollection('blogs');
+
+        const { title, description, content, image, publishDate, status } = body;
+        const updateData = { updatedAt: new Date() };
+
+        if (title !== undefined) {
+          updateData.title = title;
+          // Regenerate slug if title changed (avoid collision with other blog)
+          const baseSlug = title.toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .replace(/-+/g, '-')
+            .trim();
+          const existing = await blogs.findOne({ slug: baseSlug, id: { $ne: blogId } });
+          updateData.slug = existing ? `${baseSlug}-${Date.now()}` : baseSlug;
+        }
+        if (description !== undefined) updateData.description = description;
+        if (content !== undefined) updateData.content = content;
+        if (image !== undefined) updateData.image = image;
+        if (publishDate !== undefined) updateData.publishDate = new Date(publishDate);
+        if (status !== undefined) updateData.status = status;
+
+        const result = await blogs.updateOne({ id: blogId }, { $set: updateData });
+        if (result.matchedCount === 0) {
+          return jsonResponse({ success: false, error: 'Blog not found' }, 404);
+        }
+        const updated = await blogs.findOne({ id: blogId });
+        return jsonResponse({ success: true, data: updated });
       }
     }
 
