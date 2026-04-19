@@ -3794,8 +3794,14 @@ function AnswerKeysTab() {
           <div className="space-y-3 py-2">
             <div className="bg-teal-50 border border-teal-200 rounded-md p-3 text-sm text-teal-900">
               <p className="font-medium mb-1">Expected CSV format:</p>
-              <pre className="bg-white border rounded p-2 text-xs overflow-auto">question_id,correct_answer{'\n'}Q1,A{'\n'}Q2,C{'\n'}Q3,B</pre>
-              <p className="text-xs mt-2">For numeric answer types (NAT), put the numeric value instead of A/B/C/D.</p>
+              <pre className="bg-white border rounded p-2 text-xs overflow-auto">question_id,correct_answer{'\n'}6420084710,C           <span className="text-gray-500">← MCQ (single)</span>{'\n'}"6420084732","B,D"     <span className="text-gray-500">← MSQ (multi, quoted)</span>{'\n'}6420084736,16.5-16.8    <span className="text-gray-500">← Range</span>{'\n'}6420084740,12.5         <span className="text-gray-500">← NAT (numeric)</span>{'\n'}6420084750,MAT          <span className="text-gray-500">← Bonus</span></pre>
+              <ul className="text-xs mt-2 space-y-0.5 list-disc ml-5">
+                <li><strong>MCQ</strong>: single letter A-D</li>
+                <li><strong>MSQ</strong>: multiple letters — <em>quote the answer</em> like <code>"B,D"</code></li>
+                <li><strong>NAT</strong>: numeric value (±0.01 tolerance)</li>
+                <li><strong>Range</strong>: <code>lo-hi</code> format (e.g. <code>16.5-16.8</code>)</li>
+                <li><strong>MAT</strong>: bonus — credit if attempted</li>
+              </ul>
               <a href="/api/rank-predictor/sample-csv" download className="inline-flex items-center text-teal-700 hover:underline text-xs mt-2">
                 <Download className="w-3 h-3 mr-1" /> Download sample CSV
               </a>

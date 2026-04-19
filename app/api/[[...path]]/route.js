@@ -69,175 +69,179 @@ function normalizeAnswer(a) {
   return v;
 }
 
-// Parse response sheet HTML and extract answers.
-// Supports TCS iON / digialm GATE response sheet format (the most common),
-// plus generic label-based and table-based formats.
-// Returns: {
-//   byId:    { "70724130152": "C", ... }  // keyed on internal Question ID
-//   byIndex: { "1": "C", "2": "--", ... } // keyed on sequential 1-based index
-//   natById: { "70724130160": "12.5", ... } // numeric NAT answers by id
-//   natByIndex: { "5": "12.5", ... }
-// }
+// Parse response sheet HTML and extract per-question details.
+// Returns:
+//   { byId: { <qid>: {type, status, answer} },
+//     byIndex: { <1-based-idx>: {type, status, answer} },
+//     errorPage, totalFound }
+// - type: 'MCQ' | 'MSQ' | 'NAT' | '' (unknown)
+// - status: 'Answered' | 'Not Answered' | '' (unknown)
+// - answer: normalized (A/B/C/D or "B,D" for MSQ or numeric string for NAT) — "" when unattempted
 function parseResponseSheetHTML(html) {
-  const result = { byId: {}, byIndex: {}, natById: {}, natByIndex: {}, errorPage: false, totalFound: 0 };
+  const result = { byId: {}, byIndex: {}, errorPage: false, totalFound: 0 };
   if (!html || typeof html !== 'string') return result;
 
-  // Strip scripts/styles/comments
   let h = html
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ');
 
-  // Detect common "error page" responses from TCS iON / digialm when accessed server-side
+  // Detect TCS iON error page
   if (/<title>\s*Error Page\s*<\/title>/i.test(h) ||
       /Something went wrong\s*\.?\s*We&#39;re Sorry/i.test(h) ||
       /We&rsquo;re Sorry for the Inconvenience/i.test(h) ||
       /support@tcsion\.com/i.test(h)) {
-    // Check if also no question data present — only then flag as error
     if (!/Question\s*ID\s*:/i.test(h) && !/Chosen\s*Option\s*:/i.test(h)) {
       result.errorPage = true;
       return result;
     }
   }
 
-  // ---------- PRIMARY: TCS iON format ----------
-  // Each question has a block containing "Question ID : <id>" and either
-  // "Chosen Option : <n|-->" (MCQ/MSQ) or "Given Answer : <value>" (NAT).
-  // We walk "Question ID : X" occurrences in order and find the nearest
-  // following "Chosen Option" / "Given Answer" before the next "Question ID".
-
   const textPlain = h.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
-  // Remove tags but keep content order
-  const textStripped = textPlain.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  const text = textPlain.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 
-  // Iterate Question ID matches with lookahead
+  // PRIMARY: TCS iON format
   const qidIter = /Question\s*ID\s*[:\-]\s*([0-9A-Za-z]+)/gi;
   const matches = [];
   let m;
-  while ((m = qidIter.exec(textStripped)) !== null) {
+  while ((m = qidIter.exec(text)) !== null) {
     matches.push({ qid: String(m[1]), start: m.index, end: m.index + m[0].length });
   }
 
   if (matches.length > 0) {
-    let idx = 0;
     for (let i = 0; i < matches.length; i++) {
-      idx += 1;
       const cur = matches[i];
       const next = matches[i + 1];
-      const segment = textStripped.slice(cur.end, next ? next.start : textStripped.length);
+      const segment = text.slice(cur.end, next ? next.start : text.length);
+      const idx = i + 1;
 
-      // Look for "Chosen Option : X" first (MCQ/MSQ)
-      const coMatch = segment.match(/Chosen\s*Option\s*[:\-]\s*([0-9A-Za-z,\-]+)/i);
-      // NAT types often have "Given Answer :" with numeric text
-      const gaMatch = segment.match(/Given\s*Answer\s*[:\-]\s*([0-9A-Za-z,\.\-\+\s]+?)(?=\s*(?:Question\s*ID|Status|Option\s*1\s*ID|$))/i);
-
-      let answerRaw = null;
-      let isNat = false;
-      if (coMatch) {
-        answerRaw = coMatch[1].trim();
-        // TCS iON: "--" means not attempted
-        if (/^-+$/.test(answerRaw) || answerRaw === '') answerRaw = '';
-      } else if (gaMatch) {
-        answerRaw = gaMatch[1].trim();
-        isNat = true;
+      // Question Type
+      let qType = '';
+      const typeMatch = segment.match(/Question\s*Type\s*[:\-]\s*([A-Za-z]+)/i);
+      if (typeMatch) {
+        const t = typeMatch[1].toUpperCase();
+        if (t === 'MCQ' || t === 'MSQ' || t === 'NAT' || t === 'SA') qType = t === 'SA' ? 'NAT' : t;
       }
 
-      if (answerRaw !== null) {
-        const seqKey = String(idx);
-        const answer = isNat ? answerRaw : normalizeAnswer(answerRaw);
+      // Status
+      let status = '';
+      const statusMatch = segment.match(/Status\s*[:\-]\s*([A-Za-z\s]+?)(?=\s*(?:Chosen\s*Option|Given\s*Answer|Option\s*1\s*ID|Question\s*ID|Mark\s*Allotted|Question\s*Type|$))/i);
+      if (statusMatch) {
+        const s = statusMatch[1].trim();
+        if (/not\s*answered/i.test(s) || /not\s*attempted/i.test(s)) status = 'Not Answered';
+        else if (/answered/i.test(s)) status = 'Answered';
+        else status = s;
+      }
 
-        result.byId[cur.qid] = answer;
-        result.byIndex[seqKey] = answer;
-        if (isNat) {
-          result.natById[cur.qid] = answer;
-          result.natByIndex[seqKey] = answer;
+      // Chosen Option (MCQ/MSQ)
+      const coMatch = segment.match(/Chosen\s*Option\s*[:\-]\s*([0-9A-Za-z,\-\s]+?)(?=\s*(?:Question\s*ID|Given\s*Answer|Status|Option\s*1\s*ID|Correct\s*Answer|Mark|$))/i);
+      // Given Answer (NAT)
+      const gaMatch = segment.match(/Given\s*Answer\s*[:\-]\s*([0-9A-Za-z,\.\-\+\s]+?)(?=\s*(?:Question\s*ID|Status|Option\s*1\s*ID|Correct\s*Answer|Mark|$))/i);
+
+      let answer = '';
+      let effType = qType;
+
+      if (gaMatch && gaMatch[1].trim()) {
+        answer = gaMatch[1].trim();
+        if (!effType) effType = 'NAT';
+      } else if (coMatch) {
+        const raw = coMatch[1].trim();
+        if (raw && !/^-+$/.test(raw)) {
+          // For MSQ: "1,3" -> "A,C"; for MCQ: "3" -> "C"
+          const isMulti = /,/.test(raw);
+          if (isMulti) {
+            answer = raw.split(',').map(x => normalizeAnswer(x.trim())).filter(Boolean).sort().join(',');
+            if (!effType) effType = 'MSQ';
+          } else {
+            answer = normalizeAnswer(raw);
+            if (!effType) effType = 'MCQ';
+          }
         }
-        result.totalFound++;
-      } else {
-        // Still record sequential so we know question exists but unattempted
-        const seqKey = String(idx);
-        result.byId[cur.qid] = '';
-        result.byIndex[seqKey] = '';
-        result.totalFound++;
       }
+
+      // If status explicitly says Not Answered, wipe the answer
+      if (status === 'Not Answered') answer = '';
+
+      const entry = { type: effType || '', status: status || (answer ? 'Answered' : 'Not Answered'), answer };
+      result.byId[cur.qid] = entry;
+      result.byIndex[String(idx)] = entry;
+      result.totalFound++;
     }
     return result;
   }
 
-  // ---------- FALLBACK 1: label-based (no "Question ID") ----------
-  // Match patterns like "Q.No: 1 ... Chosen Option: A"
+  // FALLBACK: label-based (no "Question ID")
   const qnoIter = /(?:Question\s*(?:Number|No\.?)|Q\.?\s*No\.?)\s*[:\-]?\s*([0-9]+)/gi;
   const qMatches = [];
   let mm;
-  while ((mm = qnoIter.exec(textStripped)) !== null) {
+  while ((mm = qnoIter.exec(text)) !== null) {
     qMatches.push({ qnum: String(mm[1]), start: mm.index, end: mm.index + mm[0].length });
   }
   if (qMatches.length > 0) {
     for (let i = 0; i < qMatches.length; i++) {
       const cur = qMatches[i];
       const next = qMatches[i + 1];
-      const segment = textStripped.slice(cur.end, next ? next.start : textStripped.length);
-      const coMatch = segment.match(/(?:Chosen\s*Option|Selected\s*Option|Chosen\s*Answer|Your\s*Answer|Response|Answer)\s*[:\-]\s*([A-Za-z0-9,\-]+)/i);
+      const segment = text.slice(cur.end, next ? next.start : text.length);
+      const coMatch = segment.match(/(?:Chosen\s*Option|Selected\s*Option|Chosen\s*Answer|Your\s*Answer|Response|Answer)\s*[:\-]\s*([A-Za-z0-9,\-\s\.]+?)(?=\s*(?:Question|Q\.?\s*No|Status|Section|$))/i);
       if (coMatch) {
-        const ans = normalizeAnswer(coMatch[1].trim());
-        result.byIndex[cur.qnum] = ans;
+        const raw = coMatch[1].trim();
+        let answer = '';
+        let type = '';
+        if (raw && !/^-+$/.test(raw)) {
+          if (/,/.test(raw) && /^[A-H](,[A-H])+$/i.test(raw)) {
+            answer = raw.toUpperCase().split(',').map(x => x.trim()).sort().join(',');
+            type = 'MSQ';
+          } else if (/^-?\d+(\.\d+)?$/.test(raw)) {
+            answer = raw;
+            type = 'NAT';
+          } else {
+            answer = normalizeAnswer(raw);
+            type = 'MCQ';
+          }
+        }
+        const entry = { type, status: answer ? 'Answered' : 'Not Answered', answer };
+        result.byIndex[cur.qnum] = entry;
         result.totalFound++;
       }
     }
     if (result.totalFound > 0) return result;
   }
 
-  // ---------- FALLBACK 2: table row format ----------
-  const rows = h.match(/<tr[\s\S]*?<\/tr>/gi) || [];
-  let qIdx = -1, chosenIdx = -1;
-  for (const row of rows) {
-    const cells = (row.match(/<t[hd][\s\S]*?<\/t[hd]>/gi) || [])
-      .map(c => c.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim());
-    if (!cells.length) continue;
-    const lower = cells.map(c => c.toLowerCase());
-    const qi = lower.findIndex(c => /^q(\.|\s)?\s*(no|num|id)\b|^question\s*(number|no|id)/i.test(c));
-    const ci = lower.findIndex(c => /chosen|selected|candidate\s*answer|your\s*answer|^response$|given\s*answer/i.test(c));
-    if (qi !== -1 && ci !== -1) { qIdx = qi; chosenIdx = ci; break; }
-  }
-  if (qIdx !== -1 && chosenIdx !== -1) {
-    let seq = 0;
-    for (const row of rows) {
-      const cells = (row.match(/<t[hd][\s\S]*?<\/t[hd]>/gi) || [])
-        .map(c => c.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim());
-      if (cells.length <= Math.max(qIdx, chosenIdx)) continue;
-      if (/question/i.test(cells[qIdx]) && /chosen|selected/i.test(cells[chosenIdx])) continue;
-      const rawQ = cells[qIdx];
-      const ans = normalizeAnswer(cells[chosenIdx]);
-      seq += 1;
-      // If it's a pure number, use as index; otherwise store as internal id
-      if (/^[0-9]+$/.test(rawQ)) {
-        result.byIndex[rawQ] = ans;
-      } else {
-        result.byId[rawQ] = ans;
-        result.byIndex[String(seq)] = ans;
-      }
-      result.totalFound++;
-    }
-  }
-
   return result;
 }
 
-// Parse simple user-typed answers like "1:A, 2:B, 3:--" or "Q1=A, Q2=C"
-// Returns same shape as parseResponseSheetHTML for consistent matching.
+// Parse simple user-typed answers like "1:A, 2:B,D; 3:16.5; 4:--"
+// Returns same shape as parseResponseSheetHTML.
 function parseSimpleAnswers(text) {
-  const result = { byId: {}, byIndex: {}, natById: {}, natByIndex: {}, errorPage: false, totalFound: 0 };
+  const result = { byId: {}, byIndex: {}, errorPage: false, totalFound: 0 };
   if (!text || typeof text !== 'string') return result;
-  const parts = text.split(/[\n,;]+/);
+  const parts = text.split(/[\n;]+/);
   for (const p of parts) {
-    const m = p.match(/^\s*Q?\.?\s*([A-Za-z0-9]+)\s*[:=\-]\s*(.*?)\s*$/i);
+    // split on first ":" or "=" only, so MSQ answers like A,B aren't split
+    const m = p.match(/^\s*Q?\.?\s*([A-Za-z0-9]+)\s*[:=]\s*(.*?)\s*$/i);
     if (m) {
       const raw = m[1];
-      const ans = normalizeAnswer(m[2]);
+      const rawAns = m[2].trim();
+      let answer = '';
+      let type = '';
+      if (rawAns && !/^-+$/.test(rawAns)) {
+        if (/,/.test(rawAns)) {
+          // MSQ
+          answer = rawAns.split(',').map(x => normalizeAnswer(x.trim())).filter(Boolean).sort().join(',');
+          type = 'MSQ';
+        } else if (/^-?\d+(\.\d+)?$/.test(rawAns)) {
+          answer = rawAns;
+          type = 'NAT';
+        } else {
+          answer = normalizeAnswer(rawAns);
+          type = 'MCQ';
+        }
+      }
+      const entry = { type, status: answer ? 'Answered' : 'Not Answered', answer };
       if (/^[0-9]+$/.test(raw)) {
-        result.byIndex[raw] = ans;
+        result.byIndex[raw] = entry;
       } else {
-        result.byId[raw] = ans;
+        result.byId[raw] = entry;
       }
       result.totalFound++;
     }
@@ -245,53 +249,121 @@ function parseSimpleAnswers(text) {
   return result;
 }
 
-// Evaluate extracted answers (object with byId/byIndex) against the answer key.
-// CSV keys can be numeric ("1", "2") which match byIndex, or long/internal IDs which match byId.
+// Classify the correct answer from CSV to determine question type.
+function classifyCorrect(correctRaw) {
+  const c = String(correctRaw || '').trim();
+  if (!c) return { type: 'UNKNOWN', value: '' };
+  const upper = c.toUpperCase();
+  if (upper === 'MAT' || upper === 'BONUS') return { type: 'MAT', value: 'MAT' };
+  // Range: "16.5-16.8" or "16.5 to 16.8" (but not "-1" negative number)
+  const rangeMatch = c.replace(/\s+/g, '').match(/^(-?\d+(?:\.\d+)?)(?:-|–|to)(-?\d+(?:\.\d+)?)$/i);
+  if (rangeMatch) {
+    const lo = parseFloat(rangeMatch[1]);
+    const hi = parseFloat(rangeMatch[2]);
+    if (!Number.isNaN(lo) && !Number.isNaN(hi)) {
+      return { type: 'RANGE', value: [Math.min(lo, hi), Math.max(lo, hi)] };
+    }
+  }
+  // MSQ: letters separated by commas/pipes/semicolons
+  if (/[,|;]/.test(c) && /^[A-H](?:\s*[,|;]\s*[A-H])+$/i.test(c)) {
+    const letters = c.toUpperCase().split(/[,|;]/).map(s => s.trim()).filter(Boolean).sort();
+    return { type: 'MSQ', value: letters.join(',') };
+  }
+  // NAT: pure numeric
+  if (/^-?\d+(\.\d+)?$/.test(c)) {
+    return { type: 'NAT', value: parseFloat(c) };
+  }
+  // MCQ: single letter
+  if (/^[A-H]$/i.test(c)) {
+    return { type: 'MCQ', value: c.toUpperCase() };
+  }
+  // Normalized fallback - treat as MCQ
+  return { type: 'MCQ', value: normalizeAnswer(c) };
+}
+
+// Evaluate extracted answers against the answer key with advanced answer type support.
 function evaluateAnswers(extracted, answerKey, positiveMarks, negativeMarks) {
   const pos = Number(positiveMarks) || 0;
   const neg = Number(negativeMarks) || 0;
   let correct = 0, wrong = 0, unattempted = 0, marks = 0;
-  const details = []; // per-question breakdown for debugging
+  const details = [];
 
   const byId = extracted?.byId || {};
   const byIndex = extracted?.byIndex || {};
-
   const keyAnswers = answerKey.answers || [];
+
   for (let i = 0; i < keyAnswers.length; i++) {
     const item = keyAnswers[i];
-    const qidNorm = normalizeQid(item.question_id);         // "Q1" -> "1", "70724130152" stays
-    const correctAns = normalizeAnswer(item.correct_answer);
+    const rawCorrect = item.correct_answer;
+    const classified = classifyCorrect(rawCorrect);
+    const qidNorm = normalizeQid(item.question_id);
 
-    // Try multiple lookups: exact qid, as index, with/without Q prefix
-    let userAns = undefined;
-    if (byId[item.question_id] !== undefined) userAns = byId[item.question_id];
-    else if (byId[qidNorm] !== undefined) userAns = byId[qidNorm];
-    else if (byIndex[qidNorm] !== undefined) userAns = byIndex[qidNorm];
-    else if (byIndex[String(i + 1)] !== undefined && /^[0-9]+$/.test(qidNorm) && qidNorm === String(i + 1)) userAns = byIndex[String(i + 1)];
+    // Look up user's entry
+    let entry = undefined;
+    if (byId[item.question_id] !== undefined) entry = byId[item.question_id];
+    else if (byId[qidNorm] !== undefined) entry = byId[qidNorm];
+    else if (byIndex[qidNorm] !== undefined) entry = byIndex[qidNorm];
+    else if (byIndex[String(i + 1)] !== undefined) entry = byIndex[String(i + 1)];
 
-    // If still nothing, try by position index (i+1)
-    if (userAns === undefined) {
-      userAns = byIndex[String(i + 1)];
-    }
+    const userAnswer = entry?.answer ?? '';
+    const userStatus = entry?.status ?? '';
 
     let status;
-    if (userAns === undefined || userAns === null || userAns === '') {
-      unattempted++;
-      status = 'unattempted';
-    } else if (String(userAns).toUpperCase() === String(correctAns).toUpperCase()) {
-      correct++;
-      marks += pos;
-      status = 'correct';
-    } else {
-      wrong++;
-      marks -= neg;
-      status = 'wrong';
+
+    // MAT/Bonus: credit if user attempted (status = Answered OR non-empty answer)
+    if (classified.type === 'MAT') {
+      const attempted = userStatus === 'Answered' || (userAnswer && String(userAnswer).trim() !== '');
+      if (attempted) {
+        correct++; marks += pos; status = 'correct';
+      } else {
+        unattempted++; status = 'unattempted';
+      }
+    }
+    // Unattempted
+    else if (!userAnswer || String(userAnswer).trim() === '' || userStatus === 'Not Answered') {
+      unattempted++; status = 'unattempted';
+    }
+    // NAT — numeric comparison with ±0.01 tolerance
+    else if (classified.type === 'NAT') {
+      const u = parseFloat(userAnswer);
+      if (Number.isNaN(u)) { wrong++; marks -= neg; status = 'wrong'; }
+      else if (Math.abs(u - classified.value) <= 0.01) { correct++; marks += pos; status = 'correct'; }
+      else { wrong++; marks -= neg; status = 'wrong'; }
+    }
+    // RANGE — user's value must fall within [lo, hi]
+    else if (classified.type === 'RANGE') {
+      const u = parseFloat(userAnswer);
+      if (Number.isNaN(u)) { wrong++; marks -= neg; status = 'wrong'; }
+      else if (u >= classified.value[0] && u <= classified.value[1]) { correct++; marks += pos; status = 'correct'; }
+      else { wrong++; marks -= neg; status = 'wrong'; }
+    }
+    // MSQ — user set must exactly equal correct set (no partial credit by default)
+    else if (classified.type === 'MSQ') {
+      // Normalize user answer to sorted A,B,C form
+      let uStr = String(userAnswer).toUpperCase();
+      // Handle numeric multi-select: "1,3" -> "A,C"
+      if (/^[0-9](,[0-9])+$/.test(uStr)) {
+        uStr = uStr.split(',').map(n => String.fromCharCode(64 + parseInt(n.trim()))).sort().join(',');
+      } else {
+        uStr = uStr.split(/[,|;]/).map(s => s.trim()).filter(Boolean).sort().join(',');
+      }
+      if (uStr === classified.value) { correct++; marks += pos; status = 'correct'; }
+      else { wrong++; marks -= neg; status = 'wrong'; }
+    }
+    // MCQ — straight comparison (MSQ for GATE often has no negative marking but we apply whatever admin set)
+    else {
+      if (String(userAnswer).toUpperCase() === String(classified.value).toUpperCase()) {
+        correct++; marks += pos; status = 'correct';
+      } else {
+        wrong++; marks -= neg; status = 'wrong';
+      }
     }
 
     details.push({
       question_id: item.question_id,
-      correct_answer: correctAns,
-      user_answer: userAns === undefined ? null : userAns,
+      type: classified.type,
+      correct_answer: String(rawCorrect),
+      user_answer: userAnswer || null,
       status
     });
   }
@@ -302,6 +374,7 @@ function evaluateAnswers(extracted, answerKey, positiveMarks, negativeMarks) {
   marks = +marks.toFixed(2);
   return { correct, wrong, unattempted, attempted, marks, totalQuestions, maxMarks, details };
 }
+
 
 
 
@@ -431,7 +504,7 @@ export async function GET(request) {
 
     // Public - Sample CSV download for answer key
     if (path === '/rank-predictor/sample-csv') {
-      const csv = 'question_id,correct_answer\nQ1,A\nQ2,C\nQ3,B\nQ4,D\nQ5,A\n';
+      const csv = 'question_id,correct_answer\n6420084710,C\n6420084720,A\n"6420084732","B,D"\n6420084736,16.5-16.8\n6420084740,12.5\n6420084750,MAT\n';
       return new NextResponse(csv, {
         status: 200,
         headers: {
@@ -1641,17 +1714,32 @@ export async function POST(request) {
           return jsonResponse({ success: false, error: 'Selected answer key has no questions uploaded yet' }, 400);
         }
 
-        // Gather user answers: priority manualAnswers -> responseHtml -> responseUrl
-        // extracted will be: { byId, byIndex, natById, natByIndex, errorPage, totalFound }
-        let extracted = { byId: {}, byIndex: {}, natById: {}, natByIndex: {}, errorPage: false, totalFound: 0 };
+        // extracted: { byId, byIndex, errorPage, totalFound }
+        // Each entry is { type, status, answer }
+        let extracted = { byId: {}, byIndex: {}, errorPage: false, totalFound: 0 };
         let source = 'manual';
 
         if (manualAnswers && typeof manualAnswers === 'object' && !Array.isArray(manualAnswers) && Object.keys(manualAnswers).length > 0) {
           for (const [k, v] of Object.entries(manualAnswers)) {
             const qkey = normalizeQid(k);
-            const ans = normalizeAnswer(v);
-            if (/^[0-9]+$/.test(qkey)) extracted.byIndex[qkey] = ans;
-            else extracted.byId[qkey] = ans;
+            const rawV = v === null || v === undefined ? '' : String(v).trim();
+            let answer = '';
+            let type = '';
+            if (rawV && !/^-+$/.test(rawV)) {
+              if (/[,|;]/.test(rawV) && /^[A-H](?:\s*[,|;]\s*[A-H])+$/i.test(rawV)) {
+                answer = rawV.toUpperCase().split(/[,|;]/).map(s => s.trim()).sort().join(',');
+                type = 'MSQ';
+              } else if (/^-?\d+(\.\d+)?$/.test(rawV)) {
+                answer = rawV;
+                type = 'NAT';
+              } else {
+                answer = normalizeAnswer(rawV);
+                type = 'MCQ';
+              }
+            }
+            const entry = { type, status: answer ? 'Answered' : 'Not Answered', answer };
+            if (/^[0-9]+$/.test(qkey)) extracted.byIndex[qkey] = entry;
+            else extracted.byId[qkey] = entry;
             extracted.totalFound++;
           }
           source = 'manual';
@@ -1727,8 +1815,8 @@ export async function POST(request) {
           marks: result.marks,
           maxMarks: result.maxMarks,
           percentage: result.maxMarks ? +((result.marks / result.maxMarks) * 100).toFixed(2) : 0,
-          userAnswersById: extracted.byId,
-          userAnswersByIndex: extracted.byIndex,
+          extractedById: extracted.byId,
+          extractedByIndex: extracted.byIndex,
           source,
           createdAt: new Date()
         };
@@ -3158,7 +3246,8 @@ export async function POST(request) {
               .filter(a => a && a.question_id !== undefined && a.correct_answer !== undefined)
               .map(a => ({
                 question_id: normalizeQid(a.question_id),
-                correct_answer: normalizeAnswer(a.correct_answer)
+                // Keep correct_answer raw — classifyCorrect will detect MAT/RANGE/NAT/MSQ/MCQ
+                correct_answer: String(a.correct_answer).trim()
               }))
           : [];
         const akData = {
@@ -3191,29 +3280,58 @@ export async function POST(request) {
           return jsonResponse({ success: false, error: 'CSV content is required' }, 400);
         }
 
+        // RFC4180-ish parser: handle quoted fields with commas
+        function parseCsvLine(line) {
+          const out = [];
+          let i = 0, cur = '', inQ = false;
+          while (i < line.length) {
+            const ch = line[i];
+            if (inQ) {
+              if (ch === '"' && line[i + 1] === '"') { cur += '"'; i += 2; continue; }
+              if (ch === '"') { inQ = false; i++; continue; }
+              cur += ch; i++;
+            } else {
+              if (ch === '"' && cur === '') { inQ = true; i++; continue; }
+              if (ch === ',') { out.push(cur); cur = ''; i++; continue; }
+              cur += ch; i++;
+            }
+          }
+          out.push(cur);
+          return out.map(s => s.trim());
+        }
+
         const lines = csv.replace(/\r/g, '').split('\n').filter(l => l.trim());
         if (lines.length < 1) return jsonResponse({ success: false, error: 'CSV is empty' }, 400);
 
-        // Detect header
-        const firstCols = lines[0].split(',').map(c => c.trim().toLowerCase());
+        const firstCols = parseCsvLine(lines[0]).map(c => c.toLowerCase());
         const hasHeader = firstCols.includes('question_id') || firstCols.includes('correct_answer') || firstCols.includes('answer');
         const startIdx = hasHeader ? 1 : 0;
-        const qIdx = hasHeader ? firstCols.indexOf('question_id') : 0;
+        let qIdx = hasHeader ? firstCols.indexOf('question_id') : 0;
         let aIdx = hasHeader ? firstCols.findIndex(c => c === 'correct_answer' || c === 'answer') : 1;
-        if (qIdx === -1 || aIdx === -1) { aIdx = 1; }
+        if (qIdx === -1) qIdx = 0;
+        if (aIdx === -1) aIdx = 1;
 
         const answers = [];
         const errors = [];
         const seen = new Set();
         for (let i = startIdx; i < lines.length; i++) {
-          const cols = lines[i].split(',').map(c => c.trim());
+          const cols = parseCsvLine(lines[i]);
           if (cols.length < 2) continue;
-          const qid = normalizeQid(cols[qIdx] ?? cols[0]);
-          const ans = normalizeAnswer(cols[aIdx] ?? cols[1]);
+          const qRaw = cols[qIdx] ?? cols[0];
+          // If answer column has comma (MSQ) and was not quoted, auto-join remaining columns
+          let aRaw = cols[aIdx] ?? cols[1];
+          if (!hasHeader && cols.length > 2) {
+            aRaw = cols.slice(1).join(',');
+          } else if (hasHeader && aIdx !== -1 && cols.length > Math.max(qIdx, aIdx) + 1) {
+            // columns after aIdx — join with commas (unquoted MSQ)
+            aRaw = cols.slice(aIdx).join(',');
+          }
+          const qid = normalizeQid(qRaw);
           if (!qid) { errors.push(`Row ${i + 1}: invalid question_id`); continue; }
           if (seen.has(qid)) { errors.push(`Row ${i + 1}: duplicate question_id ${qid}`); continue; }
           seen.add(qid);
-          answers.push({ question_id: qid, correct_answer: ans });
+          // Don't normalize to letter — keep raw so classifyCorrect can detect MAT/RANGE/NAT/MSQ
+          answers.push({ question_id: qid, correct_answer: String(aRaw).trim() });
         }
 
         await keys.updateOne(
@@ -3590,7 +3708,8 @@ export async function PUT(request) {
             .filter(a => a && a.question_id !== undefined && a.correct_answer !== undefined)
             .map(a => ({
               question_id: normalizeQid(a.question_id),
-              correct_answer: normalizeAnswer(a.correct_answer)
+              // Keep raw — classifyCorrect will detect MAT/RANGE/NAT/MSQ/MCQ
+              correct_answer: String(a.correct_answer).trim()
             }));
           updateData.answers = normalized;
           updateData.totalQuestions = normalized.length;
