@@ -190,11 +190,14 @@ function ResponseSheetPredictor() {
               {responseMode === 'url' && (
                 <>
                   <Input
-                    placeholder="https://gate2024.iisc.ac.in/response-sheet?..."
+                    placeholder="https://cdn.digialm.com/..."
                     value={responseUrl}
                     onChange={(e) => setResponseUrl(e.target.value)}
                   />
-                  <p className="text-xs text-gray-500 mt-1">We'll fetch the page and extract your answers. If the URL requires a login, use "Upload HTML" instead.</p>
+                  <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 mt-2">
+                    <p className="font-semibold">⚠ TCS iON / GATE response URLs are often restricted to the candidate's IP/session.</p>
+                    <p className="mt-1">If you get a fetch error, open the URL in your browser, save the page (Ctrl+S), and use <span className="font-semibold">"Upload HTML"</span> below.</p>
+                  </div>
                 </>
               )}
               {responseMode === 'upload' && (
@@ -204,7 +207,7 @@ function ResponseSheetPredictor() {
                       <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
                       <p className="text-sm text-gray-700 font-medium">Click to upload response sheet HTML</p>
                       <p className="text-xs text-gray-500 mt-1">
-                        {fileName ? <span className="text-teal-600">{fileName} ✓</span> : 'Save the response page from your browser (Ctrl+S) and upload the .html file.'}
+                        {fileName ? <span className="text-teal-600">{fileName} ✓</span> : 'Save the response page from your browser (Ctrl+S → "Webpage, HTML Only") and upload the .html file.'}
                       </p>
                     </div>
                     <input type="file" accept=".html,.htm,text/html" className="hidden" onChange={handleFile} />
@@ -299,7 +302,43 @@ function ResponseSheetPredictor() {
                   <p>Total questions: <span className="font-semibold text-gray-700">{result.totalQuestions}</span></p>
                   <p>Attempted: <span className="font-semibold text-gray-700">{result.attempted}</span></p>
                   <p>Marking: <span className="text-green-600">+{result.positiveMarks}</span> / <span className="text-red-500">−{result.negativeMarks}</span></p>
+                  {result.extractedAnswerCount !== undefined && (
+                    <p>Extracted from sheet: <span className="font-semibold text-gray-700">{result.extractedAnswerCount}</span> responses</p>
+                  )}
                 </div>
+
+                {/* Per-question breakdown */}
+                {Array.isArray(result.details) && result.details.length > 0 && (
+                  <details className="mt-4">
+                    <summary className="text-sm text-teal-700 cursor-pointer hover:underline">View per-question breakdown</summary>
+                    <div className="mt-2 max-h-64 overflow-y-auto border rounded">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 sticky top-0">
+                          <tr>
+                            <th className="text-left p-2">Q.ID</th>
+                            <th className="text-left p-2">Correct</th>
+                            <th className="text-left p-2">Your Ans</th>
+                            <th className="text-left p-2">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {result.details.map((d, i) => (
+                            <tr key={i} className="border-t">
+                              <td className="p-2 font-mono">{d.question_id}</td>
+                              <td className="p-2 font-mono">{d.correct_answer}</td>
+                              <td className="p-2 font-mono">{d.user_answer || '—'}</td>
+                              <td className="p-2">
+                                {d.status === 'correct' && <span className="text-green-600 font-semibold">✓ Correct</span>}
+                                {d.status === 'wrong' && <span className="text-red-500 font-semibold">✗ Wrong</span>}
+                                {d.status === 'unattempted' && <span className="text-gray-500">— Skipped</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </details>
+                )}
               </CardContent>
             </Card>
 

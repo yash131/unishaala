@@ -69,103 +69,240 @@ function normalizeAnswer(a) {
   return v;
 }
 
-// Parse response sheet HTML and extract { question_id: selected_answer } map.
-// Supports common GATE-style formats. Resilient to markup variations.
+// Parse response sheet HTML and extract answers.
+// Supports TCS iON / digialm GATE response sheet format (the most common),
+// plus generic label-based and table-based formats.
+// Returns: {
+//   byId:    { "70724130152": "C", ... }  // keyed on internal Question ID
+//   byIndex: { "1": "C", "2": "--", ... } // keyed on sequential 1-based index
+//   natById: { "70724130160": "12.5", ... } // numeric NAT answers by id
+//   natByIndex: { "5": "12.5", ... }
+// }
 function parseResponseSheetHTML(html) {
-  if (!html || typeof html !== 'string') return {};
-  const answers = {};
+  const result = { byId: {}, byIndex: {}, natById: {}, natByIndex: {}, errorPage: false, totalFound: 0 };
+  if (!html || typeof html !== 'string') return result;
 
-  // Strip scripts/styles
-  let h = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
+  // Strip scripts/styles/comments
+  let h = html
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ');
 
-  // Approach 1: label-based "Question Number/ID: X" & "Chosen Option/Answer: Y" in same block
-  // Convert HTML to tagless text preserving order
-  const text = h.replace(/<\/(tr|div|p|li|section)[^>]*>/gi, '\n').replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
-  // Try block regex: sliding window
-  const qRegex = /(?:Question\s*(?:Number|No\.?|ID)|Q\.?\s*No\.?|Q\.?\s*ID)\s*[:\-]?\s*([A-Za-z0-9]+)[\s\S]{0,400}?(?:Chosen\s*Option|Option\s*Chosen|Answer\s*Chosen|Candidate\s*Answer|Chosen\s*Answer|Chosen\s*Response|Selected\s*Option|Your\s*Answer|Response|Answer)\s*[:\-]?\s*([A-Za-z0-9,\-\s\.]{0,30}?)(?=\s*(?:Section|Question\s*Type|Correct|Marks|Status|Q\.?\s*No|Question\s*Number|Question\s*ID|$))/gi;
+  // Detect common "error page" responses from TCS iON / digialm when accessed server-side
+  if (/<title>\s*Error Page\s*<\/title>/i.test(h) ||
+      /Something went wrong\s*\.?\s*We&#39;re Sorry/i.test(h) ||
+      /We&rsquo;re Sorry for the Inconvenience/i.test(h) ||
+      /support@tcsion\.com/i.test(h)) {
+    // Check if also no question data present — only then flag as error
+    if (!/Question\s*ID\s*:/i.test(h) && !/Chosen\s*Option\s*:/i.test(h)) {
+      result.errorPage = true;
+      return result;
+    }
+  }
+
+  // ---------- PRIMARY: TCS iON format ----------
+  // Each question has a block containing "Question ID : <id>" and either
+  // "Chosen Option : <n|-->" (MCQ/MSQ) or "Given Answer : <value>" (NAT).
+  // We walk "Question ID : X" occurrences in order and find the nearest
+  // following "Chosen Option" / "Given Answer" before the next "Question ID".
+
+  const textPlain = h.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
+  // Remove tags but keep content order
+  const textStripped = textPlain.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+  // Iterate Question ID matches with lookahead
+  const qidIter = /Question\s*ID\s*[:\-]\s*([0-9A-Za-z]+)/gi;
+  const matches = [];
   let m;
-  while ((m = qRegex.exec(text)) !== null) {
-    const qid = normalizeQid(m[1]);
-    const ans = normalizeAnswer(m[2]);
-    if (qid) answers[qid] = ans;
+  while ((m = qidIter.exec(textStripped)) !== null) {
+    matches.push({ qid: String(m[1]), start: m.index, end: m.index + m[0].length });
   }
 
-  // Approach 2: table-row parse. Extract rows and look for [qid, ..., chosen] columns
-  if (Object.keys(answers).length === 0) {
-    // Gather <tr>...</tr> rows
-    const rows = h.match(/<tr[\s\S]*?<\/tr>/gi) || [];
-    // First, try to find a header row to identify column indexes
-    let qIdx = -1, chosenIdx = -1;
+  if (matches.length > 0) {
+    let idx = 0;
+    for (let i = 0; i < matches.length; i++) {
+      idx += 1;
+      const cur = matches[i];
+      const next = matches[i + 1];
+      const segment = textStripped.slice(cur.end, next ? next.start : textStripped.length);
+
+      // Look for "Chosen Option : X" first (MCQ/MSQ)
+      const coMatch = segment.match(/Chosen\s*Option\s*[:\-]\s*([0-9A-Za-z,\-]+)/i);
+      // NAT types often have "Given Answer :" with numeric text
+      const gaMatch = segment.match(/Given\s*Answer\s*[:\-]\s*([0-9A-Za-z,\.\-\+\s]+?)(?=\s*(?:Question\s*ID|Status|Option\s*1\s*ID|$))/i);
+
+      let answerRaw = null;
+      let isNat = false;
+      if (coMatch) {
+        answerRaw = coMatch[1].trim();
+        // TCS iON: "--" means not attempted
+        if (/^-+$/.test(answerRaw) || answerRaw === '') answerRaw = '';
+      } else if (gaMatch) {
+        answerRaw = gaMatch[1].trim();
+        isNat = true;
+      }
+
+      if (answerRaw !== null) {
+        const seqKey = String(idx);
+        const answer = isNat ? answerRaw : normalizeAnswer(answerRaw);
+
+        result.byId[cur.qid] = answer;
+        result.byIndex[seqKey] = answer;
+        if (isNat) {
+          result.natById[cur.qid] = answer;
+          result.natByIndex[seqKey] = answer;
+        }
+        result.totalFound++;
+      } else {
+        // Still record sequential so we know question exists but unattempted
+        const seqKey = String(idx);
+        result.byId[cur.qid] = '';
+        result.byIndex[seqKey] = '';
+        result.totalFound++;
+      }
+    }
+    return result;
+  }
+
+  // ---------- FALLBACK 1: label-based (no "Question ID") ----------
+  // Match patterns like "Q.No: 1 ... Chosen Option: A"
+  const qnoIter = /(?:Question\s*(?:Number|No\.?)|Q\.?\s*No\.?)\s*[:\-]?\s*([0-9]+)/gi;
+  const qMatches = [];
+  let mm;
+  while ((mm = qnoIter.exec(textStripped)) !== null) {
+    qMatches.push({ qnum: String(mm[1]), start: mm.index, end: mm.index + mm[0].length });
+  }
+  if (qMatches.length > 0) {
+    for (let i = 0; i < qMatches.length; i++) {
+      const cur = qMatches[i];
+      const next = qMatches[i + 1];
+      const segment = textStripped.slice(cur.end, next ? next.start : textStripped.length);
+      const coMatch = segment.match(/(?:Chosen\s*Option|Selected\s*Option|Chosen\s*Answer|Your\s*Answer|Response|Answer)\s*[:\-]\s*([A-Za-z0-9,\-]+)/i);
+      if (coMatch) {
+        const ans = normalizeAnswer(coMatch[1].trim());
+        result.byIndex[cur.qnum] = ans;
+        result.totalFound++;
+      }
+    }
+    if (result.totalFound > 0) return result;
+  }
+
+  // ---------- FALLBACK 2: table row format ----------
+  const rows = h.match(/<tr[\s\S]*?<\/tr>/gi) || [];
+  let qIdx = -1, chosenIdx = -1;
+  for (const row of rows) {
+    const cells = (row.match(/<t[hd][\s\S]*?<\/t[hd]>/gi) || [])
+      .map(c => c.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim());
+    if (!cells.length) continue;
+    const lower = cells.map(c => c.toLowerCase());
+    const qi = lower.findIndex(c => /^q(\.|\s)?\s*(no|num|id)\b|^question\s*(number|no|id)/i.test(c));
+    const ci = lower.findIndex(c => /chosen|selected|candidate\s*answer|your\s*answer|^response$|given\s*answer/i.test(c));
+    if (qi !== -1 && ci !== -1) { qIdx = qi; chosenIdx = ci; break; }
+  }
+  if (qIdx !== -1 && chosenIdx !== -1) {
+    let seq = 0;
     for (const row of rows) {
-      const cells = (row.match(/<t[hd][\s\S]*?<\/t[hd]>/gi) || []).map(c => c.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim());
-      if (!cells.length) continue;
-      const lower = cells.map(c => c.toLowerCase());
-      const qi = lower.findIndex(c => /question\s*(number|no|id)|^q\.?\s*(no|id)/i.test(c) || c === 'q.no' || c === 'q no');
-      const ci = lower.findIndex(c => /chosen|selected|candidate\s*answer|your\s*answer|response|given\s*answer/.test(c));
-      if (qi !== -1 && ci !== -1) {
-        qIdx = qi; chosenIdx = ci;
-        break;
+      const cells = (row.match(/<t[hd][\s\S]*?<\/t[hd]>/gi) || [])
+        .map(c => c.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim());
+      if (cells.length <= Math.max(qIdx, chosenIdx)) continue;
+      if (/question/i.test(cells[qIdx]) && /chosen|selected/i.test(cells[chosenIdx])) continue;
+      const rawQ = cells[qIdx];
+      const ans = normalizeAnswer(cells[chosenIdx]);
+      seq += 1;
+      // If it's a pure number, use as index; otherwise store as internal id
+      if (/^[0-9]+$/.test(rawQ)) {
+        result.byIndex[rawQ] = ans;
+      } else {
+        result.byId[rawQ] = ans;
+        result.byIndex[String(seq)] = ans;
       }
-    }
-    if (qIdx !== -1 && chosenIdx !== -1) {
-      for (const row of rows) {
-        const cells = (row.match(/<t[hd][\s\S]*?<\/t[hd]>/gi) || []).map(c => c.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim());
-        if (cells.length <= Math.max(qIdx, chosenIdx)) continue;
-        // Skip header
-        if (/question/i.test(cells[qIdx]) && /chosen|selected/i.test(cells[chosenIdx])) continue;
-        const qid = normalizeQid(cells[qIdx]);
-        const ans = normalizeAnswer(cells[chosenIdx]);
-        if (qid && /^\d+$/.test(qid)) answers[qid] = ans;
-      }
+      result.totalFound++;
     }
   }
 
-  return answers;
+  return result;
 }
 
 // Parse simple user-typed answers like "1:A, 2:B, 3:--" or "Q1=A, Q2=C"
+// Returns same shape as parseResponseSheetHTML for consistent matching.
 function parseSimpleAnswers(text) {
-  if (!text || typeof text !== 'string') return {};
-  const out = {};
+  const result = { byId: {}, byIndex: {}, natById: {}, natByIndex: {}, errorPage: false, totalFound: 0 };
+  if (!text || typeof text !== 'string') return result;
   const parts = text.split(/[\n,;]+/);
   for (const p of parts) {
-    const m = p.match(/^\s*Q?\.?\s*(\d+)\s*[:=\-]\s*(.+?)\s*$/i);
+    const m = p.match(/^\s*Q?\.?\s*([A-Za-z0-9]+)\s*[:=\-]\s*(.*?)\s*$/i);
     if (m) {
-      out[normalizeQid(m[1])] = normalizeAnswer(m[2]);
+      const raw = m[1];
+      const ans = normalizeAnswer(m[2]);
+      if (/^[0-9]+$/.test(raw)) {
+        result.byIndex[raw] = ans;
+      } else {
+        result.byId[raw] = ans;
+      }
+      result.totalFound++;
     }
   }
-  return out;
+  return result;
 }
 
-// Evaluate user answers against the answer key
-function evaluateAnswers(userAnswers, answerKey, positiveMarks, negativeMarks) {
+// Evaluate extracted answers (object with byId/byIndex) against the answer key.
+// CSV keys can be numeric ("1", "2") which match byIndex, or long/internal IDs which match byId.
+function evaluateAnswers(extracted, answerKey, positiveMarks, negativeMarks) {
   const pos = Number(positiveMarks) || 0;
   const neg = Number(negativeMarks) || 0;
   let correct = 0, wrong = 0, unattempted = 0, marks = 0;
+  const details = []; // per-question breakdown for debugging
 
-  for (const item of answerKey.answers || []) {
-    const qid = normalizeQid(item.question_id);
+  const byId = extracted?.byId || {};
+  const byIndex = extracted?.byIndex || {};
+
+  const keyAnswers = answerKey.answers || [];
+  for (let i = 0; i < keyAnswers.length; i++) {
+    const item = keyAnswers[i];
+    const qidNorm = normalizeQid(item.question_id);         // "Q1" -> "1", "70724130152" stays
     const correctAns = normalizeAnswer(item.correct_answer);
-    const userAns = userAnswers[qid];
+
+    // Try multiple lookups: exact qid, as index, with/without Q prefix
+    let userAns = undefined;
+    if (byId[item.question_id] !== undefined) userAns = byId[item.question_id];
+    else if (byId[qidNorm] !== undefined) userAns = byId[qidNorm];
+    else if (byIndex[qidNorm] !== undefined) userAns = byIndex[qidNorm];
+    else if (byIndex[String(i + 1)] !== undefined && /^[0-9]+$/.test(qidNorm) && qidNorm === String(i + 1)) userAns = byIndex[String(i + 1)];
+
+    // If still nothing, try by position index (i+1)
+    if (userAns === undefined) {
+      userAns = byIndex[String(i + 1)];
+    }
+
+    let status;
     if (userAns === undefined || userAns === null || userAns === '') {
       unattempted++;
-      continue;
-    }
-    if (String(userAns).toUpperCase() === String(correctAns).toUpperCase()) {
+      status = 'unattempted';
+    } else if (String(userAns).toUpperCase() === String(correctAns).toUpperCase()) {
       correct++;
       marks += pos;
+      status = 'correct';
     } else {
       wrong++;
       marks -= neg;
+      status = 'wrong';
     }
+
+    details.push({
+      question_id: item.question_id,
+      correct_answer: correctAns,
+      user_answer: userAns === undefined ? null : userAns,
+      status
+    });
   }
 
-  const totalQuestions = (answerKey.answers || []).length;
+  const totalQuestions = keyAnswers.length;
   const attempted = correct + wrong;
   const maxMarks = +(totalQuestions * pos).toFixed(2);
   marks = +marks.toFixed(2);
-  return { correct, wrong, unattempted, attempted, marks, totalQuestions, maxMarks };
+  return { correct, wrong, unattempted, attempted, marks, totalQuestions, maxMarks, details };
 }
+
 
 
 // Helper function to check ICICI transaction status via Command API
@@ -1505,47 +1642,71 @@ export async function POST(request) {
         }
 
         // Gather user answers: priority manualAnswers -> responseHtml -> responseUrl
-        let userAnswers = {};
+        // extracted will be: { byId, byIndex, natById, natByIndex, errorPage, totalFound }
+        let extracted = { byId: {}, byIndex: {}, natById: {}, natByIndex: {}, errorPage: false, totalFound: 0 };
         let source = 'manual';
 
-        if (manualAnswers && typeof manualAnswers === 'object' && Object.keys(manualAnswers).length > 0) {
+        if (manualAnswers && typeof manualAnswers === 'object' && !Array.isArray(manualAnswers) && Object.keys(manualAnswers).length > 0) {
           for (const [k, v] of Object.entries(manualAnswers)) {
-            userAnswers[normalizeQid(k)] = normalizeAnswer(v);
+            const qkey = normalizeQid(k);
+            const ans = normalizeAnswer(v);
+            if (/^[0-9]+$/.test(qkey)) extracted.byIndex[qkey] = ans;
+            else extracted.byId[qkey] = ans;
+            extracted.totalFound++;
           }
           source = 'manual';
         } else if (manualAnswers && typeof manualAnswers === 'string') {
-          userAnswers = parseSimpleAnswers(manualAnswers);
+          extracted = parseSimpleAnswers(manualAnswers);
           source = 'manual-text';
         } else if (responseHtml) {
-          userAnswers = parseResponseSheetHTML(responseHtml);
+          extracted = parseResponseSheetHTML(responseHtml);
           source = 'html-upload';
+          if (extracted.errorPage) {
+            return jsonResponse({
+              success: false,
+              error: 'The uploaded HTML looks like an error page — not a real response sheet. Please re-save the response sheet from your browser and upload again.'
+            }, 400);
+          }
         } else if (responseUrl) {
           try {
             const res = await fetch(responseUrl, {
-              headers: { 'User-Agent': 'Mozilla/5.0 (compatible; UnishaalaRankBot/1.0)' },
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9'
+              },
               redirect: 'follow'
             });
             if (!res.ok) {
-              return jsonResponse({ success: false, error: `Could not fetch response sheet URL (status ${res.status}). Try downloading and uploading the HTML file instead.` }, 400);
+              return jsonResponse({ success: false, error: `Could not fetch response sheet URL (HTTP ${res.status}). Please download the page from your browser (Ctrl+S) and use "Upload HTML" instead.` }, 400);
             }
             const html = await res.text();
-            userAnswers = parseResponseSheetHTML(html);
+            extracted = parseResponseSheetHTML(html);
             source = 'url';
+            if (extracted.errorPage) {
+              return jsonResponse({
+                success: false,
+                error: 'The response sheet URL returned an error page (likely geo-restricted or session-protected). Please open the URL in your browser, save the page (Ctrl+S), and use "Upload HTML" mode instead.'
+              }, 400);
+            }
           } catch (e) {
-            return jsonResponse({ success: false, error: 'Could not fetch response sheet URL. It may require login — please save the page and upload the HTML file.' }, 400);
+            return jsonResponse({ success: false, error: 'Could not fetch the response sheet URL. It may require login — please save the page and upload the HTML file.' }, 400);
           }
         } else {
           return jsonResponse({ success: false, error: 'Please provide responseHtml, responseUrl, or manualAnswers' }, 400);
         }
 
-        if (Object.keys(userAnswers).length === 0) {
-          return jsonResponse({ success: false, error: 'Could not extract any answers from the response sheet. Please check the format.' }, 400);
+        if (extracted.totalFound === 0) {
+          return jsonResponse({
+            success: false,
+            error: 'Could not extract any answers from the response sheet. The format may not be recognized. Please try Manual Entry mode or contact support.'
+          }, 400);
         }
 
         // Evaluate
-        const result = evaluateAnswers(userAnswers, key, key.positiveMarks ?? 1, key.negativeMarks ?? 0);
+        const result = evaluateAnswers(extracted, key, key.positiveMarks ?? 1, key.negativeMarks ?? 0);
 
-        // Store submission (upsert by email+answerKey to keep latest score)
+        // Store submission (remove previous by same email+key)
         const user = await getAuthUser(request);
         const predictionsCol = await getCollection('rank_predictions');
         const normCategory = (category || 'General').trim();
@@ -1566,12 +1727,12 @@ export async function POST(request) {
           marks: result.marks,
           maxMarks: result.maxMarks,
           percentage: result.maxMarks ? +((result.marks / result.maxMarks) * 100).toFixed(2) : 0,
-          userAnswers,
+          userAnswersById: extracted.byId,
+          userAnswersByIndex: extracted.byIndex,
           source,
           createdAt: new Date()
         };
 
-        // Remove previous submissions of same email for this key so ranking is per-user latest attempt
         await predictionsCol.deleteMany({ answerKeyId, email: submission.email });
         await predictionsCol.insertOne(submission);
 
@@ -1606,7 +1767,9 @@ export async function POST(request) {
             categoryTotal,
             totalParticipants,
             percentile,
-            extractedAnswerCount: Object.keys(userAnswers).length
+            extractedAnswerCount: extracted.totalFound,
+            source,
+            details: result.details
           }
         });
       } catch (e) {
