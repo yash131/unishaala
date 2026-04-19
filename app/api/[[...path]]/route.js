@@ -70,13 +70,7 @@ function normalizeAnswer(a) {
 }
 
 // Parse response sheet HTML and extract per-question details.
-// Returns:
-//   { byId: { <qid>: {type, status, answer} },
-//     byIndex: { <1-based-idx>: {type, status, answer} },
-//     errorPage, totalFound }
-// - type: 'MCQ' | 'MSQ' | 'NAT' | '' (unknown)
-// - status: 'Answered' | 'Not Answered' | '' (unknown)
-// - answer: normalized (A/B/C/D or "B,D" for MSQ or numeric string for NAT) — "" when unattempted
+// Works on HTML table structure directly (label <td> → value <td> pairs).
 function parseResponseSheetHTML(html) {
   const result = { byId: {}, byIndex: {}, errorPage: false, totalFound: 0 };
   if (!html || typeof html !== 'string') return result;
@@ -97,85 +91,106 @@ function parseResponseSheetHTML(html) {
     }
   }
 
-  const textPlain = h.replace(/&nbsp;/g, ' ').replace(/[\u200B-\u200F\uFEFF]/g, '').replace(/\s+/g, ' ');
-  const text = textPlain.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  // Helper: strip tags and zero-width chars from a fragment
+  const stripTags = (s) => String(s || '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/[\u200B-\u200F\uFEFF]/g, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
-  // PRIMARY: TCS iON format — "Question ID" followed by ":" and the numeric id.
-  // Accept optional whitespace, nbsp, zero-width chars inside the ID (trimmed by regex).
-  const qidIter = /Question\s*ID\s*[:\-]\s*([0-9A-Za-z][0-9A-Za-z\s\-]*?)(?=\s*(?:Option\s*[0-9]\s*ID|Correct\s*Option|Question\s*Type|Status|Chosen|Given|<|$))/gi;
-  const matches = [];
-  let m;
-  while ((m = qidIter.exec(text)) !== null) {
-    // Clean the ID: keep only alphanumerics
-    const rawId = m[1].replace(/[^0-9A-Za-z]/g, '');
-    if (rawId) {
-      matches.push({ qid: String(rawId), start: m.index, end: m.index + m[0].length });
-    }
+  // ---------- PRIMARY: TCS iON HTML table structure ----------
+  // Extract all <td>...</td> cells in document order, pair them as (label, value).
+  // TCS iON always has "Label :" in one td and the value in the NEXT td.
+  const tdIter = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+  const tds = [];
+  let tm;
+  while ((tm = tdIter.exec(h)) !== null) {
+    tds.push(stripTags(tm[1]));
   }
 
-  if (matches.length > 0) {
-    for (let i = 0; i < matches.length; i++) {
-      const cur = matches[i];
-      const next = matches[i + 1];
-      const segment = text.slice(cur.end, next ? next.start : text.length);
-      const idx = i + 1;
+  if (tds.length > 0) {
+    // Walk through cells. Each question is a block starting with "Question ID :" label.
+    let currentQid = null;
+    let currentType = '';
+    let currentStatus = '';
+    let currentChosen = '';
+    let currentGiven = '';
+    let idx = 0;
 
-      // Question Type
-      let qType = '';
-      const typeMatch = segment.match(/Question\s*Type\s*[:\-]\s*([A-Za-z]+)/i);
-      if (typeMatch) {
-        const t = typeMatch[1].toUpperCase();
-        if (t === 'MCQ' || t === 'MSQ' || t === 'NAT' || t === 'SA') qType = t === 'SA' ? 'NAT' : t;
-      }
-
-      // Status
-      let status = '';
-      const statusMatch = segment.match(/Status\s*[:\-]\s*([A-Za-z\s]+?)(?=\s*(?:Chosen\s*Option|Given\s*Answer|Option\s*1\s*ID|Question\s*ID|Mark\s*Allotted|Question\s*Type|$))/i);
-      if (statusMatch) {
-        const s = statusMatch[1].trim();
-        if (/not\s*answered/i.test(s) || /not\s*attempted/i.test(s)) status = 'Not Answered';
-        else if (/answered/i.test(s)) status = 'Answered';
-        else status = s;
-      }
-
-      // Chosen Option (MCQ/MSQ)
-      const coMatch = segment.match(/Chosen\s*Option\s*[:\-]\s*([0-9A-Za-z,\-\s]+?)(?=\s*(?:Question\s*ID|Given\s*Answer|Status|Option\s*1\s*ID|Correct\s*Answer|Mark|$))/i);
-      // Given Answer (NAT)
-      const gaMatch = segment.match(/Given\s*Answer\s*[:\-]\s*([0-9A-Za-z,\.\-\+\s]+?)(?=\s*(?:Question\s*ID|Status|Option\s*1\s*ID|Correct\s*Answer|Mark|$))/i);
-
+    const flushCurrent = () => {
+      if (!currentQid) return;
+      idx += 1;
       let answer = '';
-      let effType = qType;
+      let effType = currentType;
 
-      if (gaMatch && gaMatch[1].trim()) {
-        answer = gaMatch[1].trim();
+      // Prefer Given Answer (NAT) over Chosen Option when both present
+      if (currentGiven && !/^-+$/.test(currentGiven.trim())) {
+        answer = currentGiven.trim();
         if (!effType) effType = 'NAT';
-      } else if (coMatch) {
-        const raw = coMatch[1].trim();
-        if (raw && !/^-+$/.test(raw)) {
-          // For MSQ: "1,3" -> "A,C"; for MCQ: "3" -> "C"
-          const isMulti = /,/.test(raw);
-          if (isMulti) {
-            answer = raw.split(',').map(x => normalizeAnswer(x.trim())).filter(Boolean).sort().join(',');
-            if (!effType) effType = 'MSQ';
-          } else {
-            answer = normalizeAnswer(raw);
-            if (!effType) effType = 'MCQ';
-          }
+      } else if (currentChosen && !/^-+$/.test(currentChosen.trim())) {
+        const raw = currentChosen.trim();
+        const isMulti = /[,;|]/.test(raw);
+        if (isMulti) {
+          answer = raw.split(/[,;|]/).map(x => normalizeAnswer(x.trim())).filter(Boolean).sort().join(',');
+          if (!effType) effType = 'MSQ';
+        } else {
+          answer = normalizeAnswer(raw);
+          if (!effType) effType = 'MCQ';
         }
       }
 
-      // If status explicitly says Not Answered, wipe the answer
-      if (status === 'Not Answered') answer = '';
+      if (currentStatus === 'Not Answered') answer = '';
 
-      const entry = { type: effType || '', status: status || (answer ? 'Answered' : 'Not Answered'), answer };
-      result.byId[cur.qid] = entry;
+      const entry = {
+        type: effType || '',
+        status: currentStatus || (answer ? 'Answered' : 'Not Answered'),
+        answer
+      };
+      result.byId[currentQid] = entry;
       result.byIndex[String(idx)] = entry;
       result.totalFound++;
+    };
+
+    for (let i = 0; i < tds.length - 1; i++) {
+      const label = tds[i];
+      const value = tds[i + 1] || '';
+
+      // Normalize label (remove trailing ":" and lowercase for comparison)
+      const labelLower = label.toLowerCase().replace(/\s*:\s*$/, '').trim();
+
+      if (labelLower === 'question id' || /^question\s*id$/i.test(labelLower)) {
+        // flush previous question, start new
+        flushCurrent();
+        currentQid = String(value).replace(/[^0-9A-Za-z]/g, '');
+        currentType = '';
+        currentStatus = '';
+        currentChosen = '';
+        currentGiven = '';
+      } else if (/^question\s*type$/i.test(labelLower)) {
+        const t = String(value).trim().toUpperCase();
+        if (t === 'MCQ' || t === 'MSQ' || t === 'NAT' || t === 'SA') currentType = t === 'SA' ? 'NAT' : t;
+      } else if (labelLower === 'status') {
+        const s = String(value).trim();
+        if (/not\s*answered/i.test(s) || /not\s*attempted/i.test(s)) currentStatus = 'Not Answered';
+        else if (/answered/i.test(s)) currentStatus = 'Answered';
+      } else if (/^chosen\s*option$/i.test(labelLower)) {
+        currentChosen = String(value).trim();
+      } else if (/^given\s*answer$/i.test(labelLower)) {
+        currentGiven = String(value).trim();
+      }
     }
-    return result;
+    // flush the last one
+    flushCurrent();
+
+    if (result.totalFound > 0) return result;
   }
 
-  // FALLBACK: label-based (no "Question ID")
+  // ---------- FALLBACK: regex on stripped text (for non-tabular formats) ----------
+  const textPlain = h.replace(/&nbsp;/g, ' ').replace(/[\u200B-\u200F\uFEFF]/g, '').replace(/\s+/g, ' ');
+  const text = textPlain.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+
+  // Label-based: "Q.No: 1 ... Chosen Option: A"
   const qnoIter = /(?:Question\s*(?:Number|No\.?)|Q\.?\s*No\.?)\s*[:\-]?\s*([0-9]+)/gi;
   const qMatches = [];
   let mm;
@@ -197,11 +212,9 @@ function parseResponseSheetHTML(html) {
             answer = raw.toUpperCase().split(',').map(x => x.trim()).sort().join(',');
             type = 'MSQ';
           } else if (/^-?\d+(\.\d+)?$/.test(raw)) {
-            answer = raw;
-            type = 'NAT';
+            answer = raw; type = 'NAT';
           } else {
-            answer = normalizeAnswer(raw);
-            type = 'MCQ';
+            answer = normalizeAnswer(raw); type = 'MCQ';
           }
         }
         const entry = { type, status: answer ? 'Answered' : 'Not Answered', answer };
@@ -209,7 +222,6 @@ function parseResponseSheetHTML(html) {
         result.totalFound++;
       }
     }
-    if (result.totalFound > 0) return result;
   }
 
   return result;
