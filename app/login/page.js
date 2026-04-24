@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,16 @@ import { toast } from 'sonner';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams?.get('next') || '';
+
+  // Validate that next is a safe internal path and not the landing page
+  const safeNext = (() => {
+    if (!nextUrl) return '';
+    if (!nextUrl.startsWith('/') || nextUrl.startsWith('//')) return '';
+    return nextUrl;
+  })();
+
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -28,11 +38,13 @@ export default function LoginPage() {
       const userData = JSON.parse(user);
       if (userData.role === 'SUPER_ADMIN' || userData.role === 'ADMIN') {
         router.push('/admin');
+      } else if (safeNext) {
+        router.push(safeNext);
       } else {
         router.push('/');
       }
     }
-  }, [router]);
+  }, [router, safeNext]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -50,9 +62,14 @@ export default function LoginPage() {
       if (result.success) {
         toast.success('Login successful!');
         localStorage.setItem('user', JSON.stringify(result.data.user));
-        
+
         if (result.data.user.role === 'SUPER_ADMIN' || result.data.user.role === 'ADMIN') {
           router.push('/admin');
+        } else if (result.data.user.phoneVerified !== true) {
+          // Need to verify phone first — land on home with verify-phone banner
+          router.push(`/?auth=verify-phone${safeNext ? `&next=${encodeURIComponent(safeNext)}` : ''}`);
+        } else if (safeNext) {
+          router.push(safeNext);
         } else {
           router.push('/');
         }

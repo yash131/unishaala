@@ -1507,7 +1507,7 @@ export async function POST(request) {
         { $set: { isVerified: true, otp: null, otpExpiry: null } }
       );
 
-      const token = createToken({ userId: user.id, email: user.email, role: user.role });
+      const token = createToken({ userId: user.id, email: user.email, role: user.role, phoneVerified: user.phoneVerified === true });
       
       const response = jsonResponse({
         success: true,
@@ -1546,7 +1546,7 @@ export async function POST(request) {
         return jsonResponse({ success: false, error: 'Invalid credentials' }, 401);
       }
 
-      const token = createToken({ userId: user.id, email: user.email, role: user.role });
+      const token = createToken({ userId: user.id, email: user.email, role: user.role, phoneVerified: user.phoneVerified === true });
       
       const response = jsonResponse({
         success: true,
@@ -1557,7 +1557,8 @@ export async function POST(request) {
             id: user.id,
             name: user.name,
             email: user.email,
-            role: user.role
+            role: user.role,
+            phoneVerified: user.phoneVerified === true
           }
         }
       });
@@ -1679,11 +1680,27 @@ export async function POST(request) {
         );
         const updated = await users.findOne({ id: currentUser.id });
         const { password, otp, otpExpiry, ...safe } = updated || {};
-        return jsonResponse({
+
+        // Re-issue JWT with phoneVerified:true so middleware sees the updated state
+        const newToken = createToken({
+          userId: updated.id,
+          email: updated.email,
+          role: updated.role,
+          phoneVerified: true
+        });
+        const response = jsonResponse({
           success: true,
           message: 'Phone verified successfully',
           data: safe
         });
+        response.cookies.set('auth_token', newToken, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 7 * 24 * 60 * 60
+        });
+        return response;
       } catch (error) {
         console.error('Phone verify-my-phone error:', error);
         return jsonResponse({ success: false, error: 'Verification failed' }, 400);
@@ -1752,7 +1769,7 @@ export async function POST(request) {
         }
 
         // Create our own token
-        const token = createToken({ userId: user.id, email: user.email, role: user.role });
+        const token = createToken({ userId: user.id, email: user.email, role: user.role, phoneVerified: user.phoneVerified === true });
         
         const response = jsonResponse({
           success: true,
@@ -1764,7 +1781,8 @@ export async function POST(request) {
               name: user.name,
               email: user.email,
               role: user.role,
-              picture: user.picture
+              picture: user.picture,
+              phoneVerified: user.phoneVerified === true
             }
           }
         });

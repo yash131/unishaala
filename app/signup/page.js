@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,9 @@ import { toast } from 'sonner';
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextParam = searchParams?.get('next') || '';
+  const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '';
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -130,7 +133,7 @@ export default function SignupPage() {
 
       if (signupResult.success) {
         toast.success('Account created successfully! Please login.');
-        router.push('/login');
+        router.push(`/login${safeNext ? `?next=${encodeURIComponent(safeNext)}` : ''}`);
       } else {
         toast.error(signupResult.error || 'Signup failed');
       }

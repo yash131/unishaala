@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Logo, LogoIcon } from '@/components/Logo';
 import { MainNavbar } from '@/components/MainNavbar';
+import AccessGateBanner from '@/components/AccessGateBanner';
 import { 
   GraduationCap, 
   FileText, 
@@ -464,8 +465,11 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-teal-600 border-t-transparent"></div>
+      <div className="min-h-screen">
+        <AccessGateBanner />
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-teal-600 border-t-transparent"></div>
+        </div>
       </div>
     );
   }
@@ -473,6 +477,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       <MainNavbar />
+      <AccessGateBanner />
       <HeroSection />
       <ExamNotifications notifications={data.notifications} />
       <PopularExams exams={data.exams} />
