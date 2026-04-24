@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { MainNavbar } from '@/components/MainNavbar';
+import BlogPdfViewer from '@/components/BlogPdfViewer';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -154,6 +155,9 @@ export default function BlogDetailPage() {
                   className="blog-content prose prose-teal max-w-none"
                   dangerouslySetInnerHTML={{ __html: blog.content || '' }}
                 />
+
+                {/* PDF Attachment (if any) */}
+                {blog.pdfFileId && <BlogPdfViewer blog={blog} />}
               </CardContent>
             </Card>
 

@@ -110,12 +110,16 @@ function parseResponseSheetHTML(html) {
   }
 
   if (tds.length > 0) {
-    // Walk through cells. Each question is a block starting with "Question ID :" label.
+    // Walk through cells. Note: TCS iON layout quirk —
+    //   * For MCQ/MSQ: Chosen Option appears AFTER Question ID (same block)
+    //   * For NAT:     Given Answer appears BEFORE Question ID (left-side row)
+    // We buffer Given Answer and apply it to the NEXT question block.
     let currentQid = null;
     let currentType = '';
     let currentStatus = '';
     let currentChosen = '';
     let currentGiven = '';
+    let pendingGiven = ''; // Given Answer seen before the next Question ID
     let idx = 0;
 
     const flushCurrent = () => {
@@ -155,8 +159,6 @@ function parseResponseSheetHTML(html) {
     for (let i = 0; i < tds.length - 1; i++) {
       const label = tds[i];
       const value = tds[i + 1] || '';
-
-      // Normalize label (remove trailing ":" and lowercase for comparison)
       const labelLower = label.toLowerCase().replace(/\s*:\s*$/, '').trim();
 
       if (labelLower === 'question id' || /^question\s*id$/i.test(labelLower)) {
@@ -166,7 +168,9 @@ function parseResponseSheetHTML(html) {
         currentType = '';
         currentStatus = '';
         currentChosen = '';
-        currentGiven = '';
+        // Apply any Given Answer that appeared BEFORE this Question ID (NAT layout)
+        currentGiven = pendingGiven || '';
+        pendingGiven = '';
       } else if (/^question\s*type$/i.test(labelLower)) {
         const t = String(value).trim().toUpperCase();
         if (t === 'MCQ' || t === 'MSQ' || t === 'NAT' || t === 'SA') currentType = t === 'SA' ? 'NAT' : t;
@@ -175,9 +179,18 @@ function parseResponseSheetHTML(html) {
         if (/not\s*answered/i.test(s) || /not\s*attempted/i.test(s)) currentStatus = 'Not Answered';
         else if (/answered/i.test(s)) currentStatus = 'Answered';
       } else if (/^chosen\s*option$/i.test(labelLower)) {
+        // Always post-Question-ID
         currentChosen = String(value).trim();
       } else if (/^given\s*answer$/i.test(labelLower)) {
-        currentGiven = String(value).trim();
+        // NAT: Given Answer may appear BEFORE Question ID. Buffer until a Question ID is seen.
+        if (!currentQid) {
+          pendingGiven = String(value).trim();
+        } else {
+          // If we already have a Question ID set (layout variant), apply directly.
+          // But for TCS iON, this usually means the Given Answer is for the NEXT question
+          // whose Question ID hasn't been reached yet — buffer it.
+          pendingGiven = String(value).trim();
+        }
       }
     }
     // flush the last one
@@ -488,6 +501,16 @@ export async function GET(request) {
 
   try {
     await connectToDatabase();
+
+    // Current authenticated user — useful for client-side gating (phone verification, PDF access, etc.)
+    if (path === '/auth/me') {
+      const user = await getAuthUser(request);
+      if (!user) {
+        return jsonResponse({ success: false, error: 'Not authenticated' }, 401);
+      }
+      const { password, otp, otpExpiry, ...safeUser } = user;
+      return jsonResponse({ success: true, data: safeUser });
+    }
 
     // Home page data
     if (path === '/home' || path === '/') {
@@ -1616,6 +1639,53 @@ export async function POST(request) {
         }
       } catch (error) {
         console.error('Twilio verification error:', error);
+        return jsonResponse({ success: false, error: 'Verification failed' }, 400);
+      }
+    }
+
+    // Verify phone for the currently logged-in user and persist phoneVerified=true on their profile.
+    // Used for gating protected content (e.g., full PDF view / download).
+    if (path === '/auth/verify-my-phone') {
+      const currentUser = await getAuthUser(request);
+      if (!currentUser) {
+        return jsonResponse({ success: false, error: 'Login required' }, 401);
+      }
+
+      const { phone, code } = body;
+      const targetPhone = (phone || currentUser.phone || '').toString().trim();
+      if (!targetPhone || !code) {
+        return jsonResponse({ success: false, error: 'Phone and OTP code are required' }, 400);
+      }
+
+      try {
+        const twilio = require('twilio');
+        const client = twilio(
+          process.env.TWILIO_ACCOUNT_SID,
+          process.env.TWILIO_AUTH_TOKEN
+        );
+
+        const check = await client.verify.v2
+          .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+          .verificationChecks.create({ to: targetPhone, code });
+
+        if (check.status !== 'approved') {
+          return jsonResponse({ success: false, error: 'Invalid OTP' }, 400);
+        }
+
+        const users = await getCollection('users');
+        await users.updateOne(
+          { id: currentUser.id },
+          { $set: { phone: targetPhone, phoneVerified: true, updatedAt: new Date() } }
+        );
+        const updated = await users.findOne({ id: currentUser.id });
+        const { password, otp, otpExpiry, ...safe } = updated || {};
+        return jsonResponse({
+          success: true,
+          message: 'Phone verified successfully',
+          data: safe
+        });
+      } catch (error) {
+        console.error('Phone verify-my-phone error:', error);
         return jsonResponse({ success: false, error: 'Verification failed' }, 400);
       }
     }
@@ -3782,7 +3852,7 @@ export async function PUT(request) {
         const blogId = path.split('/admin/blogs/')[1];
         const blogs = await getCollection('blogs');
 
-        const { title, description, content, image, publishDate, status } = body;
+        const { title, description, content, image, publishDate, status, pdfPermission } = body;
         const updateData = { updatedAt: new Date() };
 
         if (title !== undefined) {
@@ -3801,6 +3871,12 @@ export async function PUT(request) {
         if (image !== undefined) updateData.image = image;
         if (publishDate !== undefined) updateData.publishDate = new Date(publishDate);
         if (status !== undefined) updateData.status = status;
+        if (pdfPermission !== undefined) {
+          // Only allow two values; anything else ignored
+          if (pdfPermission === 'view' || pdfPermission === 'view_download') {
+            updateData.pdfPermission = pdfPermission;
+          }
+        }
 
         const result = await blogs.updateOne({ id: blogId }, { $set: updateData });
         if (result.matchedCount === 0) {
@@ -3845,6 +3921,24 @@ export async function DELETE(request) {
     if (path.startsWith('/admin/blogs/')) {
       const blogId = path.split('/admin/blogs/')[1];
       const blogs = await getCollection('blogs');
+      const blog = await blogs.findOne({ id: blogId });
+
+      // Clean up any GridFS PDF files associated with this blog
+      if (blog && (blog.pdfFileId || blog.pdfPreviewFileId)) {
+        try {
+          const { ObjectId } = require('mongodb');
+          const { getPdfBucket } = require('@/lib/db');
+          const bucket = await getPdfBucket('pdfs');
+          for (const fid of [blog.pdfFileId, blog.pdfPreviewFileId]) {
+            if (fid) {
+              try { await bucket.delete(new ObjectId(fid)); } catch (_) {}
+            }
+          }
+        } catch (e) {
+          console.error('PDF cleanup error on blog delete:', e);
+        }
+      }
+
       await blogs.deleteOne({ id: blogId });
       return jsonResponse({ success: true, message: 'Blog deleted' });
     }

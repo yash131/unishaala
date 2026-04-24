@@ -62,7 +62,10 @@ import {
   Mail,
   Phone,
   MapPin,
-  ExternalLink
+  ExternalLink,
+  FileDown,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -2305,9 +2308,11 @@ function BlogsTab() {
     content: '',
     image: '',
     publishDate: '',
-    status: 'draft'
+    status: 'draft',
+    pdfPermission: 'view'
   });
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
 
   const fetchBlogs = async () => {
     setLoading(true);
@@ -2330,7 +2335,8 @@ function BlogsTab() {
       content: '',
       image: '',
       publishDate: new Date().toISOString().slice(0, 10),
-      status: 'draft'
+      status: 'draft',
+      pdfPermission: 'view'
     });
     setEditing(null);
   };
@@ -2348,7 +2354,8 @@ function BlogsTab() {
       content: blog.content || '',
       image: blog.image || '',
       publishDate: blog.publishDate ? new Date(blog.publishDate).toISOString().slice(0, 10) : '',
-      status: blog.status || 'draft'
+      status: blog.status || 'draft',
+      pdfPermission: blog.pdfPermission || 'view'
     });
     setDialogOpen(true);
   };
@@ -2404,7 +2411,8 @@ function BlogsTab() {
         content: form.content,
         image: form.image || null,
         publishDate: form.publishDate || new Date().toISOString(),
-        status: form.status
+        status: form.status,
+        pdfPermission: form.pdfPermission || 'view'
       };
       const url = editing ? `/api/admin/blogs/${editing.id}` : '/api/admin/blogs';
       const method = editing ? 'PUT' : 'POST';
@@ -2417,8 +2425,15 @@ function BlogsTab() {
       const d = await res.json();
       if (d.success) {
         toast.success(editing ? 'Blog updated' : 'Blog created');
-        setDialogOpen(false);
-        resetForm();
+        // If this was a new blog, reopen in edit mode so PDF can be attached
+        if (!editing && d.data) {
+          setEditing(d.data);
+          setForm((p) => ({ ...p, pdfPermission: d.data.pdfPermission || 'view' }));
+          toast.info('You can now attach a PDF to this post', { duration: 4000 });
+        } else {
+          setDialogOpen(false);
+          resetForm();
+        }
         fetchBlogs();
       } else {
         toast.error(d.error || 'Save failed');
@@ -2427,6 +2442,94 @@ function BlogsTab() {
       toast.error('Save failed');
     }
     setSaving(false);
+  };
+
+  // ---- PDF Handlers ----
+  const handlePdfUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!editing?.id) {
+      toast.error('Save the blog first, then attach a PDF.');
+      e.target.value = '';
+      return;
+    }
+    if (!/pdf/i.test(file.type) && !/\.pdf$/i.test(file.name || '')) {
+      toast.error('Please select a PDF file');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('PDF too large (max 25 MB)');
+      e.target.value = '';
+      return;
+    }
+    setUploadingPdf(true);
+    try {
+      const fd = new FormData();
+      fd.append('pdf', file);
+      fd.append('permission', form.pdfPermission || 'view');
+
+      const res = await fetch(`/api/admin/blogs/${editing.id}/upload-pdf`, {
+        method: 'POST',
+        credentials: 'include',
+        body: fd
+      });
+      const d = await res.json();
+      if (d.success) {
+        setEditing(d.data);
+        toast.success('PDF uploaded successfully');
+        fetchBlogs();
+      } else {
+        toast.error(d.error || 'PDF upload failed');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('PDF upload failed');
+    }
+    setUploadingPdf(false);
+    e.target.value = '';
+  };
+
+  const handlePdfRemove = async () => {
+    if (!editing?.id) return;
+    if (!confirm('Remove the attached PDF? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/admin/blogs/${editing.id}/upload-pdf`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const d = await res.json();
+      if (d.success) {
+        setEditing(d.data);
+        toast.success('PDF removed');
+        fetchBlogs();
+      } else {
+        toast.error(d.error || 'Failed to remove PDF');
+      }
+    } catch (e) {
+      toast.error('Failed to remove PDF');
+    }
+  };
+
+  const handlePermissionChange = async (newValue) => {
+    setForm((p) => ({ ...p, pdfPermission: newValue }));
+    // Persist immediately if editing an existing blog with a PDF
+    if (editing?.id && editing?.pdfFileId) {
+      try {
+        const res = await fetch(`/api/admin/blogs/${editing.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ pdfPermission: newValue })
+        });
+        const d = await res.json();
+        if (d.success) {
+          setEditing(d.data);
+          toast.success('PDF permission updated');
+          fetchBlogs();
+        }
+      } catch (e) { /* ignore */ }
+    }
   };
 
   const handleDelete = async (blog) => {
@@ -2551,6 +2654,17 @@ function BlogsTab() {
                     <TableCell>
                       <div className="font-medium text-gray-900 line-clamp-1">{b.title}</div>
                       <div className="text-xs text-gray-500 line-clamp-1">/blogs/{b.slug}</div>
+                      {b.pdfFileId && (
+                        <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-teal-700 bg-teal-50 border border-teal-200 rounded px-1.5 py-0.5">
+                          <FileDown className="w-3 h-3" />
+                          PDF attached
+                          {b.pdfPermission === 'view_download' ? (
+                            <span className="ml-1 text-green-700">• Downloadable</span>
+                          ) : (
+                            <span className="ml-1 text-amber-700">• View only</span>
+                          )}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell>
                       {b.status === 'published' ? (
@@ -2676,6 +2790,123 @@ function BlogsTab() {
                 placeholder="Start writing your blog post..."
               />
             </div>
+
+            {/* ===== PDF ATTACHMENT ===== */}
+            <div className="border rounded-lg p-4 bg-gradient-to-br from-slate-50 to-white">
+              <div className="flex items-center justify-between gap-4 mb-3">
+                <div>
+                  <Label className="flex items-center gap-2 text-base">
+                    <FileDown className="w-4 h-4 text-teal-600" />
+                    PDF Attachment
+                  </Label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Optionally attach a PDF. Users will see only the first page until they
+                    log in and verify their phone number.
+                  </p>
+                </div>
+              </div>
+
+              {!editing?.id ? (
+                <div className="text-sm text-gray-500 bg-amber-50 border border-amber-200 rounded p-3">
+                  Save the blog first — then you can attach a PDF from this dialog.
+                </div>
+              ) : editing?.pdfFileId ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-3 bg-white border rounded-lg">
+                    <div className="w-10 h-10 rounded bg-red-100 text-red-600 flex items-center justify-center">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900 truncate">
+                        {editing.pdfFileName || 'document.pdf'}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {editing.pdfPageCount || 0} page{(editing.pdfPageCount || 0) === 1 ? '' : 's'}
+                        {editing.pdfSize ? ` • ${(editing.pdfSize / 1024 / 1024).toFixed(2)} MB` : ''}
+                      </div>
+                    </div>
+                    <a
+                      href={`/api/pdfs/${editing.pdfPreviewFileId}/preview`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-teal-600 hover:underline flex items-center gap-1"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> Preview
+                    </a>
+                    <label className="cursor-pointer">
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-1 border rounded hover:bg-gray-50">
+                        {uploadingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                        Replace
+                      </span>
+                      <input
+                        type="file"
+                        accept="application/pdf,.pdf"
+                        className="hidden"
+                        onChange={handlePdfUpload}
+                        disabled={uploadingPdf}
+                      />
+                    </label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handlePdfRemove}
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                      disabled={uploadingPdf}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <label className="cursor-pointer flex items-center justify-center gap-2 px-4 py-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-teal-400 hover:bg-teal-50/40 transition-colors">
+                  {uploadingPdf ? (
+                    <><Loader2 className="w-5 h-5 animate-spin text-teal-600" /><span className="text-sm text-gray-600">Uploading & generating preview…</span></>
+                  ) : (
+                    <><Upload className="w-5 h-5 text-teal-600" /><span className="text-sm text-gray-700">Click to upload a PDF (max 25 MB)</span></>
+                  )}
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="hidden"
+                    onChange={handlePdfUpload}
+                    disabled={uploadingPdf}
+                  />
+                </label>
+              )}
+
+              {/* Permission control */}
+              {editing?.id && (
+                <div className="mt-4 grid md:grid-cols-2 gap-3 items-end">
+                  <div>
+                    <Label className="flex items-center gap-2">
+                      {form.pdfPermission === 'view_download' ? (
+                        <Unlock className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <Lock className="w-4 h-4 text-amber-600" />
+                      )}
+                      Access Permission
+                    </Label>
+                    <Select
+                      value={form.pdfPermission || 'view'}
+                      onValueChange={handlePermissionChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="view">View Only (no download)</SelectItem>
+                        <SelectItem value="view_download">View + Download</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-gray-500 pb-2">
+                    Applies whenever a verified user opens the blog. You can change this at any time.
+                  </p>
+                </div>
+              )}
+            </div>
+            {/* ===== END PDF ATTACHMENT ===== */}
           </div>
 
           <DialogFooter>

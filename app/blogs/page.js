@@ -195,8 +195,15 @@ export default function BlogsPage() {
                       <p className="text-sm text-gray-600 line-clamp-2 mb-3">
                         {blog.description || stripHtml(blog.content).slice(0, 140)}
                       </p>
-                      <div className="inline-flex items-center text-sm text-teal-600 font-medium">
-                        Read more <ArrowRight className="w-3 h-3 ml-1 group-hover:translate-x-1 transition-transform" />
+                      <div className="flex items-center justify-between">
+                        <div className="inline-flex items-center text-sm text-teal-600 font-medium">
+                          Read more <ArrowRight className="w-3 h-3 ml-1 group-hover:translate-x-1 transition-transform" />
+                        </div>
+                        {blog.pdfFileId && (
+                          <span className="inline-flex items-center gap-1 text-[10px] bg-teal-50 text-teal-700 border border-teal-200 rounded-full px-2 py-0.5">
+                            <FileText className="w-3 h-3" /> PDF
+                          </span>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

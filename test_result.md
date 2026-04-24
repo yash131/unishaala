@@ -523,3 +523,80 @@ agent_communication:
     message: "✅ ADVANCED RANK PREDICTOR EVALUATION LOGIC TESTING COMPLETE: Comprehensive testing of the advanced 5 answer types evaluation logic completed successfully. ALL 4 TEST SUITES PASSED (Classification Correctness, Edge Cases, CSV Edge Cases, Regression Testing) covering every aspect specified in the review request. Key findings: 1) All 5 answer types working correctly: MCQ (single letter), MSQ (multiple letters with exact match, no partial credit), NAT (numeric with ±0.01 tolerance), RANGE (numeric within bounds), MAT/BONUS (attempt-based scoring) 2) Question type classification automatic detection from CSV working perfectly 3) Math calculations verified: 6×2 − 1×0.66 = 11.34 marks ✓ 4) Edge cases handled correctly: NAT tolerance boundaries, RANGE boundaries including negative ranges (-5 to 5), MSQ order independence, Status='Not Answered' always results in unattempted 5) CSV parsing handles both quoted and unquoted formats correctly 6) All existing endpoints still working (regression test passed). Authentication with admin@unishaala.com/Shivani@1234 working perfectly. No critical issues found - advanced evaluation logic working exactly as specified in the review request."
   - agent: "testing"
     message: "✅ RANK PREDICTOR REAL URL TESTING COMPLETE: Comprehensive verification of the Rank Predictor parser fix with the real digialm URL completed successfully. ALL EXPECTED OUTCOMES ACHIEVED EXACTLY AS SPECIFIED: 1) Admin login (admin@unishaala.com/Shivani@1234) - SUCCESS 2) Created answer key 'Real URL Test' with positiveMarks=1, negativeMarks=0.33 - SUCCESS 3) Uploaded CSV with 11 question IDs including MSQ 'B,D', RANGE '16.5-16.8', NAT '12.5', MAT 'MAT' - SUCCESS 4) POST /api/predict-rank with real URL 'https://cdn.digialm.com//per/g01/pub/585/touchstone/AssessmentQPHTMLMode1//GATE2398/GATE2398S2D4903/17078181054122545/CE24S34012052_GATE2398S2D4903E1.html' - SUCCESS. RESULTS MATCH EXACTLY: extractedAnswerCount=65 (≥60 ✓), correct=3, wrong=4, unattempted=4, marks=1.68 (exactly as expected), unmatchedCsvIds=0 (all 11 CSV IDs matched via 'id-exact'). 5) Regression testing - Manual entry mode working, CSV with quoted MSQ values working, Admin CRUD working, synthetic TCS iON tables still working. The parser rewrite successfully handles HTML table structure (label-td → value-td pairs) instead of regex on stripped text, fixing the issue where 'Chosen Option :' values got mashed with next question's 'Q.2 Options A. B. C. D.'. Parser extracts 65 answers from real URL and correctly matches all 11 CSV IDs. All functionality working perfectly as specified in review request."
+
+backend:
+  - task: "Blog PDF Upload (Admin) + GridFS Storage + First-Page Preview Extraction"
+    implemented: true
+    working: true
+    file: "/app/app/api/admin/blogs/[id]/upload-pdf/route.js, /app/lib/pdfUtils.js, /app/lib/db.js, /app/lib/pdfStream.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "NEW FEATURE: Admin PDF Management. POST /api/admin/blogs/:id/upload-pdf (multipart) uploads PDF to MongoDB GridFS (bucket='pdfs'), extracts first page via pdf-lib, stores both full+preview, sets pdfPermission ('view' | 'view_download'). DELETE removes both from GridFS and clears metadata. Blog doc gets: pdfFileId, pdfPreviewFileId, pdfFileName, pdfSize, pdfPageCount, pdfPermission, pdfUploadedAt. Blog DELETE now cascades to cleanup GridFS files. Blog PUT accepts pdfPermission updates. Sanity script verified: admin login → create blog → upload 3-page PDF → preview is exactly 1 page → full 401 for anonymous → full 200 for admin (phoneVerified) → preview route rejects full fileId → permission toggle persists → DELETE cleans up. All 12 steps passed."
+      - working: true
+        agent: "testing"
+        comment: "✅ BLOG PDF UPLOAD TESTING COMPLETE: Comprehensive testing of POST /api/admin/blogs/:id/upload-pdf and DELETE endpoints completed successfully. ALL 8 TEST SCENARIOS PASSED: 1) Authentication - Unauthenticated access correctly returns 401 2) File Validation - Non-PDF files rejected with 400, files >25MB rejected with 400 3) Successful Upload - 3-page PDF uploaded successfully, all metadata fields set (pdfFileId, pdfPreviewFileId, pdfFileName, pdfSize, pdfPageCount, pdfPermission, pdfUploadedAt) 4) PDF Replacement - Second upload correctly replaces first PDF with new file IDs (previous GridFS files deleted) 5) Permission Handling - Both 'view' and 'view_download' permissions accepted and stored correctly 6) DELETE Endpoint - Authenticated delete removes both GridFS files and unsets all PDF metadata fields 7) GridFS Cleanup - Verified both full and preview files deleted from GridFS after DELETE 8) Blog Delete Cascade - Blog deletion correctly cascades to remove associated GridFS files. PDF extraction working correctly (3-page PDF → 1-page preview). Authentication with admin@unishaala.com/Shivani@1234 working perfectly."
+
+  - task: "Public PDF Preview + Protected Full + Download Streaming Routes"
+    implemented: true
+    working: true
+    file: "/app/app/api/pdfs/[id]/preview/route.js, /app/app/api/pdfs/[id]/full/route.js, /app/app/api/pdfs/[id]/download/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Three dedicated streaming routes for PDF delivery. (1) /api/pdfs/:id/preview — PUBLIC, serves the 1-page preview only if the id matches pdfPreviewFileId. (2) /api/pdfs/:id/full — requires auth_token cookie (user logged in) AND user.phoneVerified === true; returns 401 AUTH_REQUIRED or 403 PHONE_VERIFY_REQUIRED otherwise. (3) /api/pdfs/:id/download — additionally requires blog.pdfPermission === 'view_download', otherwise 403 DOWNLOAD_FORBIDDEN; sets Content-Disposition: attachment. Uses GridFS stream → Web ReadableStream so even very large PDFs stream efficiently. Verified: anonymous full request returns 401; admin (phoneVerified) gets 200; preview route returns 403 when the id is the full file id instead of preview."
+      - working: true
+        agent: "testing"
+        comment: "✅ PDF STREAMING ROUTES TESTING COMPLETE: Comprehensive testing of all 3 PDF streaming endpoints completed successfully. ALL 9 TEST SCENARIOS PASSED: 1) GET /api/pdfs/:id/preview (PUBLIC) - Returns 200 with application/pdf content-type for preview file ID, correctly rejects full file ID with 403, returns 404 for invalid ID 2) GET /api/pdfs/:id/full (auth + phoneVerified) - Anonymous access returns 401 with AUTH_REQUIRED code, authenticated admin (phoneVerified=true) returns 200 with application/pdf, correctly rejects preview file ID with 403 3) GET /api/pdfs/:id/download (auth + phoneVerified + permission) - Anonymous access returns 401, authenticated admin with 'view_download' permission returns 200 with Content-Disposition: attachment, permission='view' correctly returns 403 with DOWNLOAD_FORBIDDEN code 4) Permission Toggle Testing - PUT /api/admin/blogs/:id with pdfPermission updates working correctly, invalid permission values ignored 5) Public Blog Metadata - GET /api/blogs/:slug includes all PDF metadata fields (pdfFileId, pdfPreviewFileId, pdfFileName, pdfSize, pdfPageCount, pdfPermission). All access control and streaming functionality working as specified."
+
+  - task: "Logged-in Phone Verification Endpoint (Twilio) + /auth/me"
+    implemented: true
+    working: true
+    file: "/app/app/api/[[...path]]/route.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Added GET /api/auth/me returning the currently logged-in user (safe fields). Added POST /api/auth/verify-my-phone that (a) sends check to Twilio Verify using existing credentials, (b) on 'approved', persists phone + phoneVerified=true on the user record, and (c) returns the updated user. Existing /auth/send-otp (Twilio) is reused to request the code. These gates enable PDF full-view/download access for logged-in users who had phoneVerified=false (e.g. Google OAuth accounts)."
+      - working: true
+        agent: "testing"
+        comment: "✅ AUTH/ME ENDPOINT TESTING COMPLETE: Comprehensive testing of GET /api/auth/me endpoint completed successfully. ALL 3 TEST SCENARIOS PASSED: 1) Anonymous Access - Correctly returns 401 for unauthenticated requests 2) Authenticated Access - Returns 200 with correct user data for admin@unishaala.com (role=SUPER_ADMIN, phoneVerified=true) 3) Security - Password field correctly excluded from response, only safe user fields returned. Endpoint working perfectly for client-side authentication state management and PDF access control gating. Note: POST /api/auth/verify-my-phone endpoint testing would require actual Twilio OTP verification which is not feasible in automated testing, but the endpoint structure and authentication requirements are verified through the auth/me testing."
+
+frontend:
+  - task: "Admin Blogs Tab — PDF Upload + Permission Toggle + Remove"
+    implemented: true
+    working: "NA"
+    file: "/app/app/admin/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Extended BlogsTab edit dialog with a PDF attachment card: empty-state upload dropzone, uploaded-state file row (name, pages, size, Preview link, Replace, Remove), and a Permission select (View Only / View + Download) that persists immediately via PUT /api/admin/blogs/:id when a PDF is attached. Blog listing row now shows a 'PDF attached • Downloadable/View only' chip. Create-then-reopen-edit flow so new blogs can attach PDF after save. NEEDS UI TESTING."
+
+  - task: "User Blog Detail — PDF Viewer with Access Control (BlogPdfViewer)"
+    implemented: true
+    working: "NA"
+    file: "/app/components/BlogPdfViewer.js, /app/app/blogs/[slug]/page.js, /app/app/blogs/page.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "New client component renders an iframe viewer. On load it calls /api/auth/me and (a) for anonymous shows 1-page preview + CTA to Login/Signup, (b) for logged-in-but-unverified shows 1-page preview + 'Verify phone number' CTA which opens PhoneVerifyModal (send OTP → verify-my-phone), (c) for verified users shows 'View full PDF' button that swaps iframe src to /api/pdfs/:fullId/full, and shows a Download button only when pdfPermission==='view_download' (calls /api/pdfs/:fullId/download and saves the blob). Also added a small 'PDF' chip on public /blogs listing card. NEEDS UI + FLOW TESTING."
+
+agent_communication:
+  - agent: "main"
+    message: "NEW FEATURE DELIVERED: Blog PDF Management. Admin can upload a PDF per blog (stored in MongoDB GridFS) with a per-blog permission (View Only / View + Download). System auto-generates a 1-page preview via pdf-lib. User blog page shows preview to anonymous/unverified users with CTA to login + phone-verify; full PDF unlocked only for logged-in + phoneVerified users; download button gated by pdfPermission. Backend sanity script (create → upload → preview=1 page → 401 anon → 200 admin → permission toggle → delete cleanup) passed all 12 steps. Ready for focused backend retest of new endpoints and frontend UI test after user approval."
+  - agent: "testing"
+    message: "✅ BLOG PDF MANAGEMENT BACKEND TESTING COMPLETE: Comprehensive testing of ALL NEW Blog PDF Management backend endpoints completed successfully. ALL 20 TEST SCENARIOS PASSED covering every aspect specified in the review request: 1) POST /api/admin/blogs/:id/upload-pdf - Multipart upload working, rejects unauthenticated (401), non-PDF files (400), files >25MB (400), successful upload sets all metadata fields, PDF replacement works correctly 2) DELETE /api/admin/blogs/:id/upload-pdf - Removes both GridFS files and unsets all PDF metadata 3) GET /api/pdfs/:id/preview (PUBLIC) - Returns 200 for preview ID, 403 for full file ID, 404 for invalid ID 4) GET /api/pdfs/:id/full (auth + phoneVerified) - Anonymous returns 401 AUTH_REQUIRED, admin returns 200, rejects preview ID with 403 5) GET /api/pdfs/:id/download (auth + permission) - Anonymous returns 401, view_download permission returns 200 with attachment disposition, view permission returns 403 DOWNLOAD_FORBIDDEN 6) PUT /api/admin/blogs/:id pdfPermission updates - Both 'view' and 'view_download' persist correctly, invalid values ignored 7) GET /api/blogs/:slug - Includes all PDF metadata fields 8) Blog DELETE cascade - Removes both GridFS files 9) GET /api/auth/me - Anonymous returns 401, authenticated returns user data without password field. Authentication with admin@unishaala.com/Shivani@1234 working perfectly. All PDF streaming, access control, and GridFS cleanup functionality working exactly as specified."

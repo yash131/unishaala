@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timedelta
 
 # Configuration
-BASE_URL = "https://content-hub-admin-5.preview.emergentagent.com"
+BASE_URL = "https://admin-suite-46.preview.emergentagent.com"
 ADMIN_EMAIL = "admin@unishaala.com"
 ADMIN_PASSWORD = "Shivani@1234"
 

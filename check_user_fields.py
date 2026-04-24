@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Get base URL from environment
-BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://content-hub-admin-5.preview.emergentagent.com')
+BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://admin-suite-46.preview.emergentagent.com')
 API_URL = f"{BASE_URL}/api"
 
 session = requests.Session()

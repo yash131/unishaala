@@ -1,0 +1,150 @@
+<analysis>**original_problem_statement**: 
+The user requested enhancements to the Rank Predictor system to parse TCS iON/GATE response sheet HTML URLs, extract Question IDs and answers (MCQ, MSQ, NAT, Range, MAT), and evaluate them against an Admin-uploaded CSV answer key. Additionally, the user requested full CRUD functionality in the Admin Panel for Testimonials, Contact Leads, Colleges, and Jobs. Earlier, the user also requested completion of the Blog Management Panel and replacing Exam with Test Series on the user panel.
+
+**PRODUCT REQUIREMENTS**:
+1. Rank Predictor Logic: Parse response sheets, map student answers to CSV keys by Question ID, and apply admin-defined positive/negative marks.
+2. Support advanced evaluations: Exact match (MCQ), exact set match (MSQ), numerical tolerance (NAT), range bounds (Range), and attempted-bonus (MAT).
+3. Admin Panel CRUD: Build out Testimonials, Contacts, Colleges, Jobs, and Answer Keys tabs.
+
+**User's preferred language**: English (INSTRUCT next agent to respond in English only)
+
+**what currently exists?** 
+A Next.js full-stack mock test platform with MongoDB. It features user auth, Mock Test unlocking (Razorpay), a Blog system, Admin dashboard (Exams, Domains, Tests, Blogs, Contacts, Colleges, Jobs, Testimonials, Answer Keys), and an advanced Rank Predictor that parses digialm (TCS iON) HTML response sheets to estimate ranks based on real-time data.
+
+**Last working item**:
+- **Last item agent was working**: Fixing a critical extraction and mapping bug in the Rank Predictor. The parser was incorrectly mapping NAT answers (e.g., 327.36) to the previous Question ID. The agent identified the root cause: in the TCS iON HTML layout, the  section appears *before* the  section for NAT questions. The agent rewrote the parser in  to split the HTML by question blocks () rather than relying on global regex, ensuring data isn't mixed between questions.
+- **Status**: USER VERIFICATION PENDING
+- **Agent Testing Done**: Y
+- **Which testing method agent to use?**: Backend testing agent / python -c script test.
+- **User Testing Done**: N
+
+**All Pending/In progress Issue list**:
+- **Issue 1: Verify Rank Predictor NAT Mapping Fix**
+  - **Priority**: P0
+  - **Attempted fixes**: The agent applied a fix to split the HTML document by question blocks to isolate properties.
+  - **Next debug checklist**: Verify the output for Question ID  and  to ensure 16.27 and 327.36 map accurately. If successful, finalize the task with the user.
+  - **Why fix this issue and what will be achieved with the fix?**: Ensures accurate score calculation for NAT questions in the Rank Predictor.
+  - **Status**: TESTING PENDING
+  - **Is recurring issue?**: N
+  - **Should Test frontend/backend/both after fix?**: Backend (Test via script)
+  - **Blocked on other issue**: None
+
+- **Issue 2: CSV Bulk Question Upload Duplicate Bug**
+  - **Priority**: P2
+  - **Attempted fixes**: None in this session.
+  - **Next debug checklist**: Check . Ensure the CSV upsert logic handles duplicate  correctly without dropping rows.
+  - **Why fix this issue and what will be achieved with the fix?**: Prevents silent failure when admins bulk-upload questions.
+  - **Status**: NOT STARTED
+  - **Is recurring issue?**: Y
+  - **Should Test frontend/backend/both after fix?**: Backend
+
+**In progress Task List**:
+None currently active (waiting on Issue 1 verification).
+
+**Upcoming and Future Tasks**:
+- **P1**: Add Clear submissions admin button per Answer Key.
+- **P1**: Add leaderboard (top-N ranks) to the user-facing Rank Predictor results.
+- **P2**: Export contact leads and rank predictions to CSV from the Admin panel.
+- **P2**: Email notification to admin on new contact form submission.
+
+**Completed work in this session**:
+- Created User-facing Blog pages (, ) (DONE)
+- Implemented  component in Admin Panel (DONE)
+- Fixed  404 error on Admin Blogs API (DONE)
+- Renamed all user-facing Exam references to Test Series (DONE)
+- Implemented CRUD Tabs for Testimonials, Contacts, Colleges, and Jobs in Admin (DONE)
+- Built Answer Key Management CRUD + CSV bulk upload (DONE)
+- Built advanced Rank Predictor parser supporting MCQ, MSQ, NAT, Range, and MAT logic (DONE)
+- Fixed geo-blocked URL fetching logic and regex parsing bugs for digialm.com response sheets (DONE)
+
+**Earlier issues found/mentioned but not fixed**:
+- **Issue 1: CSV Bulk Question Upload Duplicate Bug**
+  - **Debug checklist**: Review the  logic for  collision handling.
+  - **Why to solve this issue**: Previous uploads dropped 6 out of 7 questions.
+  - **Should Test frontend/backend/both after fix**: Backend
+  - **Is recurring issue?**: Y
+
+**Known issue recurrence from previous fork**:
+- **Recurrence count**: 0
+- **Status**: RESOLVED (Ephemeral storage and SelectItem empty value bugs were fixed in the previous fork and did not recur).
+
+**Code Architecture**:
+
+
+**Key Technical Concepts**:
+- Next.js App Router (React, Tailwind CSS, shadcn/ui)
+- MongoDB unified collection helper
+- Digialm / TCS iON HTML parsing using Cheerio/Regex
+- Advanced Evaluation Algorithms (Exact matching, string bounds checking, numerical tolerances)
+
+**key DB schema**:
+- : 
+- : 
+- : 
+- : 
+-  |  |  | 
+
+**changes in tech stack**:
+None.
+
+**All files of reference**:
+1. : Contains all new endpoints for blogs, contacts, colleges, jobs, answer keys, and the  parser logic. (Over 3,300 lines long).
+2. : Monolithic admin dashboard, now includes Tabs for Testimonials, Contacts, Colleges, Jobs, and Answer Keys. (Over 2,800 lines long).
+3. : Redesigned to accept response sheet URLs/HTML files and display calculated score and rank.
+4.  & : New public facing blog views.
+
+**Areas that need refactoring**:
+-  and  are massive monolithic files that run the risk of breaking sibling logic when edited. They desperately need breaking down into modular routes/components.
+
+**key api endpoints**:
+- : Evaluates a student's HTML response sheet against a selected Answer Key.
+- : Bulk CSV upload for answers.
+- 
+-  (and Colleges, Jobs, Testimonials).
+
+**Critical Info for New Agent**:
+- **Rank Predictor Parser Design**: The digialm HTML response sheet places  *before*  for NAT questions. Do not use global sequential regex. The parser in  now splits the HTML using  to parse each question independently.
+- **CSV Data Mapping**: Matching *must* strictly use  as a string ().
+- Always update  if changing auth keys. Use Admin credentials  /  for testing.
+
+**documents and test reports created in this job**:
+-  (Updated repeatedly by testing agents)
+
+**Last 10 User Messages and any pending HUMAN messages**:
+1. **[PENDING]** User reported a mapping bug in Rank Predictor where NAT answers (e.g., 327.36) mapped to the previous Question ID. (Agent applied the fix but hasn't finalized).
+2. **[RESOLVED]** User reported Rank Predictor failed to extract any answers from their specific digialm URL.
+3. **[RESOLVED]** User reported the Rank Predictor Question IDs weren't matching the CSV IDs properly.
+4. **[RESOLVED]** User uploaded sample CSVs and a screenshot demonstrating the mismatch issue.
+5. **[RESOLVED]** User requested advanced evaluation logic (MCQ, MSQ, NAT, Range, MAT) with precise rule sets.
+6. **[RESOLVED]** User reported that fetching the URL in Rank Predictor evaluated everything incorrectly.
+7. **[RESOLVED]** User requested to build out the Rank Predictor + Answer Key management feature.
+8. **[RESOLVED]** User requested to build out CRUD for Testimonials, Contacts, Colleges, and Jobs in the Admin panel.
+9. **[RESOLVED]** User provided a screenshot showing a 404 error when clicking Publish on a blog post.
+10. **[RESOLVED]** User provided instructions on blog SEO fields and renaming Exams to Test Series.
+
+**Project Health Check:**
+- **Broken**: None (Pending NAT parsing verification).
+- **Mocked**: None.
+
+**3rd Party Integrations**:
+- Razorpay (Payments) — requires User API Key.
+
+**Testing status**:
+- Testing agent used after significant changes: YES
+- Troubleshoot agent used after agent stuck in loop: NO
+- Test files created: , , , .
+- Known regressions: None detected.
+
+**Credentials to test flow:**
+- Admin Login:  / 
+
+**What agent forgot to execute**:
+The agent implemented the NAT parsing layout fix but never responded to the user to confirm the fix was complete and successful. 
+
+**Debugging checklist for current issue**
+    Issue: Verify Rank Predictor NAT Question ID mapping.
+
+    Backend files to check:
+    -  (Check the  block, specifically where it splits  to ensure NAT  is safely mapped to the correct ID).
+
+    Action: Run a quick test (via  or via curl) and then  the interaction with the user.</analysis>
