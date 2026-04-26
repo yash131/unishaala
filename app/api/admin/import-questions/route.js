@@ -281,11 +281,16 @@ export async function POST(request) {
 
     // STEP 3 & 4: Process records and save to DB
     const questions = await getCollection('questions');
-    
+
+    // Match BOTH legacy (mockTestId only) and current (test_id) docs so we don't
+    // create duplicate question_numbers when re-importing into a test that
+    // already has questions inserted via a different code path.
+    const testMatch = { $or: [{ test_id: testId }, { mockTestId: testId }] };
+
     // Track used question numbers to detect duplicates
     const usedQuestionNumbers = new Set();
-    // Get existing max question number for this test
-    const maxExisting = await questions.find({ test_id: testId }).sort({ question_number: -1 }).limit(1).toArray();
+    // Get existing max question number for this test (across both id fields)
+    const maxExisting = await questions.find(testMatch).sort({ question_number: -1 }).limit(1).toArray();
     let nextQuestionNumber = (maxExisting[0]?.question_number || 0) + 1;
 
     for (let i = 0; i < records.length; i++) {
@@ -410,15 +415,16 @@ export async function POST(request) {
           updatedAt: new Date()
         };
 
-        // Upsert by test_id + question_number
-        const existingQuestion = await questions.findOne({ 
-          test_id: testId, 
-          question_number: questionNumber 
+        // Upsert by (test_id OR mockTestId) + question_number so legacy docs
+        // (that only have mockTestId set) are updated instead of duplicated.
+        const existingQuestion = await questions.findOne({
+          ...testMatch,
+          question_number: questionNumber
         });
 
         if (existingQuestion) {
           await questions.updateOne(
-            { test_id: testId, question_number: questionNumber },
+            { id: existingQuestion.id },
             { $set: questionDoc }
           );
           result.updated++;
@@ -439,7 +445,7 @@ export async function POST(request) {
     }
 
     // Update test question count and publish status
-    const totalQuestions = await questions.countDocuments({ test_id: testId });
+    const totalQuestions = await questions.countDocuments(testMatch);
     const updateData = { totalQuestions, updatedAt: new Date() };
     if (publish) {
       updateData.isPublished = true;
