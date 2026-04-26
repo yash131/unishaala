@@ -43,9 +43,9 @@ function HeroSection() {
       <div className="container mx-auto px-4 py-16">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
-            <Badge className="bg-brand-100 text-brand-700 mb-4">India's #1 Test Series Preparation Platform</Badge>
+            <Badge className="bg-brand-100 text-brand-700 mb-4">India's #1 Exam Preparation Platform</Badge>
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
-              Crack Your Dream Test Series with <span className="text-brand-600">Unishaala</span>
+              Crack Your Dream Exam with <span className="text-brand-600">Unishaala</span>
             </h1>
             <p className="text-lg text-gray-600 mb-8">
               Access thousands of mock tests, previous year papers, and expert-curated study materials for GATE, CAT, UPSC, JEE and more.
@@ -53,7 +53,7 @@ function HeroSection() {
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href="/exams">
                 <Button size="lg" className="bg-brand-600 hover:bg-brand-700 text-white w-full sm:w-auto">
-                  Explore Test Series <ArrowRight className="ml-2 w-4 h-4" />
+                  Explore Exams <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </Link>
               <Link href="/signup">
@@ -73,7 +73,7 @@ function HeroSection() {
               </div>
               <div className="text-center">
                 <p className="text-2xl font-bold text-brand-600">50+</p>
-                <p className="text-sm text-gray-600">Test Series</p>
+                <p className="text-sm text-gray-600">Exams</p>
               </div>
             </div>
           </div>
@@ -110,8 +110,8 @@ function ExamNotifications({ notifications }) {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900">Test Series Notifications</h2>
-            <p className="text-gray-600 mt-2">Stay updated with latest test series announcements</p>
+            <h2 className="text-3xl font-bold text-gray-900">Exam Notifications</h2>
+            <p className="text-gray-600 mt-2">Stay updated with latest exam announcements</p>
           </div>
           <Link href="/notifications">
             <Button variant="outline" className="hidden md:flex">
@@ -151,8 +151,8 @@ function PopularExams({ exams }) {
     <section className="py-16 bg-gray-50">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900">Popular Test Series</h2>
-          <p className="text-gray-600 mt-2">Choose from 50+ competitive test series</p>
+          <h2 className="text-3xl font-bold text-gray-900">Popular Exams</h2>
+          <p className="text-gray-600 mt-2">Choose from 50+ competitive exams</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-6">
@@ -178,7 +178,7 @@ function PopularExams({ exams }) {
         <div className="text-center mt-8">
           <Link href="/exams">
             <Button size="lg" className="bg-brand-600 hover:bg-brand-700">
-              View All Test Series <ArrowRight className="ml-2 w-4 h-4" />
+              View All Exams <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
           </Link>
         </div>
