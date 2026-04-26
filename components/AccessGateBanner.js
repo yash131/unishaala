@@ -131,41 +131,24 @@ function AccessGateBannerInner() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {reason === 'required' ? (
-                <><Lock className="w-5 h-5 text-amber-600" /> Access restricted</>
+                <><Lock className="w-5 h-5 text-amber-600" /> Login to get full access</>
               ) : (
                 <><Phone className="w-5 h-5 text-amber-600" /> Verification needed</>
               )}
             </DialogTitle>
           </DialogHeader>
 
-          <div className="py-2 space-y-3 text-sm text-gray-700">
-            <p className="text-base">
-              {message}
-            </p>
-            <ul className="space-y-1.5 text-sm text-gray-600">
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-brand-600" /> Access blogs, test series & job notifications
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-brand-600" /> Predict your rank & track progress
-              </li>
-              <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-brand-600" /> Download study PDFs & resources
-              </li>
-            </ul>
-          </div>
-
-          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-2">
             {reason === 'required' ? (
               <>
                 <Link href={signupHref} className="flex-1">
                   <Button variant="outline" className="w-full">
-                    <Sparkles className="w-4 h-4 mr-2" /> Create account
+                    <Sparkles className="w-4 h-4 mr-2" /> Sign In
                   </Button>
                 </Link>
                 <Link href={loginHref} className="flex-1">
                   <Button className="w-full bg-brand-600 hover:bg-brand-700">
-                    <LogIn className="w-4 h-4 mr-2" /> Log in
+                    <LogIn className="w-4 h-4 mr-2" /> Log In
                   </Button>
                 </Link>
               </>
