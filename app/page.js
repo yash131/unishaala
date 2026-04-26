@@ -225,7 +225,7 @@ function FeaturesSection() {
 // College Finder Section
 function CollegeFinder({ colleges }) {
   return (
-    <section className="py-16 bg-gradient-to-r from-brand-600 to-brand-700">
+    <section className="py-16 bg-gradient-to-r from-logo-600 to-logo-700">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-white">College Finder</h2>

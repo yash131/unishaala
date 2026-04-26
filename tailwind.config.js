@@ -32,6 +32,20 @@ module.exports = {
                                 '950': '#390E18',
                                 DEFAULT: '#F23364'
                         },
+                        logo: {
+                                '50': '#EBFEFC',
+                                '100': '#D9FBF9',
+                                '200': '#BFF1ED',
+                                '300': '#90DED8',
+                                '400': '#58CEC4',
+                                '500': '#38BAB0',
+                                '600': '#299D93',
+                                '700': '#1E8077',
+                                '800': '#15645E',
+                                '900': '#0D4E48',
+                                '950': '#062C29',
+                                DEFAULT: '#38BAB0'
+                        },
                         border: 'hsl(var(--border))',
                         input: 'hsl(var(--input))',
                         ring: 'hsl(var(--ring))',
