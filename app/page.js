@@ -48,7 +48,7 @@ function HeroSection() {
               Crack Your Dream Exam with <span className="text-brand-600">Unishaala</span>
             </h1>
             <p className="text-lg text-gray-600 mb-8">
-              Access thousands of mock tests, previous year papers, and expert-curated study materials for GATE, CAT, UPSC, JEE and more.
+              Access thousands of mock tests, previous year papers, and expert-curated study materials for GATE, ESE, PSUs, State AE/JE in Civil Engineering and more.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href="/exams">
