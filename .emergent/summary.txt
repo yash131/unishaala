@@ -1,167 +1,146 @@
 <analysis>**original_problem_statement**: 
-The user requested enhancements to the Rank Predictor system to parse TCS iON/GATE response sheet HTML URLs, extract Question IDs and answers, and evaluate them against an Admin-uploaded CSV answer key. Additionally, the user requested full CRUD functionality in the Admin Panel for Testimonials, Contact Leads, Colleges, and Jobs. 
-*New requests in this session:* 
-1. Build and integrate a PDF Management Feature inside the Blog Panel (Admin upload, View/Download permissions) and a user-facing embedded PDF viewer (page 1 preview for unauthenticated users, full access for logged-in & phone-verified users). 
-2. Implement a site-wide user access control system using phone number verification (OTP-based). Unverified/anonymous users should only access the first page (home) and public auth routes, with all other content locked behind a redirection and CTA banner.
+The user requested UI/UX and thematic enhancements, specifically changing the site's dominant color to a specific pink () and applying a specific logo green () to designated sections. Additional homepage updates included changing Test Series text to Exam, simplifying the Access Restricted pop-up, and replacing the College Finder section with a marquee-style Blog section. 
+On the backend, the user introduced a new CSV format for uploading exam questions using direct Bunny.net image URLs instead of a ZIP file. The system needed to process these image URLs, handle re-uploads cleanly without caching/duplicate issues, and route URL-based CSV uploads correctly from the admin dashboard.
 
 **PRODUCT REQUIREMENTS**:
-1. Rank Predictor Logic: Parse response sheets, map student answers to CSV keys by Question ID.
-2. Admin Panel CRUD: Testimonials, Contacts, Colleges, Jobs, and Answer Keys.
-3. PDF Management: Upload PDFs to blogs (GridFS), generate page 1 previews, gate access/downloads based on admin-defined permissions and user authentication status.
-4. Site-wide Access Control: Edge middleware to restrict access to core routes (, , , etc.) ensuring only logged-in users with a verified phone number can access them.
+1. Global Theme Update: Set  as the primary brand color and  as an accent background for specific components (About page stats/CTA).
+2. Homepage UI: Marquee-style auto-scrolling Blog cards, copy text updates.
+3. CSV Question Import: Support HTTP(S) image URLs directly in the CSV columns (, , option images).
+4. Idempotent Uploads: Replace existing questions mode to prevent duplicates when re-uploading the same CSV.
+5. Strict Caching Control: Ensure tests dynamically fetch updated images without caching stale assets.
 
 **User's preferred language**: English (INSTRUCT next agent to respond in English only)
 
 **what currently exists?** 
-A Next.js full-stack platform with MongoDB. It features user auth (with Twilio OTP verification), Razorpay mock test unlocking, a Blog system with GridFS-based PDF attachment management, an Admin dashboard, and a Rank Predictor. The platform is secured by Next.js edge middleware that restricts most pages to users who are logged in and have a verified phone number.
+A Next.js full-stack platform with MongoDB. It features user auth, Edge middleware for gated access, PDF management inside blogs, Rank Predictor, and an Admin dashboard. The site now utilizes a custom  pink brand palette and a robust URL-based CSV question importer that isolates data and prevents duplication via a replace existing upload mode.
 
 **Last working item**:
-- **Last item agent was working**: Implementing the site-wide access control system (Next.js middleware,  JWT integration, and the  UI for redirect messaging).
-- **Status**: USER VERIFICATION PENDING
-- **Agent Testing Done**: Y
-- **Which testing method agent to use?**: Frontend testing agent (pending user approval to test the UI flow).
-- **User Testing Done**: N
+    - **Last item agent was working**: Fixing a routing bug in the frontend Admin panel () that sent CSVs without ZIP files to the legacy  endpoint, causing image URLs to be ignored (specifically for the user's IMMI Test). 
+    - **Status**: USER VERIFICATION PENDING
+    - **Agent Testing Done**: Y
+    - **Which testing method agent to use?**: manual testing by python -c / mongodb queries
+    - **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
-- **Issue 1: Verify Rank Predictor NAT Mapping Fix**
-  - **Attempted fixes**: Previous agent applied a fix to split HTML by question blocks to isolate properties.
-  - **Next debug checklist**: Verify output for Question ID  and  to ensure 16.27 and 327.36 map accurately. Run a quick test and finalize with the user.
-  - **Why fix this issue and what will be achieved with the fix?**: Ensures accurate score calculation for NAT questions in Rank Predictor.
-  - **Status**: TESTING PENDING
-  - **Is recurring issue?**: N
-  - **Should Test frontend/backend/both after fix?**: Backend (Test via script)
-  - **Blocked on other issue**: None
-  - **Priority**: P0
+  - **Issue 1: Verify Rank Predictor NAT Mapping Fix (IGNORED TWICE)**
+     - **Attempted fixes**: Previous agent applied a fix to split HTML by question blocks to isolate properties, but it was never verified.
+     - **Next debug checklist**: Check  (predict-rank endpoint). Verify output for Question ID  and  to ensure 16.27 and 327.36 map accurately. Run a test script or cURL.
+     - **Why fix this issue and what will be achieved with the fix?**: Ensures accurate score calculation for NAT questions in Rank Predictor.
+     - **Status**: TESTING PENDING
+     - **Is recurring issue?**: Y (Persistently ignored by agents)
+     - **Should Test frontend/backend/both after fix?**: Backend
+     - **Blocked on other issue**: None
+     - **Priority**: P0
 
-- **Issue 2: CSV Bulk Question Upload Duplicate Bug**
-  - **Attempted fixes**: None.
-  - **Next debug checklist**: Check . Ensure CSV upsert logic handles duplicate  correctly without dropping rows.
-  - **Why fix this issue and what will be achieved with the fix?**: Prevents silent failure when admins bulk-upload questions. Previous uploads dropped 6 out of 7 questions.
-  - **Status**: NOT STARTED
-  - **Is recurring issue?**: Y
-  - **Should Test frontend/backend/both after fix?**: Backend
-  - **Blocked on other issue**: None
-  - **Priority**: P2
+  - **Issue 2: Accidental Deletion of Legacy Questions**
+     - **Attempted fixes**: N/A
+     - **Next debug checklist**: Assess if the user needs help recovering manually-added questions (where  was ), which were deleted by the agent's deduplication script. If unrecoverable, implement a Clear all questions button per test in the admin panel to allow safe manual resets in the future.
+     - **Why fix this issue and what will be achieved with the fix?**: Gives admins safe tools to manage test states after the destructive script ran.
+     - **Status**: NOT STARTED
+     - **Is recurring issue?**: N
+     - **Should Test frontend/backend/both after fix?**: Frontend/Backend
+     - **Blocked on other issue**: None
+     - **Priority**: P1
 
 **In progress Task List**:
 None currently active.
 
-**Upcoming and Future Tasks**:
-- **P1**: Add Clear submissions admin button per Answer Key.
-- **P1**: Add leaderboard (top-N ranks) to the user-facing Rank Predictor results.
-- **P2**: Export contact leads and rank predictions to CSV from the Admin panel.
-- **P2**: Email notification to admin on new contact form submission.
+**Upcoming and Future Tasks**
+    - P1: Add Clear submissions admin button per Answer Key.
+    - P1: Add Clear all questions button per-test in the admin UI.
+    - P1: Add leaderboard (top-N ranks) to the user-facing Rank Predictor results.
+    - P2: Export contact leads and rank predictions to CSV from the Admin panel.
+    - P2: Email notification to admin on new contact form submission.
 
-**Completed work in this session**:
-- Built Admin PDF upload functionality for Blogs using GridFS () (DONE)
-- Created  integration to generate first-page previews of PDFs securely (DONE)
-- Built User-facing  with auth/OTP gating (DONE)
-- Configured Next.js Middleware () to block unverified access to core pages (DONE)
-- Injected  into the Home Page to handle blocked route redirects and prompt login/OTP verification (DONE)
-- Updated JWT authentication payload to include  state to prevent DB hits on edge routing (DONE)
+**Completed work in this session**
+  - Updated Tailwind config and applied  (pink) as the primary brand color globally (DONE)
+  - Applied Unishaala logo green () to About page Stats and CTA section backgrounds (DONE)
+  - Replaced Test Series with Exam text on Homepage hero and updated subtitle (DONE)
+  - Simplified Access Gate Banner pop-up text (DONE)
+  - Implemented marquee-style auto-scrolling Blog cards on Homepage, replacing College Finder (DONE)
+  - Built direct URL-based CSV image import feature for Bunny.net compatibility in  (DONE)
+  - Fixed CSV duplication issues by introducing Replace existing questions mode and row-index mapping (DONE)
+  - Fixed image caching cross-pollution between mock tests by adding  headers and resetting state in  (DONE)
+  - Fixed Admin CSV upload routing bug so image-column CSVs correctly map to the new image-aware endpoint even without a ZIP (DONE)
 
-**Earlier issues found/mentioned but not fixed**:
-- **Issue 1: CSV Bulk Question Upload Duplicate Bug**
-  - **Debug checklist**: Review  logic for  collision handling.
-  - **Why to solve this issue and what will be achieved with this?**: Users lose data silently on bulk uploads.
-  - **Should Test frontend/backend/both after fix**: Backend
-  - **Is recurring issue?**: Y
+**Earlier issues found/mentioned but not fixed**
+  - Issue 1: Verify Rank Predictor NAT Mapping (Carried over from 2 forks ago, still unverified).
 
-- **Issue 2: Verify Rank Predictor NAT Mapping**
-  - **Debug checklist**: Run  or curl to ensure NAT answers map to the correct Question ID.
-  - **Why to solve this issue and what will be achieved with this?**: Carried over from the previous session. Fix was applied but never verified with the user.
-  - **Should Test frontend/backend/both after fix**: Backend
-  - **Is recurring issue?**: N
+**Known issue recurrence from previous fork**
+  - Issue recurrence in previous fork: Rank Predictor Mapping Verification ignored.
+  - Recurrence count: 2
+  - Status: TESTING PENDING
 
-**Known issue recurrence from previous fork**:
-- **Issue recurrence in previous fork**: Ephemeral storage and SelectItem empty value bugs.
-- **Recurrence count**: 0
-- **Status**: RESOLVED
+**Code Architecture**
+- Monolithic API routing via 
+- Custom JWT auth checking Edge Middleware 
+- Server-side caching strictly disabled () on Mock Test questions to prevent CDN URL reuse issues.
 
-**Code Architecture**:
+**Key Technical Concepts**
+- Next.js App Router
+- Tailwind CSS custom color palettes ( overriding )
+- MongoDB  lookups (using both  and  for legacy backward compatibility)
+- Bunny.net CDN integration via CSV URL parsing
 
+**key DB schema**
+  - : 
 
-**Key Technical Concepts**:
-- Next.js App Router & Edge Middleware ()
-- JWT Authentication (Custom token carrying  state)
-- MongoDB GridFS for large file/PDF storage
--  for server-side PDF manipulation
-- Advanced Evaluation Algorithms (Rank Predictor)
+**changes in tech stack**
+  - Moved away from strictly requiring ZIP files for question images; system now natively supports direct CDN URL arrays parsed directly from the CSV.
 
-**key DB schema**:
-- : 
-- : 
--  & : MongoDB GridFS default collections for PDF storage.
-
-**changes in tech stack**:
-- Added  for PDF document processing.
-- Utilizing MongoDB GridFS for storing blog attachments (PDFs) instead of base64 strings to handle large files efficiently.
-
-**All files of reference**:
-1. : Core routing guard. Redirects anonymous or unverified users attempting to access locked pages.
-2.  & : Created to handle PDF page extraction and GridFS streaming safely without OOM errors.
-3.  & : Created for the new auth-gated UX.
-4. : Heavily updated for Auth flows (re-issuing cookies with ) and Blog deletion GridFS cleanup.
+**All files of reference**
+  -  & : Custom  palette added.
+  - : Heavily updated for Marquee blogs and text changes.
+  - : UI updated with Replace Mode toggle and URL-mode detection.
+  - : Handles URL scraping, validation, and idempotent replace operations.
+  - : Upload routing logic patched.
+  - : Cache-busting logic implemented.
 
 **Areas that need refactoring**:
--  and  are massive monolithic files (4000+ lines). They urgently need breaking down into modular components to avoid breaking sibling functionality.
+  -  and  remain excessively large (4000+ lines). 
 
-**key api endpoints**:
-- , , : GridFS streaming endpoints with strict role/auth gating.
-- : Verifies OTP and re-issues JWT cookie with .
-- : GridFS chunked upload.
+**key api endpoints**
+  - : Heavily modified to handle URL-based images and Replace existing logic.
+  - : Added  headers.
 
-**Critical Info for New Agent**:
-- **Middleware is Active**: Any new public routes must be explicitly excluded in  or they will 307 redirect to the home page .
-- **JWT State Management**: If a user's verification state changes anywhere, the  cookie MUST be explicitly re-issued, as the edge middleware reads  directly from the token payload, not the database.
-- **File Storage**: Do not store PDFs as base64 in standard collections; always use the implemented GridFS helper methods.
+**Critical Info for New Agent**
+  - **Data Loss Warning**: The previous agent accidentally deleted ~212 legacy questions that had  while running a manual script. Always back up or triple-check MongoDB shell scripts before executing bulk deletes. 
+  - **Question IDs**: The system now matches mock test questions using  to bridge legacy code and new imports. Ensure you retain this pattern for backward compatibility.
+  - **Color Theming**: Use  and  classes instead of  or  directly, as the Tailwind config has been precisely calibrated to the user's reference hex .
 
-**documents and test reports created in this job**:
--  (Updated with Blog PDF Backend Tests and Site-wide Access Control Middleware Tests)
+**documents and test reports created in this job**
+  -  (Updated with CSV Import URL-based backend testing results)
 
-**Last 10 User Messages and any pending HUMAN messages**:
-1. **[PENDING]** User needs to decide whether to run automated frontend testing on the new Site-wide Access Control UI, test manually, or move to the next task.
-2. **[RESOLVED]** User requested to implement a site-wide user access control system using phone number verification.
-3. **[PENDING]** User needs to decide whether to run automated frontend testing on the PDF feature. (Agent moved on to access control before getting a reply on this specific UI test).
-4. **[RESOLVED]** User requested a PDF Management Feature inside the Blog Panel.
-5. **[RESOLVED]** User bypassed clarification phase, telling the agent to proceed with best judgment.
-6. **[RESOLVED]** User asked the agent to use  tool to confirm the plan.
-7. **[RESOLVED]** User reported a mapping bug in Rank Predictor (from previous fork, fix pending confirmation).
-8. **[RESOLVED]** User reported Rank Predictor failed to extract any answers.
-9. **[RESOLVED]** User reported Rank Predictor Question IDs weren't matching CSV IDs.
-10. **[RESOLVED]** User requested advanced evaluation logic (MCQ, MSQ, NAT, Range, MAT).
+**Last 10 User Messages and any pending HUMAN messages** 
+ 1. **[PENDING]** User needs to verify if the IMMI Test CSV upload fix successfully loads images. User may ask for further tasks. 
+ 2. **[RESOLVED]** User reported IMMI test CSV upload is not fetching images.
+ 3. **[RESOLVED]** User reported the system incorrectly reused/cached images from previous uploads.
+ 4. **[RESOLVED]** User reported uploaded images were missing in the exam viewer.
+ 5. **[RESOLVED]** User requested to support a new CSV format with direct Bunny.net URLs in image columns instead of ZIP files.
+ 6. **[RESOLVED]** User requested to update hero subtitle text.
+ 7. **[RESOLVED]** User requested to replace the College Finder with a marquee-style Blog section.
+ 8. **[RESOLVED]** User requested a minimal Login to get full access pop-up.
+ 9. **[RESOLVED]** User requested to apply logo green color exclusively to About page Stats/CTA.
+ 10. **[RESOLVED]** User asked to apply logo green color exclusively to the College finder section.
 
 **Project Health Check:**
-- **Broken**: None detected.
-- **Mocked**: Twilio OTP is configured but uses mock success bypass locally.
+  - Broken: Legacy manually-created questions () were permanently deleted via a bad script.
+  - Mocked: Twilio OTP.
 
-**3rd Party Integrations**:
-- Twilio (Phone OTP) — requires User API Key.
-- Razorpay (Payments) — requires User API Key.
+**3rd Party Integrations**
+  - Twilio (Phone OTP) — requires User API Key
+  - Razorpay (Payments) — requires User API Key
+  - Bunny.net (CDN) — images served dynamically via URLs (No API key required natively, just valid URLs)
 
-**Testing status**:
-- Testing agent used after significant changes: YES (backend testing agent used twice: passed 20/20 for PDFs, passed 9/9 for Middleware).
-- Troubleshoot agent used after agent stuck in loop: NO
-- Test files created: , 
-- Known regressions: None
+**Testing status**
+  - Testing agent used after significant changes: YES (backend testing agent used for CSV import).
+  - Troubleshoot agent used after agent stuck in loop: NO
+  - Test files created: None preserved.
+  - Known regressions: None code-wise, but data was lost (legacy questions).
 
 **Credentials to test flow:**
-- Admin Login:  / 
+  - Admin Login:  / 
 
-**What agent forgot to execute**:
-The agent in this session completely ignored the P0/P2 issues (NAT mapping verification and CSV duplicate question upload bug) inherited from the previous handoff summary. These must be addressed.
-
-**Debugging checklist for current issue**
-    Issue: Need to verify CSV Bulk Question Upload Duplicate Bug
-
-    Backend files to check:
-    - 
-    
-    Action: Check if the upsert logic uses  effectively without wiping out previous items in the bulk array.
-
-    Issue: Need to verify Rank Predictor NAT Question ID mapping
-    
-    Backend files to check:
-    -  (predict-rank endpoint)
-    
-    Action: Run the previous test script or manually verify  maps correctly.</analysis>
+**What agent forgot to execute**
+  - Issue 1: **Verify Rank Predictor NAT Mapping Fix** (The previous fork's P0 issue was ignored *again*).
+  - Add a Clear all questions button (Agent suggested it to fix their DB mistake but didn't implement it).</analysis>
