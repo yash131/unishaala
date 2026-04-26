@@ -133,7 +133,7 @@ export default function BlogPdfViewer({ blog }) {
 
         <div className="flex items-center gap-2">
           {canDownload && showingFull && (
-            <Button onClick={handleDownload} className="bg-pink-600 hover:bg-pink-700">
+            <Button onClick={handleDownload} className="bg-rose-600 hover:bg-rose-700">
               <Download className="w-4 h-4 mr-2" /> Download PDF
             </Button>
           )}
@@ -144,7 +144,7 @@ export default function BlogPdfViewer({ blog }) {
       <div className="relative rounded-xl overflow-hidden border shadow-lg bg-gray-100">
         {loadingMe ? (
           <div className="h-[500px] flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-pink-600" />
+            <Loader2 className="w-6 h-6 animate-spin text-rose-600" />
           </div>
         ) : (
           <iframe
@@ -172,7 +172,7 @@ export default function BlogPdfViewer({ blog }) {
                   </p>
                   <div className="flex flex-col sm:flex-row gap-2">
                     <Link href="/login" className="flex-1">
-                      <Button className="w-full bg-pink-600 hover:bg-pink-700">
+                      <Button className="w-full bg-rose-600 hover:bg-rose-700">
                         <LogIn className="w-4 h-4 mr-2" /> Log in
                       </Button>
                     </Link>
@@ -194,7 +194,7 @@ export default function BlogPdfViewer({ blog }) {
                   </p>
                   <Button
                     onClick={() => setShowVerifyModal(true)}
-                    className="w-full bg-pink-600 hover:bg-pink-700"
+                    className="w-full bg-rose-600 hover:bg-rose-700"
                   >
                     <ShieldCheck className="w-4 h-4 mr-2" /> Verify phone number
                   </Button>
@@ -210,7 +210,7 @@ export default function BlogPdfViewer({ blog }) {
                   </p>
                   <Button
                     onClick={() => setUnlocked(true)}
-                    className="w-full bg-pink-600 hover:bg-pink-700"
+                    className="w-full bg-rose-600 hover:bg-rose-700"
                   >
                     <Eye className="w-4 h-4 mr-2" /> View full PDF
                   </Button>
@@ -323,7 +323,7 @@ function PhoneVerifyModal({ open, onOpenChange, user, onVerified }) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Phone className="w-5 h-5 text-pink-600" />
+            <Phone className="w-5 h-5 text-rose-600" />
             Verify your phone number
           </DialogTitle>
         </DialogHeader>
@@ -362,7 +362,7 @@ function PhoneVerifyModal({ open, onOpenChange, user, onVerified }) {
               </div>
               <button
                 type="button"
-                className="text-xs text-pink-600 hover:underline"
+                className="text-xs text-rose-600 hover:underline"
                 onClick={() => setStep('phone')}
               >
                 Change phone number
@@ -376,7 +376,7 @@ function PhoneVerifyModal({ open, onOpenChange, user, onVerified }) {
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
                 Cancel
               </Button>
-              <Button onClick={sendOtp} disabled={sending} className="bg-pink-600 hover:bg-pink-700">
+              <Button onClick={sendOtp} disabled={sending} className="bg-rose-600 hover:bg-rose-700">
                 {sending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending…</> : 'Send OTP'}
               </Button>
             </>
@@ -385,7 +385,7 @@ function PhoneVerifyModal({ open, onOpenChange, user, onVerified }) {
               <Button variant="outline" onClick={() => setStep('phone')} disabled={verifying}>
                 Back
               </Button>
-              <Button onClick={verifyOtp} disabled={verifying} className="bg-pink-600 hover:bg-pink-700">
+              <Button onClick={verifyOtp} disabled={verifying} className="bg-rose-600 hover:bg-rose-700">
                 {verifying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying…</> : 'Verify & unlock'}
               </Button>
             </>

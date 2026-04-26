@@ -38,11 +38,11 @@ export default function AboutPage() {
       <MainNavbar />
 
       {/* Hero Section */}
-      <div className="pt-20 bg-gradient-to-b from-pink-50 to-white">
+      <div className="pt-20 bg-gradient-to-b from-rose-50 to-white">
         <div className="container mx-auto px-4 py-16">
           <div className="max-w-3xl mx-auto text-center">
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6">
-              About <span className="text-pink-600">Unishaala</span>
+              About <span className="text-rose-600">Unishaala</span>
             </h1>
             <p className="text-xl text-gray-600 leading-relaxed">
               We are on a mission to transform the way students prepare for competitive exams. 
@@ -54,13 +54,13 @@ export default function AboutPage() {
       </div>
 
       {/* Stats Section */}
-      <div className="py-16 bg-pink-600">
+      <div className="py-16 bg-rose-600">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {stats.map((stat, index) => (
               <div key={index} className="text-center">
                 <p className="text-4xl md:text-5xl font-bold text-white mb-2">{stat.number}</p>
-                <p className="text-pink-100">{stat.label}</p>
+                <p className="text-rose-100">{stat.label}</p>
               </div>
             ))}
           </div>
@@ -75,7 +75,7 @@ export default function AboutPage() {
             {values.map((value, index) => (
               <Card key={index} className="card-hover text-center">
                 <CardContent className="p-8">
-                  <div className="w-16 h-16 bg-pink-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-pink-600">
+                  <div className="w-16 h-16 bg-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-4 text-rose-600">
                     {value.icon}
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-3">{value.title}</h3>
@@ -127,7 +127,7 @@ export default function AboutPage() {
                     className="w-24 h-24 rounded-full mx-auto mb-4 object-cover"
                   />
                   <h3 className="font-bold text-gray-900">{member.name}</h3>
-                  <p className="text-pink-600">{member.role}</p>
+                  <p className="text-rose-600">{member.role}</p>
                 </CardContent>
               </Card>
             ))}
@@ -136,10 +136,10 @@ export default function AboutPage() {
       </div>
 
       {/* CTA Section */}
-      <div className="py-16 bg-gradient-to-r from-pink-600 to-pink-700">
+      <div className="py-16 bg-gradient-to-r from-rose-600 to-rose-700">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">Ready to Start Your Journey?</h2>
-          <p className="text-pink-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-rose-100 mb-8 max-w-2xl mx-auto">
             Join thousands of students who have achieved their dreams with Unishaala.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -149,7 +149,7 @@ export default function AboutPage() {
               </Button>
             </Link>
             <Link href="/exams">
-              <Button size="lg" variant="outline" className="bg-white text-pink-600 hover:bg-gray-100">
+              <Button size="lg" variant="outline" className="bg-white text-rose-600 hover:bg-gray-100">
                 Explore Exams
               </Button>
             </Link>

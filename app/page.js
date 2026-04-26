@@ -39,20 +39,20 @@ import {
 // Hero Section
 function HeroSection() {
   return (
-    <section className="pt-20 bg-gradient-to-b from-pink-50 to-white">
+    <section className="pt-20 bg-gradient-to-b from-rose-50 to-white">
       <div className="container mx-auto px-4 py-16">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
-            <Badge className="bg-pink-100 text-pink-700 mb-4">India's #1 Test Series Preparation Platform</Badge>
+            <Badge className="bg-rose-100 text-rose-700 mb-4">India's #1 Test Series Preparation Platform</Badge>
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
-              Crack Your Dream Test Series with <span className="text-pink-600">Unishaala</span>
+              Crack Your Dream Test Series with <span className="text-rose-600">Unishaala</span>
             </h1>
             <p className="text-lg text-gray-600 mb-8">
               Access thousands of mock tests, previous year papers, and expert-curated study materials for GATE, CAT, UPSC, JEE and more.
             </p>
             <div className="flex flex-col sm:flex-row gap-4">
               <Link href="/exams">
-                <Button size="lg" className="bg-pink-600 hover:bg-pink-700 text-white w-full sm:w-auto">
+                <Button size="lg" className="bg-rose-600 hover:bg-rose-700 text-white w-full sm:w-auto">
                   Explore Test Series <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </Link>
@@ -64,21 +64,21 @@ function HeroSection() {
             </div>
             <div className="flex items-center gap-8 mt-8">
               <div className="text-center">
-                <p className="text-2xl font-bold text-pink-600">500K+</p>
+                <p className="text-2xl font-bold text-rose-600">500K+</p>
                 <p className="text-sm text-gray-600">Students</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-pink-600">10K+</p>
+                <p className="text-2xl font-bold text-rose-600">10K+</p>
                 <p className="text-sm text-gray-600">Mock Tests</p>
               </div>
               <div className="text-center">
-                <p className="text-2xl font-bold text-pink-600">50+</p>
+                <p className="text-2xl font-bold text-rose-600">50+</p>
                 <p className="text-sm text-gray-600">Test Series</p>
               </div>
             </div>
           </div>
           <div className="relative">
-            <div className="bg-pink-100 rounded-3xl p-4 overflow-hidden">
+            <div className="bg-rose-100 rounded-3xl p-4 overflow-hidden">
               <img 
                 src="https://customer-assets.emergentagent.com/job_7acc3893-d2c4-4511-8e86-2a2521e5fe9d/artifacts/harwama0_banner_%20finsl.png" 
                 alt="UPPSC Full Length Test - Unishaala" 
@@ -125,7 +125,7 @@ function ExamNotifications({ notifications }) {
             <Card key={notif.id} className="card-hover border-l-4 border-l-teal-500">
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-2">
-                  <Badge variant="secondary" className="bg-pink-100 text-pink-700">
+                  <Badge variant="secondary" className="bg-rose-100 text-rose-700">
                     {notif.examName}
                   </Badge>
                   {notif.isNew && (
@@ -160,7 +160,7 @@ function PopularExams({ exams }) {
             <Link key={exam.id} href={`/exams/${exam.slug}`}>
               <Card className="card-hover text-center h-full cursor-pointer">
                 <CardContent className="p-6">
-                  <div className="w-16 h-16 mx-auto bg-pink-100 rounded-full flex items-center justify-center mb-4 text-3xl">
+                  <div className="w-16 h-16 mx-auto bg-rose-100 rounded-full flex items-center justify-center mb-4 text-3xl">
                     {exam.icon}
                   </div>
                   <h3 className="font-bold text-gray-900 mb-1">{exam.name}</h3>
@@ -177,7 +177,7 @@ function PopularExams({ exams }) {
 
         <div className="text-center mt-8">
           <Link href="/exams">
-            <Button size="lg" className="bg-pink-600 hover:bg-pink-700">
+            <Button size="lg" className="bg-rose-600 hover:bg-rose-700">
               View All Test Series <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
           </Link>
@@ -225,11 +225,11 @@ function FeaturesSection() {
 // College Finder Section
 function CollegeFinder({ colleges }) {
   return (
-    <section className="py-16 bg-gradient-to-r from-pink-600 to-pink-700">
+    <section className="py-16 bg-gradient-to-r from-rose-600 to-rose-700">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-white">College Finder</h2>
-          <p className="text-pink-100 mt-2">Find the best colleges based on your rank</p>
+          <p className="text-rose-100 mt-2">Find the best colleges based on your rank</p>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -237,7 +237,7 @@ function CollegeFinder({ colleges }) {
             <Card key={college.id} className="card-hover">
               <CardContent className="p-6">
                 <div className="flex items-center gap-2 mb-3">
-                  <Building className="w-5 h-5 text-pink-600" />
+                  <Building className="w-5 h-5 text-rose-600" />
                   <Badge variant="secondary">Rank #{college.ranking}</Badge>
                 </div>
                 <h3 className="font-bold text-gray-900 mb-1">{college.name}</h3>
@@ -255,7 +255,7 @@ function CollegeFinder({ colleges }) {
 
         <div className="text-center mt-8">
           <Link href="/colleges">
-            <Button size="lg" variant="secondary" className="bg-white text-pink-600 hover:bg-gray-100">
+            <Button size="lg" variant="secondary" className="bg-white text-rose-600 hover:bg-gray-100">
               Explore All Colleges <ArrowRight className="ml-2 w-4 h-4" />
             </Button>
           </Link>
@@ -287,19 +287,19 @@ function JobNotifications({ jobs }) {
             <Card key={job.id} className="card-hover">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
-                  <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center">
-                    <Briefcase className="w-6 h-6 text-pink-600" />
+                  <div className="w-12 h-12 bg-rose-100 rounded-lg flex items-center justify-center">
+                    <Briefcase className="w-6 h-6 text-rose-600" />
                   </div>
                   <Badge className="bg-green-100 text-green-700">{job.vacancies} Posts</Badge>
                 </div>
                 <h3 className="font-bold text-gray-900 mb-1">{job.title}</h3>
-                <p className="text-sm text-pink-600 font-medium mb-3">{job.organization}</p>
+                <p className="text-sm text-rose-600 font-medium mb-3">{job.organization}</p>
                 <div className="space-y-2 text-sm text-gray-600">
                   <p className="flex items-center gap-2"><MapPin className="w-4 h-4" /> {job.location}</p>
                   <p className="flex items-center gap-2"><Clock className="w-4 h-4" /> Last Date: {job.lastDate}</p>
                 </div>
                 <Link href={`/jobs/${job.id}`}>
-                  <Button className="w-full mt-4 bg-pink-600 hover:bg-pink-700">View Details</Button>
+                  <Button className="w-full mt-4 bg-rose-600 hover:bg-rose-700">View Details</Button>
                 </Link>
               </CardContent>
             </Card>
@@ -332,7 +332,7 @@ function TestimonialsSection({ testimonials }) {
                   />
                   <div>
                     <h4 className="font-bold text-gray-900">{item.name}</h4>
-                    <p className="text-sm text-pink-600">{item.exam}</p>
+                    <p className="text-sm text-rose-600">{item.exam}</p>
                     <Badge className="bg-yellow-100 text-yellow-700 mt-1">{item.rank}</Badge>
                   </div>
                 </div>
@@ -365,16 +365,16 @@ function Footer() {
               Your trusted partner for competitive test series preparation. Join millions of students achieving their dreams.
             </p>
             <div className="flex gap-4">
-              <a href="#" className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center text-pink-600 hover:bg-pink-200">
+              <a href="#" className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center text-rose-600 hover:bg-rose-200">
                 <Facebook className="w-5 h-5" />
               </a>
-              <a href="#" className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center text-pink-600 hover:bg-pink-200">
+              <a href="#" className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center text-rose-600 hover:bg-rose-200">
                 <Twitter className="w-5 h-5" />
               </a>
-              <a href="#" className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center text-pink-600 hover:bg-pink-200">
+              <a href="#" className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center text-rose-600 hover:bg-rose-200">
                 <Instagram className="w-5 h-5" />
               </a>
-              <a href="#" className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center text-pink-600 hover:bg-pink-200">
+              <a href="#" className="w-10 h-10 bg-rose-100 rounded-full flex items-center justify-center text-rose-600 hover:bg-rose-200">
                 <Linkedin className="w-5 h-5" />
               </a>
             </div>
@@ -383,21 +383,21 @@ function Footer() {
           <div>
             <h4 className="font-bold text-gray-900 mb-4">Quick Links</h4>
             <ul className="space-y-2 text-sm text-gray-600">
-              <li><Link href="/exams" className="hover:text-pink-600">Test Series</Link></li>
-              <li><Link href="/blogs" className="hover:text-pink-600">Blogs</Link></li>
-              <li><Link href="/jobs" className="hover:text-pink-600">Jobs</Link></li>
-              <li><Link href="/rank-predictor" className="hover:text-pink-600">Rank Predictor</Link></li>
-              <li><Link href="/colleges" className="hover:text-pink-600">College Finder</Link></li>
+              <li><Link href="/exams" className="hover:text-rose-600">Test Series</Link></li>
+              <li><Link href="/blogs" className="hover:text-rose-600">Blogs</Link></li>
+              <li><Link href="/jobs" className="hover:text-rose-600">Jobs</Link></li>
+              <li><Link href="/rank-predictor" className="hover:text-rose-600">Rank Predictor</Link></li>
+              <li><Link href="/colleges" className="hover:text-rose-600">College Finder</Link></li>
             </ul>
           </div>
 
           <div>
             <h4 className="font-bold text-gray-900 mb-4">Popular Test Series</h4>
             <ul className="space-y-2 text-sm text-gray-600">
-              <li><Link href="/exams/gate" className="hover:text-pink-600">GATE</Link></li>
-              <li><Link href="/exams/cat" className="hover:text-pink-600">CAT</Link></li>
-              <li><Link href="/exams/upsc" className="hover:text-pink-600">UPSC</Link></li>
-              <li><Link href="/exams/jee-main" className="hover:text-pink-600">JEE Main</Link></li>
+              <li><Link href="/exams/gate" className="hover:text-rose-600">GATE</Link></li>
+              <li><Link href="/exams/cat" className="hover:text-rose-600">CAT</Link></li>
+              <li><Link href="/exams/upsc" className="hover:text-rose-600">UPSC</Link></li>
+              <li><Link href="/exams/jee-main" className="hover:text-rose-600">JEE Main</Link></li>
             </ul>
           </div>
 
@@ -405,15 +405,15 @@ function Footer() {
             <h4 className="font-bold text-gray-900 mb-4">Contact Us</h4>
             <ul className="space-y-3 text-sm text-gray-600">
               <li className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-pink-600" />
+                <Mail className="w-4 h-4 text-rose-600" />
                 support@unishaala.com
               </li>
               <li className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-pink-600" />
+                <Phone className="w-4 h-4 text-rose-600" />
                 +91 1234567890
               </li>
               <li className="flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-pink-600" />
+                <MapPin className="w-4 h-4 text-rose-600" />
                 New Delhi, India
               </li>
             </ul>
@@ -468,7 +468,7 @@ export default function HomePage() {
       <div className="min-h-screen">
         <AccessGateBanner />
         <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-pink-600 border-t-transparent"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-rose-600 border-t-transparent"></div>
         </div>
       </div>
     );

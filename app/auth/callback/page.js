@@ -63,9 +63,9 @@ export default function AuthCallbackPage() {
   }, [router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-pink-50 to-white">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-rose-50 to-white">
       <div className="text-center">
-        <Loader2 className="w-12 h-12 animate-spin text-pink-600 mx-auto mb-4" />
+        <Loader2 className="w-12 h-12 animate-spin text-rose-600 mx-auto mb-4" />
         <p className="text-gray-600">Completing login...</p>
       </div>
     </div>

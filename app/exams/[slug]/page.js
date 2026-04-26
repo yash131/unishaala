@@ -247,7 +247,7 @@ export default function ExamDetailPage() {
       <div className="min-h-screen bg-gray-50">
         <MainNavbar />
         <div className="pt-24 flex items-center justify-center">
-          <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full"></div>
+          <div className="animate-spin w-8 h-8 border-4 border-rose-500 border-t-transparent rounded-full"></div>
         </div>
       </div>
     );
@@ -273,7 +273,7 @@ export default function ExamDetailPage() {
       <Card key={domain.id} className="card-hover cursor-pointer" onClick={() => handleSelectDomain(domain)}>
         <CardContent className="p-6">
           <div className="flex items-start justify-between mb-4">
-            <div className="w-14 h-14 bg-gradient-to-br from-pink-400 to-pink-600 rounded-xl flex items-center justify-center">
+            <div className="w-14 h-14 bg-gradient-to-br from-rose-400 to-rose-600 rounded-xl flex items-center justify-center">
               <Layers className="w-7 h-7 text-white" />
             </div>
             {isPurchased ? (
@@ -291,7 +291,7 @@ export default function ExamDetailPage() {
               <ClipboardList className="w-4 h-4 inline mr-1" />
               {domain.testCount || 0} Tests
             </span>
-            <ChevronRight className="w-5 h-5 text-pink-600" />
+            <ChevronRight className="w-5 h-5 text-rose-600" />
           </div>
         </CardContent>
       </Card>
@@ -309,13 +309,13 @@ export default function ExamDetailPage() {
       <Card key={test.id} className="card-hover">
         <CardContent className="p-6">
           <div className="flex items-start justify-between mb-4">
-            <div className="w-12 h-12 bg-pink-100 rounded-lg flex items-center justify-center">
+            <div className="w-12 h-12 bg-rose-100 rounded-lg flex items-center justify-center">
               {test.testType === 'practice_questions' ? (
-                <BookOpen className="w-6 h-6 text-pink-600" />
+                <BookOpen className="w-6 h-6 text-rose-600" />
               ) : test.testType === 'previous_year' ? (
                 <History className="w-6 h-6 text-purple-600" />
               ) : (
-                <ClipboardList className="w-6 h-6 text-pink-600" />
+                <ClipboardList className="w-6 h-6 text-rose-600" />
               )}
             </div>
             {isTestPurchased || isDomainPurchased || examPurchased ? (
@@ -335,7 +335,7 @@ export default function ExamDetailPage() {
             <span>{test.questionCount || test.totalQuestions} Qs</span>
           </div>
           <Button 
-            className="w-full bg-pink-600 hover:bg-pink-700"
+            className="w-full bg-rose-600 hover:bg-rose-700"
             onClick={() => handleStartTest(test)}
           >
             {isAccessible ? (
@@ -354,24 +354,24 @@ export default function ExamDetailPage() {
       <MainNavbar />
 
       {/* Hero Section */}
-      <div className="pt-20 bg-gradient-to-b from-pink-50 to-white">
+      <div className="pt-20 bg-gradient-to-b from-rose-50 to-white">
         <div className="container mx-auto px-4 py-8">
           {selectedDomain ? (
             <button 
               onClick={handleBackToDomains}
-              className="inline-flex items-center text-pink-600 hover:text-pink-700 mb-4"
+              className="inline-flex items-center text-rose-600 hover:text-rose-700 mb-4"
             >
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to Domains
             </button>
           ) : (
-            <Link href="/exams" className="inline-flex items-center text-pink-600 hover:text-pink-700 mb-4">
+            <Link href="/exams" className="inline-flex items-center text-rose-600 hover:text-rose-700 mb-4">
               <ArrowLeft className="w-4 h-4 mr-2" /> All Test Series
             </Link>
           )}
           
           <div className="flex items-start gap-6">
             <div className="w-20 h-20 bg-white rounded-2xl shadow-lg flex items-center justify-center">
-              <Trophy className="w-10 h-10 text-pink-600" />
+              <Trophy className="w-10 h-10 text-rose-600" />
             </div>
             <div>
               <h1 className="text-3xl font-bold text-gray-900">
@@ -381,7 +381,7 @@ export default function ExamDetailPage() {
                 {selectedDomain ? selectedDomain.description : `Select a domain to view available tests`}
               </p>
               {!selectedDomain && domains.length > 0 && (
-                <p className="text-sm text-pink-600 mt-2">
+                <p className="text-sm text-rose-600 mt-2">
                   <Layers className="w-4 h-4 inline mr-1" />
                   {domains.length} domains available
                 </p>
@@ -417,7 +417,7 @@ export default function ExamDetailPage() {
             </h2>
             {testsLoading ? (
               <div className="flex justify-center py-12">
-                <div className="animate-spin w-8 h-8 border-4 border-pink-500 border-t-transparent rounded-full"></div>
+                <div className="animate-spin w-8 h-8 border-4 border-rose-500 border-t-transparent rounded-full"></div>
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -447,14 +447,14 @@ export default function ExamDetailPage() {
             {selectedTest && (
               <>
                 {/* Individual Test Purchase */}
-                <div className="border-2 border-pink-500 rounded-lg p-4 bg-pink-50">
+                <div className="border-2 border-rose-500 rounded-lg p-4 bg-rose-50">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="font-semibold text-gray-900">This Test Only</h4>
-                    <span className="text-xl font-bold text-pink-600">₹{selectedTest.price || 0}</span>
+                    <span className="text-xl font-bold text-rose-600">₹{selectedTest.price || 0}</span>
                   </div>
                   <p className="text-sm text-gray-600 mb-3">{selectedTest.title}</p>
                   <Button 
-                    className="w-full bg-pink-600 hover:bg-pink-700"
+                    className="w-full bg-rose-600 hover:bg-rose-700"
                     onClick={() => handlePayment('test')}
                   >
                     Pay ₹{selectedTest.price || 0} for Test
