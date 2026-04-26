@@ -121,6 +121,9 @@ export async function POST(request) {
     const csvFile = formData.get('csv_file');
     const imagesZip = formData.get('images_zip');
     const publish = formData.get('publish') === 'true';
+    // When 'replace' (default true) all existing questions for this testId
+    // are wiped first so re-uploading the same CSV is fully idempotent.
+    const replaceExisting = formData.get('replace_existing') !== 'false';
 
     if (!testId) {
       return NextResponse.json({ ...result, error: 'Test ID is required' }, { status: 400 });
@@ -287,11 +290,31 @@ export async function POST(request) {
     // already has questions inserted via a different code path.
     const testMatch = { $or: [{ test_id: testId }, { mockTestId: testId }] };
 
+    // REPLACE mode: wipe all existing questions for this test so re-uploading
+    // the same CSV is idempotent (no duplicates, no stale rows). This is the
+    // default behavior — pass replace_existing=false in the form to APPEND.
+    let wipedCount = 0;
+    if (replaceExisting) {
+      const del = await questions.deleteMany(testMatch);
+      wipedCount = del.deletedCount || 0;
+      console.log(`Replace mode: wiped ${wipedCount} existing questions for test ${testId}`);
+    }
+    result.replaced = wipedCount;
+
+    // Detect whether the CSV provides its own question_number column. When it
+    // does NOT, we assign question numbers by ROW INDEX (1-based) so the same
+    // CSV always maps to the same numbers — no drift across re-uploads.
+    const csvHasQuestionNumber = headers.includes('question_number');
+
     // Track used question numbers to detect duplicates
     const usedQuestionNumbers = new Set();
-    // Get existing max question number for this test (across both id fields)
-    const maxExisting = await questions.find(testMatch).sort({ question_number: -1 }).limit(1).toArray();
-    let nextQuestionNumber = (maxExisting[0]?.question_number || 0) + 1;
+    // Get existing max question number for this test (across both id fields).
+    // Only relevant in APPEND mode (replaceExisting=false) — in REPLACE mode the
+    // collection was just wiped so max is 0.
+    const maxExisting = replaceExisting
+      ? null
+      : (await questions.find(testMatch).sort({ question_number: -1 }).limit(1).toArray())[0];
+    let nextQuestionNumber = (maxExisting?.question_number || 0) + 1;
 
     for (let i = 0; i < records.length; i++) {
       const row = records[i];
@@ -304,7 +327,11 @@ export async function POST(request) {
           normalizedRow[key.toLowerCase().trim()] = value;
         }
 
-        // Extract fields (support both question_title and question_text)
+        // Determine question_number:
+        //  - if CSV provides one and it's valid + unused, use it
+        //  - if CSV has no question_number column, assign by row index (i+1)
+        //    so re-importing the same CSV maps to the same numbers
+        //  - otherwise auto-assign from nextQuestionNumber++
         let questionNumber = parseInt(normalizedRow['question_number']);
         const questionText = normalizedRow['question_title']?.trim() || normalizedRow['question_text']?.trim();
         const option1Title = normalizedRow['option1_title']?.trim();
@@ -313,8 +340,11 @@ export async function POST(request) {
         const option4Title = normalizedRow['option4_title']?.trim();
         const correctOption = parseInt(normalizedRow['correct_option_number']);
 
-        // Handle duplicate/missing question numbers - assign new unique number
-        if (!questionNumber || isNaN(questionNumber) || usedQuestionNumbers.has(questionNumber)) {
+        if (!csvHasQuestionNumber) {
+          // CSV doesn't carry question_number — use stable row-based number
+          questionNumber = i + 1;
+        } else if (!questionNumber || isNaN(questionNumber) || usedQuestionNumbers.has(questionNumber)) {
+          // CSV had a column but this row's value is missing or duplicate
           questionNumber = nextQuestionNumber++;
           console.log(`Row ${rowNum}: Assigned new question_number ${questionNumber} (was duplicate or invalid)`);
         }

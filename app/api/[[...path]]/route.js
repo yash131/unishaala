@@ -916,14 +916,19 @@ export async function GET(request) {
     if (path.startsWith('/mock-test-questions/')) {
       const testId = path.split('/mock-test-questions/')[1];
       const questions = await getCollection('questions');
-      
-      // Only fetch Active questions for this mockTestId (case-insensitive)
-      const testQuestions = await questions.find({ 
-        mockTestId: testId,
-        $or: [
-          { status: 'Active' },
-          { status: 'active' },
-          { status: { $exists: false } }
+
+      // Match docs that may carry test_id, mockTestId, or both. This handles
+      // legacy data where only one field was set.
+      const testQuestions = await questions.find({
+        $and: [
+          { $or: [{ mockTestId: testId }, { test_id: testId }] },
+          {
+            $or: [
+              { status: 'Active' },
+              { status: 'active' },
+              { status: { $exists: false } }
+            ]
+          }
         ]
       }).sort({ question_number: 1 }).toArray();
       

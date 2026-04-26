@@ -19,6 +19,7 @@ export default function ImportQuestionsPage() {
   const [selectedTest, setSelectedTest] = useState('');
   const [csvFile, setCsvFile] = useState(null);
   const [zipFile, setZipFile] = useState(null);
+  const [replaceExisting, setReplaceExisting] = useState(true); // default: REPLACE
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
@@ -140,6 +141,7 @@ export default function ImportQuestionsPage() {
       const formData = new FormData();
       formData.append('test_id', selectedTest);
       formData.append('csv_file', csvFile);
+      formData.append('replace_existing', replaceExisting ? 'true' : 'false');
       if (zipFile && hasImageColumns) {
         formData.append('images_zip', zipFile);
       }
@@ -379,6 +381,27 @@ Sample Test,Math Basics,2,Solve this equation,q2.jpg,90,Algebra,x = 5,Isolate va
               </div>
             )}
 
+            {/* Replace vs Append toggle */}
+            <div className="flex items-start gap-3 p-3 rounded-lg border bg-gray-50">
+              <input
+                id="replace-toggle"
+                type="checkbox"
+                checked={replaceExisting}
+                onChange={(e) => setReplaceExisting(e.target.checked)}
+                className="mt-1 w-4 h-4 accent-brand-600 cursor-pointer"
+              />
+              <div className="flex-1">
+                <Label htmlFor="replace-toggle" className="font-medium cursor-pointer">
+                  Replace existing questions in this test
+                </Label>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {replaceExisting
+                    ? '⚠️ All existing questions for this test will be deleted, then this CSV will be imported. Re-uploading the same CSV produces identical questions (no duplicates, no drift).'
+                    : 'Existing questions stay; rows from this CSV will be appended with new question numbers. Re-uploading the same CSV will create duplicates.'}
+                </p>
+              </div>
+            </div>
+
             {/* Import Button */}
             <Button 
               onClick={handleImport} 
@@ -436,6 +459,10 @@ Sample Test,Math Basics,2,Solve this equation,q2.jpg,90,Algebra,x = 5,Isolate va
                 <div className="bg-white p-4 rounded-lg text-center">
                   <p className="text-3xl font-bold text-yellow-600">{result.skipped}</p>
                   <p className="text-sm text-gray-500">Skipped</p>
+                </div>
+                <div className="bg-white p-4 rounded-lg text-center">
+                  <p className="text-3xl font-bold text-slate-700">{result.replaced || 0}</p>
+                  <p className="text-sm text-gray-500">Replaced (wiped)</p>
                 </div>
                 <div className="bg-white p-4 rounded-lg text-center">
                   <p className="text-3xl font-bold text-orange-600">{result.missing_images?.length || 0}</p>
