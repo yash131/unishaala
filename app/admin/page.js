@@ -1295,12 +1295,18 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
 
     setSaving(true);
     try {
-      // If ZIP file is present and we have image columns, use import-questions API
-      if (zipFile && hasImageColumns) {
+      // Use the image-aware import-questions endpoint whenever the CSV has
+      // any image columns, regardless of whether a ZIP file was attached.
+      // The endpoint auto-detects URL-mode (Bunny.net etc.) and handles it.
+      if (hasImageColumns) {
         const formData = new FormData();
         formData.append('test_id', selectedTestId);
         formData.append('csv_file', csvFileSelected);
-        formData.append('images_zip', zipFile);
+        // Default Replace mode so re-uploads stay idempotent (no duplicates).
+        formData.append('replace_existing', 'true');
+        if (zipFile) {
+          formData.append('images_zip', zipFile);
+        }
         if (publish) formData.append('publish', 'true');
 
         const res = await fetch('/api/admin/import-questions', {
@@ -1312,11 +1318,15 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
         const result = await res.json();
         
         if (result.success) {
-          toast.success(
-            `Imported: ${result.imported} new, ${result.updated} updated, ${result.skipped} skipped` +
-            (result.missing_images?.length > 0 ? ` (${result.missing_images.length} missing images)` : '') +
-            (publish ? ' - Test Published!' : '')
-          );
+          const parts = [
+            `Imported: ${result.imported} new`,
+            `${result.updated} updated`,
+            `${result.skipped} skipped`
+          ];
+          if (result.replaced > 0) parts.push(`${result.replaced} replaced`);
+          if (result.invalid_image_urls?.length > 0) parts.push(`${result.invalid_image_urls.length} invalid URLs`);
+          if (result.missing_images?.length > 0) parts.push(`${result.missing_images.length} missing images`);
+          toast.success(parts.join(', ') + (publish ? ' — Test Published!' : ''));
           setShowPreview(false);
           setPreviewData([]);
           setZipFile(null);
@@ -1329,7 +1339,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
           toast.error(result.error || 'Import failed');
         }
       } else {
-        // No ZIP file - use regular save-batch
+        // No image columns — use the simple save-batch path.
         const res = await fetch('/api/admin/questions/save-batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
