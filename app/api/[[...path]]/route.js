@@ -520,6 +520,7 @@ export async function GET(request) {
       const testimonials = await getCollection('testimonials');
       const jobs = await getCollection('jobs');
       const colleges = await getCollection('colleges');
+      const blogs = await getCollection('blogs');
 
       return jsonResponse({
         success: true,
@@ -528,7 +529,12 @@ export async function GET(request) {
           notifications: await notifications.find({}).sort({ createdAt: -1 }).limit(4).toArray(),
           testimonials: await testimonials.find({}).limit(3).toArray(),
           jobs: await jobs.find({ status: 'Active' }).sort({ createdAt: -1 }).limit(3).toArray(),
-          colleges: await colleges.find({}).sort({ ranking: 1 }).limit(4).toArray()
+          colleges: await colleges.find({}).sort({ ranking: 1 }).limit(4).toArray(),
+          blogs: await blogs.find({
+            status: 'published',
+            publishDate: { $lte: new Date() }
+          }).project({ id: 1, title: 1, slug: 1, description: 1, image: 1, publishDate: 1, views: 1 })
+            .sort({ publishDate: -1 }).limit(8).toArray()
         }
       });
     }

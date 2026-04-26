@@ -222,44 +222,87 @@ function FeaturesSection() {
   );
 }
 
-// College Finder Section
-function CollegeFinder({ colleges }) {
-  return (
-    <section className="py-16 bg-gradient-to-r from-logo-600 to-logo-700">
-      <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-white">College Finder</h2>
-          <p className="text-brand-100 mt-2">Find the best colleges based on your rank</p>
-        </div>
+// Blog Marquee Section (auto-scrolling horizontal blog cards)
+function BlogMarquee({ blogs }) {
+  if (!blogs || blogs.length === 0) return null;
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {colleges?.slice(0, 4).map((college) => (
-            <Card key={college.id} className="card-hover">
-              <CardContent className="p-6">
-                <div className="flex items-center gap-2 mb-3">
-                  <Building className="w-5 h-5 text-brand-600" />
-                  <Badge variant="secondary">Rank #{college.ranking}</Badge>
+  // Duplicate for seamless infinite loop
+  const items = [...blogs, ...blogs];
+
+  return (
+    <section className="py-16 bg-gradient-to-b from-gray-50 to-white">
+      <div className="container mx-auto px-4">
+        <div className="text-center mb-10">
+          <Badge className="bg-brand-100 text-brand-700 mb-3">Latest Articles</Badge>
+          <h2 className="text-3xl font-bold text-gray-900">From Our Blog</h2>
+          <p className="text-gray-600 mt-2">Insights, tips and updates to power your prep</p>
+        </div>
+      </div>
+
+      <div className="marquee-wrapper marquee-fade overflow-hidden">
+        <div className="marquee-track gap-6 py-4">
+          {items.map((blog, idx) => (
+            <Link
+              key={`${blog.id}-${idx}`}
+              href={`/blogs/${blog.slug}`}
+              className="block flex-shrink-0 w-[320px]"
+            >
+              <Card className="card-hover h-full overflow-hidden">
+                <div className="relative w-full h-40 bg-gray-100 overflow-hidden">
+                  {blog.image ? (
+                    <img
+                      src={blog.image}
+                      alt={blog.title}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-gradient-to-br from-brand-100 to-brand-200 flex items-center justify-center">
+                      <BookOpen className="w-12 h-12 text-brand-600" />
+                    </div>
+                  )}
                 </div>
-                <h3 className="font-bold text-gray-900 mb-1">{college.name}</h3>
-                <p className="text-sm text-gray-500 mb-3">{college.location}</p>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">{college.type}</span>
-                  <span className="flex items-center text-yellow-500">
-                    <Star className="w-4 h-4 fill-current" /> {college.rating}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-2">
+                    <Clock className="w-3.5 h-3.5" />
+                    {blog.publishDate
+                      ? new Date(blog.publishDate).toLocaleDateString('en-IN', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric'
+                        })
+                      : ''}
+                    {typeof blog.views === 'number' && (
+                      <>
+                        <span>·</span>
+                        <span>{blog.views} views</span>
+                      </>
+                    )}
+                  </div>
+                  <h3 className="font-bold text-gray-900 text-base mb-2 line-clamp-2 leading-snug">
+                    {blog.title}
+                  </h3>
+                  {blog.description && (
+                    <p className="text-sm text-gray-600 line-clamp-2">
+                      {blog.description}
+                    </p>
+                  )}
+                  <div className="mt-3 flex items-center text-sm font-medium text-brand-600">
+                    Read More <ArrowRight className="w-4 h-4 ml-1" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
+      </div>
 
-        <div className="text-center mt-8">
-          <Link href="/colleges">
-            <Button size="lg" variant="secondary" className="bg-white text-brand-600 hover:bg-gray-100">
-              Explore All Colleges <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
-          </Link>
-        </div>
+      <div className="container mx-auto px-4 mt-8 text-center">
+        <Link href="/blogs">
+          <Button size="lg" variant="outline" className="border-brand-500 text-brand-600 hover:bg-brand-50">
+            View All Articles <ArrowRight className="ml-2 w-4 h-4" />
+          </Button>
+        </Link>
       </div>
     </section>
   );
@@ -442,7 +485,8 @@ export default function HomePage() {
     notifications: [],
     testimonials: [],
     jobs: [],
-    colleges: []
+    colleges: [],
+    blogs: []
   });
   const [loading, setLoading] = useState(true);
 
@@ -482,7 +526,7 @@ export default function HomePage() {
       <ExamNotifications notifications={data.notifications} />
       <PopularExams exams={data.exams} />
       <FeaturesSection />
-      <CollegeFinder colleges={data.colleges} />
+      <BlogMarquee blogs={data.blogs} />
       <JobNotifications jobs={data.jobs} />
       <TestimonialsSection testimonials={data.testimonials} />
       <Footer />
