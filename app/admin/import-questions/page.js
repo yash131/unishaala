@@ -26,6 +26,7 @@ export default function ImportQuestionsPage() {
   // CSV format detection
   const [csvFormat, setCsvFormat] = useState(null); // 'old' | 'new' | null
   const [hasImageColumns, setHasImageColumns] = useState(false);
+  const [urlMode, setUrlMode] = useState(false); // true = URL-based images, false = ZIP-based
   const [detectedColumns, setDetectedColumns] = useState([]);
 
   useEffect(() => {
@@ -51,6 +52,7 @@ export default function ImportQuestionsPage() {
     setZipFile(null);
     setCsvFormat(null);
     setHasImageColumns(false);
+    setUrlMode(false);
     setDetectedColumns([]);
     setError(null);
     setResult(null);
@@ -91,32 +93,28 @@ export default function ImportQuestionsPage() {
       setDetectedColumns(headers);
 
       // Check for image columns (be flexible with naming)
-      const imageColumnPatterns = [
-        'question_image', 'questionimage', 'question image',
-        'option1_image', 'option1image', 'option1 image',
-        'option2_image', 'option2image', 'option2 image',
-        'option3_image', 'option3image', 'option3 image',
-        'option4_image', 'option4image', 'option4 image'
-      ];
-      
-      const foundImageColumns = headers.filter(h => {
-        const normalized = h.replace(/[\s_-]/g, '').toLowerCase();
-        return imageColumnPatterns.some(pattern => 
-          normalized === pattern.replace(/[\s_-]/g, '').toLowerCase() ||
-          normalized.includes('image')
-        );
-      });
-      
+      const foundImageColumns = headers.filter(h => h.includes('image'));
       console.log('Found image columns:', foundImageColumns);
-      
+
       if (foundImageColumns.length > 0) {
         setCsvFormat('new');
         setHasImageColumns(true);
-        console.log('Detected NEW format with image columns:', foundImageColumns);
+
+        // Sniff URL vs filename: scan a few sample rows for http(s):// in any image column
+        let detectedUrlMode = false;
+        const sampleRows = lines.slice(1, Math.min(lines.length, 11));
+        for (const line of sampleRows) {
+          if (/https?:\/\//i.test(line)) {
+            detectedUrlMode = true;
+            break;
+          }
+        }
+        setUrlMode(detectedUrlMode);
+        console.log('URL mode:', detectedUrlMode);
       } else {
         setCsvFormat('old');
         setHasImageColumns(false);
-        console.log('Detected OLD format (no image columns)');
+        setUrlMode(false);
       }
     } catch (e) {
       console.error('Error parsing CSV:', e);
@@ -183,11 +181,16 @@ export default function ImportQuestionsPage() {
 Sample Test,Math Basics,1,What is 2 + 2?,60,Simple addition,The answer is 4,Remember basic arithmetic,active,3,4,5,6,2
 Sample Test,Math Basics,2,What is 5 x 3?,60,Multiplication,The answer is 15,Use multiplication tables,active,10,15,20,25,2`;
       filename = 'sample_questions_old_format.csv';
+    } else if (format === 'url') {
+      content = `paper_title,topic_title,question_title,duration,description,question_image,solution_text,tip,status,option1_title,option1_image,option2_title,option2_image,option3_title,option3_image,option4_title,option4_image,correct_option_number,solution_image
+"GATE 2024 Civil","Strength of Materials","Identify the stress diagram shown below.",1,"Visual question.","https://cdn.example.com/q1.png","Diagram (b) shows pure shear.","Recall stress conventions.","Active","Diagram A","https://cdn.example.com/q1opt1.png","Diagram B","https://cdn.example.com/q1opt2.png","Diagram C","https://cdn.example.com/q1opt3.png","Diagram D","https://cdn.example.com/q1opt4.png",2,"https://cdn.example.com/q1sol.png"
+"GATE 2024 Civil","Surveying","What is the value of bearing shown?",1,"","https://cdn.example.com/q2.png","45° NE.","Use the compass rule.","Active","30° NE","","45° NE","","60° NE","","75° NE","",2,""`;
+      filename = 'sample_questions_url_format.csv';
     } else {
       content = `test_title,topic_title,question_number,question_title,question_image,duration,description,solution_text,tip,status,option1_title,option1_image,option2_title,option2_image,option3_title,option3_image,option4_title,option4_image,correct_option_number
 Sample Test,Math Basics,1,What is shown in the image?,q1.png,60,Image question,See the diagram,Look carefully,active,Triangle,opt1a.png,Square,opt1b.png,Circle,opt1c.png,Rectangle,opt1d.png,2
 Sample Test,Math Basics,2,Solve this equation,q2.jpg,90,Algebra,x = 5,Isolate variable,active,x = 3,,x = 5,,x = 7,,x = 9,,2`;
-      filename = 'sample_questions_new_format.csv';
+      filename = 'sample_questions_zip_format.csv';
     }
 
     const blob = new Blob([content], { type: 'text/csv' });
@@ -219,25 +222,37 @@ Sample Test,Math Basics,2,Solve this equation,q2.jpg,90,Algebra,x = 5,Isolate va
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <p className="font-medium text-gray-700">OLD Format (without images):</p>
+              <p className="font-medium text-gray-700">OLD Format (no images):</p>
               <code className="text-xs bg-white p-2 rounded block mt-1 overflow-x-auto">
-                test_title, topic_title, question_number, question_title, duration, description, solution_text, tip, status, option1_title, option2_title, option3_title, option4_title, correct_option_number
+                test_title, topic_title, question_number, question_title, duration, description, solution_text, tip, status, option1_title…option4_title, correct_option_number
               </code>
               <Button variant="outline" size="sm" className="mt-2" onClick={() => downloadSampleCSV('old')}>
                 <Download className="w-4 h-4 mr-2" /> Download Sample (Old)
               </Button>
             </div>
             <div>
-              <p className="font-medium text-gray-700">NEW Format (with images):</p>
+              <p className="font-medium text-gray-700">URL Format (recommended — images hosted externally):</p>
               <code className="text-xs bg-white p-2 rounded block mt-1 overflow-x-auto">
-                test_title, topic_title, question_number, question_title, question_image, duration, ..., option1_title, option1_image, ..., correct_option_number
+                paper_title, topic_title, question_title, duration, description, <strong>question_image (URL)</strong>, solution_text, tip, status, option1_title, <strong>option1_image (URL)</strong>… correct_option_number, <strong>solution_image (URL)</strong>
+              </code>
+              <p className="text-xs text-gray-500 mt-1">
+                Image columns must contain full <code>https://</code> URLs (e.g. Bunny.net, S3, Cloudinary, etc.). No ZIP upload required.
+              </p>
+              <Button variant="outline" size="sm" className="mt-2" onClick={() => downloadSampleCSV('url')}>
+                <Download className="w-4 h-4 mr-2" /> Download Sample (URL)
+              </Button>
+            </div>
+            <div>
+              <p className="font-medium text-gray-700">ZIP Format (legacy — image filenames + ZIP upload):</p>
+              <code className="text-xs bg-white p-2 rounded block mt-1 overflow-x-auto">
+                test_title, topic_title, question_number, question_title, question_image (filename), …
               </code>
               <Button variant="outline" size="sm" className="mt-2" onClick={() => downloadSampleCSV('new')}>
-                <Download className="w-4 h-4 mr-2" /> Download Sample (New)
+                <Download className="w-4 h-4 mr-2" /> Download Sample (ZIP)
               </Button>
             </div>
             <p className="text-sm text-gray-600">
-              <strong>Note:</strong> System auto-detects format based on columns. Upload CSV first to see format detection.
+              <strong>Note:</strong> The system auto-detects the mode based on whether image cells contain URLs or filenames.
             </p>
           </CardContent>
         </Card>
@@ -295,20 +310,30 @@ Sample Test,Math Basics,2,Solve this equation,q2.jpg,90,Algebra,x = 5,Isolate va
 
             {/* Format Detection Result */}
             {csvFormat && (
-              <div className={`p-4 rounded-lg border ${hasImageColumns ? 'bg-purple-50 border-purple-200' : 'bg-green-50 border-green-200'}`}>
+              <div className={`p-4 rounded-lg border ${
+                hasImageColumns
+                  ? (urlMode ? 'bg-blue-50 border-blue-200' : 'bg-purple-50 border-purple-200')
+                  : 'bg-green-50 border-green-200'
+              }`}>
                 <div className="flex items-center gap-2 mb-2">
                   {hasImageColumns ? (
-                    <ImageIcon className="w-5 h-5 text-purple-600" />
+                    <ImageIcon className={`w-5 h-5 ${urlMode ? 'text-blue-600' : 'text-purple-600'}`} />
                   ) : (
                     <CheckCircle className="w-5 h-5 text-green-600" />
                   )}
                   <span className="font-medium">
-                    {hasImageColumns ? 'NEW Format Detected (with images)' : 'OLD Format Detected (no images)'}
+                    {hasImageColumns
+                      ? (urlMode
+                          ? 'URL Format Detected (images hosted externally — no ZIP needed)'
+                          : 'ZIP Format Detected (image filenames — upload images ZIP below)')
+                      : 'OLD Format Detected (no images)'}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600">
-                  {hasImageColumns 
-                    ? 'Image columns found. You can optionally upload a ZIP file with images.'
+                  {hasImageColumns
+                    ? (urlMode
+                        ? 'Image cells contain http(s) URLs. The system will fetch and validate each URL during import.'
+                        : 'Image cells contain filenames. Optionally upload a ZIP with matching files.')
                     : 'No image columns found. Questions will be imported without images.'}
                 </p>
                 {detectedColumns.length > 0 && (
@@ -322,8 +347,8 @@ Sample Test,Math Basics,2,Solve this equation,q2.jpg,90,Algebra,x = 5,Isolate va
               </div>
             )}
 
-            {/* ZIP Upload - Only shown when image columns are detected */}
-            {hasImageColumns && (
+            {/* ZIP Upload - Only shown when image columns present AND filenames (not URLs) */}
+            {hasImageColumns && !urlMode && (
               <div className="space-y-2 p-4 border-2 border-dashed border-purple-300 rounded-lg bg-purple-25">
                 <Label className="flex items-center gap-2">
                   <FileArchive className="w-4 h-4 text-purple-600" />
@@ -417,10 +442,31 @@ Sample Test,Math Basics,2,Solve this equation,q2.jpg,90,Algebra,x = 5,Isolate va
                   <p className="text-sm text-gray-500">Missing Images</p>
                 </div>
                 <div className="bg-white p-4 rounded-lg text-center">
+                  <p className="text-3xl font-bold text-rose-600">{result.invalid_image_urls?.length || 0}</p>
+                  <p className="text-sm text-gray-500">Invalid Image URLs</p>
+                </div>
+                <div className="bg-white p-4 rounded-lg text-center">
                   <p className="text-3xl font-bold text-red-600">{result.invalid_rows?.length || 0}</p>
                   <p className="text-sm text-gray-500">Invalid Rows</p>
                 </div>
               </div>
+
+              {/* Invalid Image URLs */}
+              {result.invalid_image_urls?.length > 0 && (
+                <div className="mb-4">
+                  <p className="font-medium text-rose-700 mb-2 flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4" />
+                    Invalid Image URLs ({result.invalid_image_urls.length})
+                  </p>
+                  <div className="bg-white p-3 rounded max-h-40 overflow-y-auto text-sm">
+                    {result.invalid_image_urls.map((item, i) => (
+                      <div key={i} className="py-1 border-b last:border-0">
+                        Row {item.row}: <strong>{item.field}</strong> — <code className="bg-gray-100 px-1 rounded text-xs break-all">{item.url}</code> <span className="text-rose-600">({item.error})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Missing Images */}
               {result.missing_images?.length > 0 && (

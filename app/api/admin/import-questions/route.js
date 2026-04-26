@@ -25,6 +25,71 @@ const NEW_FORMAT_COLUMNS = [
 const ALLOWED_IMAGE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
 const MAX_ZIP_SIZE = 100 * 1024 * 1024; // 100MB
 
+// URL helpers --------------------------------------------------------------
+const isHttpUrl = (s) => {
+  if (!s || typeof s !== 'string') return false;
+  const t = s.trim();
+  return /^https?:\/\//i.test(t);
+};
+
+const looksLikeImageUrl = (s) => {
+  if (!isHttpUrl(s)) return false;
+  // Quick accept on file extensions or common CDN/object storage hosts
+  return /\.(png|jpe?g|webp|gif|svg|bmp|avif)(\?.*)?$/i.test(s) ||
+         /(bunny|b-cdn|cloudfront|cloudinary|imgix|amazonaws|gstatic|googleusercontent|theclosedoor)/i.test(s);
+};
+
+/**
+ * Validate an external image URL via HEAD request.
+ * Falls back to GET (range 0-0) if HEAD is not supported by the host.
+ * Returns { ok: boolean, status?: number, contentType?: string, error?: string }
+ */
+async function validateImageUrl(url, { timeoutMs = 5000 } = {}) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    let res;
+    try {
+      res = await fetch(url, { method: 'HEAD', signal: ctrl.signal, redirect: 'follow' });
+    } catch (_e) {
+      res = null;
+    }
+    if (!res || res.status === 405 || res.status === 501) {
+      // Fallback: small GET
+      res = await fetch(url, {
+        method: 'GET',
+        headers: { Range: 'bytes=0-0' },
+        signal: ctrl.signal,
+        redirect: 'follow'
+      });
+    }
+    clearTimeout(t);
+    const ct = res.headers.get('content-type') || '';
+    if (!res.ok && res.status !== 206) {
+      return { ok: false, status: res.status, contentType: ct, error: `HTTP ${res.status}` };
+    }
+    if (ct && !ct.toLowerCase().startsWith('image/')) {
+      return { ok: false, status: res.status, contentType: ct, error: `not an image (content-type: ${ct})` };
+    }
+    return { ok: true, status: res.status, contentType: ct };
+  } catch (e) {
+    return { ok: false, error: e.name === 'AbortError' ? 'timeout' : (e.message || 'fetch failed') };
+  }
+}
+
+/** Validate many URLs in parallel batches. Returns Map<url, result>. */
+async function validateUrlsInBatches(urls, { batchSize = 10, timeoutMs = 5000 } = {}) {
+  const map = new Map();
+  const unique = Array.from(new Set(urls.filter((u) => isHttpUrl(u))));
+  for (let i = 0; i < unique.length; i += batchSize) {
+    const slice = unique.slice(i, i + batchSize);
+    const results = await Promise.all(slice.map((u) => validateImageUrl(u, { timeoutMs })));
+    slice.forEach((u, idx) => map.set(u, results[idx]));
+  }
+  return map;
+}
+// --------------------------------------------------------------------------
+
 export async function POST(request) {
   const result = {
     success: false,
@@ -33,6 +98,7 @@ export async function POST(request) {
     updated: 0,
     skipped: 0,
     missing_images: [],
+    invalid_image_urls: [],
     invalid_rows: [],
     error: null
   };
@@ -96,10 +162,41 @@ export async function POST(request) {
     // Detect format by checking for image columns
     const headers = Object.keys(records[0]).map(h => h.toLowerCase().trim());
     const hasImageColumns = headers.some(h => h.includes('image'));
-    console.log('CSV Format:', hasImageColumns ? 'NEW (with images)' : 'OLD (no images)');
+
+    // Detect URL-mode: any image cell contains an http(s) URL
+    const sampleSize = Math.min(records.length, 25);
+    let urlMode = false;
+    if (hasImageColumns) {
+      outer: for (let i = 0; i < sampleSize; i++) {
+        const r = records[i];
+        for (const k of Object.keys(r)) {
+          if (k.toLowerCase().includes('image') && isHttpUrl(r[k])) {
+            urlMode = true;
+            break outer;
+          }
+        }
+      }
+    }
+
+    console.log('CSV Format:', hasImageColumns ? 'NEW (with images)' : 'OLD (no images)', urlMode ? '[URL mode]' : '[ZIP mode]');
     console.log('Headers:', headers);
 
-    // STEP 2: Process ZIP if uploaded - Store images in MongoDB
+    // STEP 2a: Validate URLs (URL mode) ------------------------------------
+    const urlValidation = new Map(); // url -> { ok, error }
+    if (hasImageColumns && urlMode) {
+      const allUrls = [];
+      for (const r of records) {
+        for (const k of Object.keys(r)) {
+          if (k.toLowerCase().includes('image') && isHttpUrl(r[k])) {
+            allUrls.push(r[k].trim());
+          }
+        }
+      }
+      const validated = await validateUrlsInBatches(allUrls, { batchSize: 10, timeoutMs: 6000 });
+      for (const [u, v] of validated.entries()) urlValidation.set(u, v);
+    }
+
+    // STEP 2b: Process ZIP if uploaded - Store images in MongoDB
     let imageMap = {};
     if (imagesZip && imagesZip.size > 0) {
       if (imagesZip.size > MAX_ZIP_SIZE) {
@@ -233,47 +330,66 @@ export async function POST(request) {
           continue;
         }
 
-        // Process image URLs
+        // Process image URLs (supports both URL mode and ZIP-filename mode)
         let questionImageUrl = null;
         let option1ImageUrl = null;
         let option2ImageUrl = null;
         let option3ImageUrl = null;
         let option4ImageUrl = null;
+        let solutionImageUrl = null;
 
-        if (hasImageColumns && Object.keys(imageMap).length > 0) {
-          // Question image
-          const qImg = normalizedRow['question_image']?.trim();
-          if (qImg) {
-            const mappedUrl = imageMap[qImg.toLowerCase()] || imageMap[path.basename(qImg, path.extname(qImg)).toLowerCase()];
-            if (mappedUrl) {
-              questionImageUrl = mappedUrl;
-            } else {
-              result.missing_images.push({ row: rowNum, field: 'question_image', filename: qImg });
+        // Helper: resolve a single image cell into a URL or null,
+        // recording validation issues on the result object.
+        const resolveImageCell = (cellRaw, fieldName) => {
+          const cell = (cellRaw || '').toString().trim();
+          if (!cell) return null;
+
+          // URL mode: cell is an http(s) URL
+          if (isHttpUrl(cell)) {
+            const v = urlValidation.get(cell);
+            if (v && !v.ok) {
+              result.invalid_image_urls.push({
+                row: rowNum,
+                field: fieldName,
+                url: cell,
+                error: v.error || 'invalid'
+              });
+              return null;
             }
+            return cell;
           }
 
-          // Option images
-          for (let opt = 1; opt <= 4; opt++) {
-            const optImg = normalizedRow[`option${opt}_image`]?.trim();
-            if (optImg) {
-              const mappedUrl = imageMap[optImg.toLowerCase()] || imageMap[path.basename(optImg, path.extname(optImg)).toLowerCase()];
-              if (mappedUrl) {
-                if (opt === 1) option1ImageUrl = mappedUrl;
-                else if (opt === 2) option2ImageUrl = mappedUrl;
-                else if (opt === 3) option3ImageUrl = mappedUrl;
-                else if (opt === 4) option4ImageUrl = mappedUrl;
-              } else {
-                result.missing_images.push({ row: rowNum, field: `option${opt}_image`, filename: optImg });
-              }
-            }
+          // ZIP/filename mode: try mapping
+          if (Object.keys(imageMap).length > 0) {
+            const mapped =
+              imageMap[cell.toLowerCase()] ||
+              imageMap[path.basename(cell, path.extname(cell)).toLowerCase()];
+            if (mapped) return mapped;
+            result.missing_images.push({ row: rowNum, field: fieldName, filename: cell });
+            return null;
           }
+
+          // Filename given but no ZIP available -> missing
+          result.missing_images.push({ row: rowNum, field: fieldName, filename: cell });
+          return null;
+        };
+
+        if (hasImageColumns) {
+          questionImageUrl = resolveImageCell(normalizedRow['question_image'], 'question_image');
+          option1ImageUrl  = resolveImageCell(normalizedRow['option1_image'],  'option1_image');
+          option2ImageUrl  = resolveImageCell(normalizedRow['option2_image'],  'option2_image');
+          option3ImageUrl  = resolveImageCell(normalizedRow['option3_image'],  'option3_image');
+          option4ImageUrl  = resolveImageCell(normalizedRow['option4_image'],  'option4_image');
+          solutionImageUrl = resolveImageCell(normalizedRow['solution_image'], 'solution_image');
         }
 
         // Build question document
         const questionDoc = {
           test_id: testId,
           mockTestId: testId, // Also set mockTestId for user-facing queries
-          test_title: normalizedRow['test_title']?.trim() || test.title,
+          test_title: normalizedRow['test_title']?.trim()
+            || normalizedRow['paper_title']?.trim()
+            || test.title,
           topic_title: normalizedRow['topic_title']?.trim() || '',
           question_number: questionNumber,
           question_text: questionText,
@@ -281,6 +397,7 @@ export async function POST(request) {
           duration: parseInt(normalizedRow['duration']) || 60,
           description: normalizedRow['description']?.trim() || '',
           solution_text: normalizedRow['solution_text']?.trim() || '',
+          solution_image_url: solutionImageUrl,
           tip: normalizedRow['tip']?.trim() || '',
           status: 'active', // Always set to active for visibility
           options: [
