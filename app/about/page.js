@@ -54,7 +54,7 @@ export default function AboutPage() {
       </div>
 
       {/* Stats Section */}
-      <div className="py-16 bg-brand-600">
+      <div className="py-16 bg-logo-600">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {stats.map((stat, index) => (
@@ -136,7 +136,7 @@ export default function AboutPage() {
       </div>
 
       {/* CTA Section */}
-      <div className="py-16 bg-gradient-to-r from-brand-600 to-brand-700">
+      <div className="py-16 bg-gradient-to-r from-logo-600 to-logo-700">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold text-white mb-4">Ready to Start Your Journey?</h2>
           <p className="text-brand-100 mb-8 max-w-2xl mx-auto">
