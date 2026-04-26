@@ -131,9 +131,24 @@ export default function MockTestPage() {
   const isSubmittingRef = useRef(false);
 
   useEffect(() => {
+    // Reset all client state when navigating between tests so we never render
+    // stale questions/answers from a previous test.
+    setTest(null);
+    setQuestions([]);
+    setAnswers({});
+    setFlagged({});
+    setStarted(false);
+    setCurrentQuestion(0);
+    setAttemptId(null);
+    setLoading(true);
+
     async function fetchTest() {
       try {
-        const response = await fetch(`/api/mock-test/${params.id}`);
+        const response = await fetch(`/api/mock-test/${params.id}?_t=${Date.now()}`, {
+          cache: 'no-store',
+          credentials: 'include',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
         const result = await response.json();
         if (result.success) {
           setTest(result.data);
@@ -341,8 +356,12 @@ export default function MockTestPage() {
       if (result.success) {
         setAttemptId(result.data.attemptId);
         
-        // Fetch questions
-        const qResponse = await fetch(`/api/mock-test-questions/${params.id}`);
+        // Fetch questions (always bypass caches so newly-imported images show up)
+        const qResponse = await fetch(`/api/mock-test-questions/${params.id}?_t=${Date.now()}`, {
+          cache: 'no-store',
+          credentials: 'include',
+          headers: { 'Cache-Control': 'no-cache' }
+        });
         const qResult = await qResponse.json();
         if (qResult.success) {
           setQuestions(qResult.data);

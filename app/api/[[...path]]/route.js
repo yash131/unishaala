@@ -909,7 +909,9 @@ export async function GET(request) {
         return jsonResponse({ success: false, error: 'Test not available' }, 404);
       }
 
-      return jsonResponse({ success: true, data: test });
+      const res = NextResponse.json({ success: true, data: test });
+      res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      return res;
     }
 
     // Get questions for a mock test (User taking test - only Active questions)
@@ -971,7 +973,13 @@ export async function GET(request) {
         };
       });
 
-      return jsonResponse({ success: true, data: questionsWithoutAnswers });
+      // Always return fresh data — admins frequently re-import question banks
+      // and any cached response would mask updated image URLs.
+      const noCacheRes = NextResponse.json({ success: true, data: questionsWithoutAnswers });
+      noCacheRes.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      noCacheRes.headers.set('Pragma', 'no-cache');
+      noCacheRes.headers.set('Expires', '0');
+      return noCacheRes;
     }
 
     // Jobs list
