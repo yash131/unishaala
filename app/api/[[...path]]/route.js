@@ -1454,27 +1454,24 @@ export async function POST(request) {
 
     // User Registration
     if (path === '/auth/signup') {
-      const { name, email, phone, password, phoneVerified } = body;
+      const { name, email, phone, password } = body;
       
       if (!name || !email || !password) {
         return jsonResponse({ success: false, error: 'Name, email and password are required' }, 400);
       }
 
-      if (!phone) {
-        return jsonResponse({ success: false, error: 'Phone number is required' }, 400);
-      }
-
       const users = await getCollection('users');
       const existingUser = await users.findOne({ email });
-      
       if (existingUser) {
         return jsonResponse({ success: false, error: 'Email already registered' }, 400);
       }
 
-      // Check if phone already registered
-      const existingPhone = await users.findOne({ phone });
-      if (existingPhone) {
-        return jsonResponse({ success: false, error: 'Phone number already registered' }, 400);
+      // Phone is optional. If provided, ensure it's unique.
+      if (phone) {
+        const existingPhone = await users.findOne({ phone });
+        if (existingPhone) {
+          return jsonResponse({ success: false, error: 'Phone number already registered' }, 400);
+        }
       }
 
       const hashedPassword = await hashPassword(password);
@@ -1486,8 +1483,10 @@ export async function POST(request) {
         phone: phone || '',
         password: hashedPassword,
         role: 'USER',
-        isVerified: phoneVerified === true, // Verified if phone OTP was verified
-        phoneVerified: phoneVerified === true,
+        // Phone verification is no longer required to access the site;
+        // mark accounts as verified so legacy gates don't block them.
+        isVerified: true,
+        phoneVerified: true,
         authProvider: 'local',
         createdAt: new Date(),
         updatedAt: new Date()
@@ -1495,11 +1494,35 @@ export async function POST(request) {
 
       await users.insertOne(newUser);
 
-      return jsonResponse({
+      // Auto-login the user by issuing the auth_token cookie immediately.
+      const token = createToken({
+        userId: newUser.id,
+        email: newUser.email,
+        role: newUser.role,
+        phoneVerified: true
+      });
+      const response = jsonResponse({
         success: true,
         message: 'Registration successful.',
-        data: { userId: newUser.id, email }
+        data: {
+          token,
+          user: {
+            id: newUser.id,
+            name: newUser.name,
+            email: newUser.email,
+            role: newUser.role,
+            phoneVerified: true
+          }
+        }
       });
+      response.cookies.set('auth_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60
+      });
+      return response;
     }
 
     // OTP Verification

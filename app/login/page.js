@@ -65,9 +65,6 @@ export default function LoginPage() {
 
         if (result.data.user.role === 'SUPER_ADMIN' || result.data.user.role === 'ADMIN') {
           router.push('/admin');
-        } else if (result.data.user.phoneVerified !== true) {
-          // Need to verify phone first — land on home with verify-phone banner
-          router.push(`/?auth=verify-phone${safeNext ? `&next=${encodeURIComponent(safeNext)}` : ''}`);
         } else if (safeNext) {
           router.push(safeNext);
         } else {

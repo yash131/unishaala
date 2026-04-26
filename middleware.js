@@ -120,21 +120,7 @@ export function middleware(request) {
     return NextResponse.redirect(url);
   }
 
-  // Admin roles always have access
-  if (payload.role === 'ADMIN' || payload.role === 'SUPER_ADMIN') {
-    return NextResponse.next();
-  }
-
-  // Logged in but phone not verified → redirect
-  if (payload.phoneVerified !== true) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/';
-    url.search = '';
-    url.searchParams.set('auth', 'verify-phone');
-    url.searchParams.set('next', pathname + (search || ''));
-    return NextResponse.redirect(url);
-  }
-
+  // Logged in (any role) → allow access. Phone verification is no longer gated.
   return NextResponse.next();
 }
 
