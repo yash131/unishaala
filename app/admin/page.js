@@ -104,7 +104,7 @@ function AdminSidebar({ activeTab, setActiveTab }) {
             className="h-10 w-auto object-contain"
           />
           <div>
-            <span className="text-lg font-bold text-rose-600">Unishaala</span>
+            <span className="text-lg font-bold text-brand-600">Unishaala</span>
             <p className="text-xs text-gray-500">Admin Panel</p>
           </div>
         </Link>
@@ -117,7 +117,7 @@ function AdminSidebar({ activeTab, setActiveTab }) {
                 onClick={() => setActiveTab(item.id)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                   activeTab === item.id
-                    ? 'bg-rose-50 text-rose-700 font-medium'
+                    ? 'bg-brand-50 text-brand-700 font-medium'
                     : 'text-gray-600 hover:bg-gray-50'
                 }`}
               >
@@ -140,7 +140,7 @@ function DashboardTab({ stats }) {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
         {[
           { label: 'Users', value: stats?.totalUsers || 0, icon: <Users className="w-6 h-6" />, color: 'bg-blue-100 text-blue-600' },
-          { label: 'Exams', value: stats?.totalExams || 0, icon: <GraduationCap className="w-6 h-6" />, color: 'bg-rose-100 text-rose-600' },
+          { label: 'Exams', value: stats?.totalExams || 0, icon: <GraduationCap className="w-6 h-6" />, color: 'bg-brand-100 text-brand-600' },
           { label: 'Mock Tests', value: stats?.totalMockTests || 0, icon: <ClipboardList className="w-6 h-6" />, color: 'bg-purple-100 text-purple-600' },
           { label: 'Questions', value: stats?.totalQuestions || 0, icon: <BookOpen className="w-6 h-6" />, color: 'bg-orange-100 text-orange-600' },
           { label: 'Jobs', value: stats?.totalJobs || 0, icon: <Briefcase className="w-6 h-6" />, color: 'bg-green-100 text-green-600' },
@@ -244,7 +244,7 @@ function ExamsTab({ exams, onRefresh }) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input placeholder="Search exams..." className="pl-10 w-64" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <Button onClick={() => { setEditingExam(null); setFormData({ name: '', fullName: '', description: '', category: 'Engineering', icon: '📚', price: 0, status: 'Active' }); setShowAddDialog(true); }} className="bg-rose-600 hover:bg-rose-700">
+          <Button onClick={() => { setEditingExam(null); setFormData({ name: '', fullName: '', description: '', category: 'Engineering', icon: '📚', price: 0, status: 'Active' }); setShowAddDialog(true); }} className="bg-brand-600 hover:bg-brand-700">
             <Plus className="w-4 h-4 mr-2" /> Add Exam
           </Button>
         </div>
@@ -374,7 +374,7 @@ function ExamsTab({ exams, onRefresh }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={loading} className="bg-rose-600 hover:bg-rose-700">
+            <Button onClick={handleSave} disabled={loading} className="bg-brand-600 hover:bg-brand-700">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
             </Button>
           </DialogFooter>
@@ -544,7 +544,7 @@ function DomainsTab({ exams, onRefresh }) {
                   <TableRow key={domain.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        <Layers className="w-4 h-4 text-rose-600" />
+                        <Layers className="w-4 h-4 text-brand-600" />
                         {domain.name}
                       </div>
                     </TableCell>
@@ -795,7 +795,7 @@ function TestsTab({ mockTests, exams, onRefresh }) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input placeholder="Search..." className="pl-10 w-48" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <Button onClick={() => { setEditingTest(null); setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', domainId: '', testType: 'mock_test' }); setShowAddDialog(true); }} className="bg-rose-600 hover:bg-rose-700">
+          <Button onClick={() => { setEditingTest(null); setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', domainId: '', testType: 'mock_test' }); setShowAddDialog(true); }} className="bg-brand-600 hover:bg-brand-700">
             <Plus className="w-4 h-4 mr-2" /> Add Test
           </Button>
         </div>
@@ -946,7 +946,7 @@ function TestsTab({ mockTests, exams, onRefresh }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-            <Button onClick={handleSave} disabled={loading} className="bg-rose-600 hover:bg-rose-700">
+            <Button onClick={handleSave} disabled={loading} className="bg-brand-600 hover:bg-brand-700">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}
             </Button>
           </DialogFooter>
@@ -1388,7 +1388,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <GraduationCap className="w-5 h-5 text-rose-600" /> Step 1: Select Exam
+            <GraduationCap className="w-5 h-5 text-brand-600" /> Step 1: Select Exam
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -1409,14 +1409,14 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
           </Select>
           
           {selectedExam && (
-            <div className="mt-4 p-4 bg-rose-50 rounded-lg border border-rose-200">
+            <div className="mt-4 p-4 bg-brand-50 rounded-lg border border-brand-200">
               <div className="flex items-center gap-4">
                 <span className="text-2xl">{selectedExam.icon}</span>
                 <div>
-                  <p className="font-semibold text-rose-800">{selectedExam.name}</p>
-                  <p className="text-sm text-rose-600">{selectedExam.fullName}</p>
+                  <p className="font-semibold text-brand-800">{selectedExam.name}</p>
+                  <p className="text-sm text-brand-600">{selectedExam.fullName}</p>
                 </div>
-                <Badge className="ml-auto bg-rose-600">{selectedExam.category}</Badge>
+                <Badge className="ml-auto bg-brand-600">{selectedExam.category}</Badge>
               </div>
             </div>
           )}
@@ -1614,7 +1614,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
             {csvFileSelected && (
               <Button 
                 onClick={handleFileUpload} 
-                className="w-full bg-rose-600 hover:bg-rose-700"
+                className="w-full bg-brand-600 hover:bg-brand-700"
               >
                 <Upload className="w-4 h-4 mr-2" />
                 Import {csvFormat === 'new' ? '(with images)' : 'Questions'}
@@ -1631,8 +1631,8 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
 
       {/* CSV Preview */}
       {showPreview && (
-        <Card className="mb-6 border-2 border-rose-500">
-          <CardHeader className="bg-rose-50">
+        <Card className="mb-6 border-2 border-brand-500">
+          <CardHeader className="bg-brand-50">
             <CardTitle className="text-lg flex items-center justify-between">
               <span className="flex items-center gap-2">
                 <Eye className="w-5 h-5" /> Preview - {previewData.length} Questions
@@ -1741,7 +1741,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (
-              <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-rose-600" /></div>
+              <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
             ) : (
               <Table>
                 <TableHeader>
@@ -1751,7 +1751,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
                         type="checkbox"
                         checked={filteredQuestions.length > 0 && selectedQuestions.length === filteredQuestions.length}
                         onChange={toggleSelectAll}
-                        className="w-4 h-4 rounded border-gray-300 text-rose-600 focus:ring-rose-500"
+                        className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                       />
                     </TableHead>
                     <TableHead className="w-12">#</TableHead>
@@ -1764,13 +1764,13 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
                 </TableHeader>
                 <TableBody>
                   {filteredQuestions.map((q, i) => (
-                    <TableRow key={q.id} className={selectedQuestions.includes(q.id) ? 'bg-rose-50' : ''}>
+                    <TableRow key={q.id} className={selectedQuestions.includes(q.id) ? 'bg-brand-50' : ''}>
                       <TableCell>
                         <input
                           type="checkbox"
                           checked={selectedQuestions.includes(q.id)}
                           onChange={() => toggleSelectQuestion(q.id)}
-                          className="w-4 h-4 rounded border-gray-300 text-rose-600 focus:ring-rose-500"
+                          className="w-4 h-4 rounded border-gray-300 text-brand-600 focus:ring-brand-500"
                         />
                       </TableCell>
                       <TableCell>{i + 1}</TableCell>
@@ -1927,9 +1927,9 @@ function TransactionsTab() {
               <p className="text-sm text-gray-600">Pending</p>
             </CardContent>
           </Card>
-          <Card className="bg-rose-50">
+          <Card className="bg-brand-50">
             <CardContent className="p-4 text-center">
-              <p className="text-2xl font-bold text-rose-600">₹{stats.totalRevenue?.toLocaleString()}</p>
+              <p className="text-2xl font-bold text-brand-600">₹{stats.totalRevenue?.toLocaleString()}</p>
               <p className="text-sm text-gray-600">Revenue</p>
             </CardContent>
           </Card>
@@ -1978,7 +1978,7 @@ function TransactionsTab() {
       <Card>
         {loading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-rose-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
           </div>
         ) : (
           <Table>
@@ -2075,7 +2075,7 @@ function CRUDTable({ title, data, columns, onDelete, loading }) {
       </div>
       <Card>
         {loading ? (
-          <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-rose-600" /></div>
+          <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
         ) : (
           <Table>
             <TableHeader>
@@ -2205,14 +2205,14 @@ function RichTextEditor({ value, onChange, placeholder }) {
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
       title={title}
-      className="p-2 rounded hover:bg-rose-50 text-gray-700 hover:text-rose-700 transition-colors"
+      className="p-2 rounded hover:bg-brand-50 text-gray-700 hover:text-brand-700 transition-colors"
     >
       {children}
     </button>
   );
 
   return (
-    <div className="border border-gray-300 rounded-lg overflow-hidden bg-white focus-within:border-rose-500 focus-within:ring-2 focus-within:ring-rose-500/20">
+    <div className="border border-gray-300 rounded-lg overflow-hidden bg-white focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/20">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-1 px-2 py-1.5 border-b bg-gray-50">
         <ToolButton onClick={() => exec('bold')} title="Bold (Ctrl+B)"><Bold className="w-4 h-4" /></ToolButton>
@@ -2229,7 +2229,7 @@ function RichTextEditor({ value, onChange, placeholder }) {
         <ToolButton onClick={() => exec('formatBlock', '<pre>')} title="Code Block"><Code className="w-4 h-4" /></ToolButton>
         <div className="w-px h-5 bg-gray-300 mx-1" />
         <ToolButton onClick={handleLinkClick} title="Insert Link"><Link2 className="w-4 h-4" /></ToolButton>
-        <label className="p-2 rounded hover:bg-rose-50 text-gray-700 hover:text-rose-700 transition-colors cursor-pointer" title="Insert Image">
+        <label className="p-2 rounded hover:bg-brand-50 text-gray-700 hover:text-brand-700 transition-colors cursor-pointer" title="Insert Image">
           <ImageIcon className="w-4 h-4" />
           <input type="file" accept="image/*" className="hidden" onChange={handleImageInsert} />
         </label>
@@ -2286,7 +2286,7 @@ function RichTextEditor({ value, onChange, placeholder }) {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>Cancel</Button>
-            <Button className="bg-rose-600 hover:bg-rose-700" onClick={applyLink}>Insert</Button>
+            <Button className="bg-brand-600 hover:bg-brand-700" onClick={applyLink}>Insert</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -2585,7 +2585,7 @@ function BlogsTab() {
           <h2 className="text-2xl font-bold text-gray-900">Blog Posts</h2>
           <p className="text-sm text-gray-500">Create and manage blog content shown on the website</p>
         </div>
-        <Button onClick={openCreate} className="bg-rose-600 hover:bg-rose-700">
+        <Button onClick={openCreate} className="bg-brand-600 hover:bg-brand-700">
           <Plus className="w-4 h-4 mr-2" /> New Blog Post
         </Button>
       </div>
@@ -2618,7 +2618,7 @@ function BlogsTab() {
         <CardContent className="p-0">
           {loading ? (
             <div className="p-12 flex justify-center">
-              <Loader2 className="w-8 h-8 animate-spin text-rose-600" />
+              <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
             </div>
           ) : filtered.length === 0 ? (
             <div className="p-12 text-center">
@@ -2655,7 +2655,7 @@ function BlogsTab() {
                       <div className="font-medium text-gray-900 line-clamp-1">{b.title}</div>
                       <div className="text-xs text-gray-500 line-clamp-1">/blogs/{b.slug}</div>
                       {b.pdfFileId && (
-                        <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-rose-700 bg-rose-50 border border-rose-200 rounded px-1.5 py-0.5">
+                        <div className="mt-1 inline-flex items-center gap-1 text-[11px] text-brand-700 bg-brand-50 border border-brand-200 rounded px-1.5 py-0.5">
                           <FileDown className="w-3 h-3" />
                           PDF attached
                           {b.pdfPermission === 'view_download' ? (
@@ -2796,7 +2796,7 @@ function BlogsTab() {
               <div className="flex items-center justify-between gap-4 mb-3">
                 <div>
                   <Label className="flex items-center gap-2 text-base">
-                    <FileDown className="w-4 h-4 text-rose-600" />
+                    <FileDown className="w-4 h-4 text-brand-600" />
                     PDF Attachment
                   </Label>
                   <p className="text-xs text-gray-500 mt-1">
@@ -2829,7 +2829,7 @@ function BlogsTab() {
                       href={`/api/pdfs/${editing.pdfPreviewFileId}/preview`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-xs text-rose-600 hover:underline flex items-center gap-1"
+                      className="text-xs text-brand-600 hover:underline flex items-center gap-1"
                     >
                       <Eye className="w-3.5 h-3.5" /> Preview
                     </a>
@@ -2859,11 +2859,11 @@ function BlogsTab() {
                   </div>
                 </div>
               ) : (
-                <label className="cursor-pointer flex items-center justify-center gap-2 px-4 py-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-rose-400 hover:bg-rose-50/40 transition-colors">
+                <label className="cursor-pointer flex items-center justify-center gap-2 px-4 py-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-brand-400 hover:bg-brand-50/40 transition-colors">
                   {uploadingPdf ? (
-                    <><Loader2 className="w-5 h-5 animate-spin text-rose-600" /><span className="text-sm text-gray-600">Uploading & generating preview…</span></>
+                    <><Loader2 className="w-5 h-5 animate-spin text-brand-600" /><span className="text-sm text-gray-600">Uploading & generating preview…</span></>
                   ) : (
-                    <><Upload className="w-5 h-5 text-rose-600" /><span className="text-sm text-gray-700">Click to upload a PDF (max 25 MB)</span></>
+                    <><Upload className="w-5 h-5 text-brand-600" /><span className="text-sm text-gray-700">Click to upload a PDF (max 25 MB)</span></>
                   )}
                   <input
                     type="file"
@@ -2913,7 +2913,7 @@ function BlogsTab() {
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button className="bg-rose-600 hover:bg-rose-700" onClick={handleSave} disabled={saving}>
+            <Button className="bg-brand-600 hover:bg-brand-700" onClick={handleSave} disabled={saving}>
               {saving ? (
                 <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</>
               ) : (
@@ -3008,7 +3008,7 @@ function JobsTab() {
           <h2 className="text-2xl font-bold text-gray-900">Jobs</h2>
           <p className="text-sm text-gray-500">Manage job listings shown on the Jobs page</p>
         </div>
-        <Button onClick={openCreate} className="bg-rose-600 hover:bg-rose-700">
+        <Button onClick={openCreate} className="bg-brand-600 hover:bg-brand-700">
           <Plus className="w-4 h-4 mr-2" /> New Job
         </Button>
       </div>
@@ -3030,7 +3030,7 @@ function JobsTab() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-rose-600" /></div>
+            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
           ) : filtered.length === 0 ? (
             <div className="p-12 text-center">
               <Briefcase className="w-12 h-12 mx-auto text-gray-300 mb-3" />
@@ -3107,7 +3107,7 @@ function JobsTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
-            <Button className="bg-rose-600 hover:bg-rose-700" onClick={handleSave} disabled={saving}>
+            <Button className="bg-brand-600 hover:bg-brand-700" onClick={handleSave} disabled={saving}>
               {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : <><Save className="w-4 h-4 mr-2" /> {editing ? 'Update' : 'Create'}</>}
             </Button>
           </DialogFooter>
@@ -3217,7 +3217,7 @@ function CollegesTab() {
           <h2 className="text-2xl font-bold text-gray-900">Colleges</h2>
           <p className="text-sm text-gray-500">Manage colleges shown in the college finder</p>
         </div>
-        <Button onClick={openCreate} className="bg-rose-600 hover:bg-rose-700"><Plus className="w-4 h-4 mr-2" /> New College</Button>
+        <Button onClick={openCreate} className="bg-brand-600 hover:bg-brand-700"><Plus className="w-4 h-4 mr-2" /> New College</Button>
       </div>
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -3227,7 +3227,7 @@ function CollegesTab() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-rose-600" /></div>
+            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
           ) : filtered.length === 0 ? (
             <div className="p-12 text-center">
               <Building className="w-12 h-12 mx-auto text-gray-300 mb-3" />
@@ -3324,7 +3324,7 @@ function CollegesTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
-            <Button className="bg-rose-600 hover:bg-rose-700" onClick={handleSave} disabled={saving}>
+            <Button className="bg-brand-600 hover:bg-brand-700" onClick={handleSave} disabled={saving}>
               {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : <><Save className="w-4 h-4 mr-2" /> {editing ? 'Update' : 'Create'}</>}
             </Button>
           </DialogFooter>
@@ -3428,7 +3428,7 @@ function TestimonialsTab() {
           <h2 className="text-2xl font-bold text-gray-900">Testimonials</h2>
           <p className="text-sm text-gray-500">Manage student testimonials shown on the homepage</p>
         </div>
-        <Button onClick={openCreate} className="bg-rose-600 hover:bg-rose-700"><Plus className="w-4 h-4 mr-2" /> New Testimonial</Button>
+        <Button onClick={openCreate} className="bg-brand-600 hover:bg-brand-700"><Plus className="w-4 h-4 mr-2" /> New Testimonial</Button>
       </div>
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -3438,7 +3438,7 @@ function TestimonialsTab() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-rose-600" /></div>
+            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
           ) : filtered.length === 0 ? (
             <div className="p-12 text-center">
               <MessageSquare className="w-12 h-12 mx-auto text-gray-300 mb-3" />
@@ -3534,7 +3534,7 @@ function TestimonialsTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
-            <Button className="bg-rose-600 hover:bg-rose-700" onClick={handleSave} disabled={saving}>
+            <Button className="bg-brand-600 hover:bg-brand-700" onClick={handleSave} disabled={saving}>
               {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : <><Save className="w-4 h-4 mr-2" /> {editing ? 'Update' : 'Create'}</>}
             </Button>
           </DialogFooter>
@@ -3636,7 +3636,7 @@ function ContactsTab() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-rose-600" /></div>
+            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
           ) : filtered.length === 0 ? (
             <div className="p-12 text-center">
               <Mail className="w-12 h-12 mx-auto text-gray-300 mb-3" />
@@ -3660,7 +3660,7 @@ function ContactsTab() {
                 {filtered.map((c) => (
                   <TableRow key={c.id} className="cursor-pointer hover:bg-gray-50" onClick={() => openDetail(c)}>
                     <TableCell className="font-medium">{c.name}</TableCell>
-                    <TableCell className="text-sm"><a href={`mailto:${c.email}`} onClick={e => e.stopPropagation()} className="text-rose-600 hover:underline">{c.email}</a></TableCell>
+                    <TableCell className="text-sm"><a href={`mailto:${c.email}`} onClick={e => e.stopPropagation()} className="text-brand-600 hover:underline">{c.email}</a></TableCell>
                     <TableCell className="text-sm text-gray-600">{c.phone || '—'}</TableCell>
                     <TableCell className="text-sm text-gray-600 max-w-[160px] truncate">{c.subject || '—'}</TableCell>
                     <TableCell className="text-sm text-gray-600 max-w-[220px] truncate">{c.message}</TableCell>
@@ -3690,11 +3690,11 @@ function ContactsTab() {
               </div>
               <div className="grid grid-cols-3 gap-2 text-sm">
                 <span className="text-gray-500">Email</span>
-                <span className="col-span-2"><a className="text-rose-600 hover:underline" href={`mailto:${active.email}`}>{active.email}</a></span>
+                <span className="col-span-2"><a className="text-brand-600 hover:underline" href={`mailto:${active.email}`}>{active.email}</a></span>
               </div>
               <div className="grid grid-cols-3 gap-2 text-sm">
                 <span className="text-gray-500">Phone</span>
-                <span className="col-span-2">{active.phone ? <a className="text-rose-600 hover:underline" href={`tel:${active.phone}`}>{active.phone}</a> : '—'}</span>
+                <span className="col-span-2">{active.phone ? <a className="text-brand-600 hover:underline" href={`tel:${active.phone}`}>{active.phone}</a> : '—'}</span>
               </div>
               <div className="grid grid-cols-3 gap-2 text-sm">
                 <span className="text-gray-500">Subject</span>
@@ -3723,7 +3723,7 @@ function ContactsTab() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setDetailOpen(false)}>Close</Button>
             {active && (
-              <Button className="bg-rose-600 hover:bg-rose-700" onClick={() => { setDetailOpen(false); openEdit(active); }}>
+              <Button className="bg-brand-600 hover:bg-brand-700" onClick={() => { setDetailOpen(false); openEdit(active); }}>
                 <Edit className="w-4 h-4 mr-2" /> Edit
               </Button>
             )}
@@ -3755,7 +3755,7 @@ function ContactsTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)} disabled={saving}>Cancel</Button>
-            <Button className="bg-rose-600 hover:bg-rose-700" onClick={handleSave} disabled={saving}>
+            <Button className="bg-brand-600 hover:bg-brand-700" onClick={handleSave} disabled={saving}>
               {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : <><Save className="w-4 h-4 mr-2" /> Update</>}
             </Button>
           </DialogFooter>
@@ -3901,7 +3901,7 @@ function AnswerKeysTab() {
           <a href="/api/rank-predictor/sample-csv" download>
             <Button variant="outline"><Download className="w-4 h-4 mr-2" /> Sample CSV</Button>
           </a>
-          <Button onClick={openCreate} className="bg-rose-600 hover:bg-rose-700">
+          <Button onClick={openCreate} className="bg-brand-600 hover:bg-brand-700">
             <Plus className="w-4 h-4 mr-2" /> New Answer Key
           </Button>
         </div>
@@ -3915,7 +3915,7 @@ function AnswerKeysTab() {
       <Card>
         <CardContent className="p-0">
           {loading ? (
-            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-rose-600" /></div>
+            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
           ) : filtered.length === 0 ? (
             <div className="p-12 text-center">
               <ClipboardList className="w-12 h-12 mx-auto text-gray-300 mb-3" />
@@ -3945,7 +3945,7 @@ function AnswerKeysTab() {
                       <TableCell className="text-sm text-gray-600">{exam?.name || '—'}</TableCell>
                       <TableCell>
                         {k.totalQuestions > 0 ? (
-                          <Badge className="bg-rose-100 text-rose-700">{k.totalQuestions}</Badge>
+                          <Badge className="bg-brand-100 text-brand-700">{k.totalQuestions}</Badge>
                         ) : (
                           <Badge variant="outline" className="text-amber-600 border-amber-300">No CSV</Badge>
                         )}
@@ -4009,7 +4009,7 @@ function AnswerKeysTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
-            <Button className="bg-rose-600 hover:bg-rose-700" onClick={handleSave} disabled={saving}>
+            <Button className="bg-brand-600 hover:bg-brand-700" onClick={handleSave} disabled={saving}>
               {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving...</> : <><Save className="w-4 h-4 mr-2" /> {editing ? 'Update' : 'Create & Continue'}</>}
             </Button>
           </DialogFooter>
@@ -4023,7 +4023,7 @@ function AnswerKeysTab() {
             <DialogTitle>Upload Answer Key CSV</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <div className="bg-rose-50 border border-rose-200 rounded-md p-3 text-sm text-rose-900">
+            <div className="bg-brand-50 border border-brand-200 rounded-md p-3 text-sm text-brand-900">
               <p className="font-medium mb-1">Expected CSV format:</p>
               <pre className="bg-white border rounded p-2 text-xs overflow-auto">question_id,correct_answer{'\n'}6420084710,C           <span className="text-gray-500">← MCQ (single)</span>{'\n'}"6420084732","B,D"     <span className="text-gray-500">← MSQ (multi, quoted)</span>{'\n'}6420084736,16.5-16.8    <span className="text-gray-500">← Range</span>{'\n'}6420084740,12.5         <span className="text-gray-500">← NAT (numeric)</span>{'\n'}6420084750,MAT          <span className="text-gray-500">← Bonus</span></pre>
               <ul className="text-xs mt-2 space-y-0.5 list-disc ml-5">
@@ -4033,7 +4033,7 @@ function AnswerKeysTab() {
                 <li><strong>Range</strong>: <code>lo-hi</code> format (e.g. <code>16.5-16.8</code>)</li>
                 <li><strong>MAT</strong>: bonus — credit if attempted</li>
               </ul>
-              <a href="/api/rank-predictor/sample-csv" download className="inline-flex items-center text-rose-700 hover:underline text-xs mt-2">
+              <a href="/api/rank-predictor/sample-csv" download className="inline-flex items-center text-brand-700 hover:underline text-xs mt-2">
                 <Download className="w-3 h-3 mr-1" /> Download sample CSV
               </a>
             </div>
@@ -4051,7 +4051,7 @@ function AnswerKeysTab() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCsvDialogOpen(false)} disabled={csvUploading}>Cancel</Button>
-            <Button className="bg-rose-600 hover:bg-rose-700" onClick={handleCsvUpload} disabled={csvUploading || !csvText.trim()}>
+            <Button className="bg-brand-600 hover:bg-brand-700" onClick={handleCsvUpload} disabled={csvUploading || !csvText.trim()}>
               {csvUploading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading...</> : <><Upload className="w-4 h-4 mr-2" /> Import CSV</>}
             </Button>
           </DialogFooter>
@@ -4077,9 +4077,9 @@ function AnswerKeysTab() {
                   <p className="text-xs text-gray-500">Negative marks</p>
                   <p className="text-xl font-bold text-red-600">−{active.negativeMarks}</p>
                 </div>
-                <div className="bg-rose-50 rounded p-3">
+                <div className="bg-brand-50 rounded p-3">
                   <p className="text-xs text-gray-500">Submissions</p>
-                  <p className="text-xl font-bold text-rose-600">{countSubsFor(active.id)}</p>
+                  <p className="text-xl font-bold text-brand-600">{countSubsFor(active.id)}</p>
                 </div>
               </div>
               {active.answers && active.answers.length > 0 ? (
@@ -4100,7 +4100,7 @@ function AnswerKeysTab() {
               ) : (
                 <div className="border-2 border-dashed rounded p-8 text-center">
                   <p className="text-gray-500 mb-3">No answers uploaded yet.</p>
-                  <Button onClick={() => { setViewDialogOpen(false); openCsvUpload(active); }} className="bg-rose-600 hover:bg-rose-700">
+                  <Button onClick={() => { setViewDialogOpen(false); openCsvUpload(active); }} className="bg-brand-600 hover:bg-brand-700">
                     <Upload className="w-4 h-4 mr-2" /> Upload CSV
                   </Button>
                 </div>
@@ -4206,7 +4206,7 @@ export default function AdminPage() {
     }
   };
 
-  if (!user) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-rose-600" /></div>;
+  if (!user) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -73,7 +73,7 @@ function WarningModal({ isOpen, warningCount, onClose }) {
             </span>
           </div>
         </div>
-        <Button onClick={onClose} className="w-full bg-rose-600 hover:bg-rose-700">
+        <Button onClick={onClose} className="w-full bg-brand-600 hover:bg-brand-700">
           Return to Exam
         </Button>
       </DialogContent>
@@ -417,7 +417,7 @@ export default function MockTestPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-rose-600 border-t-transparent"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-600 border-t-transparent"></div>
       </div>
     );
   }
@@ -453,8 +453,8 @@ export default function MockTestPage() {
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Test Instructions</h3>
                 
                 <div className="grid md:grid-cols-3 gap-4 mb-6">
-                  <div className="bg-rose-50 p-4 rounded-lg text-center">
-                    <p className="text-2xl font-bold text-rose-600">{test.duration}</p>
+                  <div className="bg-brand-50 p-4 rounded-lg text-center">
+                    <p className="text-2xl font-bold text-brand-600">{test.duration}</p>
                     <p className="text-sm text-gray-600">Minutes</p>
                   </div>
                   <div className="bg-blue-50 p-4 rounded-lg text-center">
@@ -516,7 +516,7 @@ export default function MockTestPage() {
                 </div>
 
                 <Button 
-                  className="w-full h-14 bg-rose-600 hover:bg-rose-700 text-lg"
+                  className="w-full h-14 bg-brand-600 hover:bg-brand-700 text-lg"
                   onClick={handleStartTest}
                 >
                   <Play className="w-5 h-5 mr-2" /> Start Test (Enter Fullscreen)
@@ -565,7 +565,7 @@ export default function MockTestPage() {
             </div>
 
             <div className="flex items-center gap-6">
-              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${timeLeft < 300 ? 'bg-red-100 text-red-600' : 'bg-rose-100 text-rose-600'}`}>
+              <div className={`flex items-center gap-2 px-4 py-2 rounded-lg ${timeLeft < 300 ? 'bg-red-100 text-red-600' : 'bg-brand-100 text-brand-600'}`}>
                 <Clock className="w-5 h-5" />
                 <span className="font-mono font-bold text-lg">{formatTime(timeLeft)}</span>
               </div>
@@ -579,7 +579,7 @@ export default function MockTestPage() {
               </Button>
               
               <Button 
-                className="bg-rose-500 hover:bg-rose-600"
+                className="bg-brand-500 hover:bg-brand-600"
                 onClick={() => setShowSubmitDialog(true)}
               >
                 Submit Test
@@ -598,7 +598,7 @@ export default function MockTestPage() {
               <CardHeader className="border-b">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-4">
-                    <Badge className="bg-rose-600">
+                    <Badge className="bg-brand-600">
                       Question {currentQuestion + 1} of {questions.length}
                     </Badge>
                     {currentQ?.marks && (
@@ -654,7 +654,7 @@ export default function MockTestPage() {
                               key={index}
                               className={`flex items-start gap-4 p-4 border rounded-lg cursor-pointer transition-all ${
                                 answers[currentQ.id] === index + 1
-                                  ? 'border-rose-500 bg-rose-50'
+                                  ? 'border-brand-500 bg-brand-50'
                                   : 'border-gray-200 hover:border-gray-300'
                               }`}
                             >
@@ -689,7 +689,7 @@ export default function MockTestPage() {
                   <Button
                     disabled={currentQuestion === questions.length - 1}
                     onClick={() => setCurrentQuestion(currentQuestion + 1)}
-                    className="bg-rose-600 hover:bg-rose-700"
+                    className="bg-brand-600 hover:bg-brand-700"
                   >
                     Next <ChevronRight className="w-4 h-4 ml-1" />
                   </Button>
@@ -712,7 +712,7 @@ export default function MockTestPage() {
                       onClick={() => setCurrentQuestion(index)}
                       className={`w-10 h-10 rounded-lg text-sm font-medium transition-all ${
                         currentQuestion === index
-                          ? 'bg-rose-600 text-white'
+                          ? 'bg-brand-600 text-white'
                           : answers[q.id]
                           ? 'bg-green-500 text-white'
                           : flagged[q.id]
@@ -807,7 +807,7 @@ export default function MockTestPage() {
                 Continue Test
               </Button>
               <Button 
-                className="flex-1 bg-rose-600 hover:bg-rose-700"
+                className="flex-1 bg-brand-600 hover:bg-brand-700"
                 onClick={() => handleSubmit(false)}
               >
                 Submit Test

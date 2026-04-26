@@ -66,10 +66,10 @@ export default function ContactPage() {
     <div className="min-h-screen bg-gray-50">
       <MainNavbar />
 
-      <div className="pt-20 pb-12 bg-gradient-to-b from-rose-50 to-white">
+      <div className="pt-20 pb-12 bg-gradient-to-b from-brand-50 to-white">
         <div className="container mx-auto px-4 text-center">
-          <div className="w-20 h-20 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <MessageSquare className="w-10 h-10 text-rose-600" />
+          <div className="w-20 h-20 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <MessageSquare className="w-10 h-10 text-brand-600" />
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Contact Us</h1>
           <p className="text-gray-600 max-w-2xl mx-auto">
@@ -87,7 +87,7 @@ export default function ContactPage() {
                 <Card key={index} className="card-hover">
                   <CardContent className="p-6">
                     <a href={info.href} className="flex items-start gap-4">
-                      <div className="w-12 h-12 bg-rose-100 rounded-lg flex items-center justify-center text-rose-600 flex-shrink-0">
+                      <div className="w-12 h-12 bg-brand-100 rounded-lg flex items-center justify-center text-brand-600 flex-shrink-0">
                         {info.icon}
                       </div>
                       <div>
@@ -99,12 +99,12 @@ export default function ContactPage() {
                 </Card>
               ))}
 
-              <Card className="bg-rose-600">
+              <Card className="bg-brand-600">
                 <CardContent className="p-6 text-white">
                   <h3 className="font-bold text-lg mb-2">Office Hours</h3>
-                  <p className="text-rose-100">Monday - Friday: 9:00 AM - 6:00 PM</p>
-                  <p className="text-rose-100">Saturday: 10:00 AM - 4:00 PM</p>
-                  <p className="text-rose-100">Sunday: Closed</p>
+                  <p className="text-brand-100">Monday - Friday: 9:00 AM - 6:00 PM</p>
+                  <p className="text-brand-100">Saturday: 10:00 AM - 4:00 PM</p>
+                  <p className="text-brand-100">Sunday: Closed</p>
                 </CardContent>
               </Card>
             </div>
@@ -113,7 +113,7 @@ export default function ContactPage() {
             <Card className="lg:col-span-2 shadow-lg">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Send className="w-5 h-5 text-rose-600" />
+                  <Send className="w-5 h-5 text-brand-600" />
                   Send us a Message
                 </CardTitle>
               </CardHeader>
@@ -201,7 +201,7 @@ export default function ContactPage() {
 
                     <Button 
                       type="submit" 
-                      className="w-full h-12 bg-rose-600 hover:bg-rose-700 text-lg"
+                      className="w-full h-12 bg-brand-600 hover:bg-brand-700 text-lg"
                       disabled={loading}
                     >
                       {loading ? (

@@ -72,10 +72,10 @@ export default function BlogDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-rose-50/40">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50/40">
         <MainNavbar />
         <div className="flex justify-center pt-32">
-          <div className="animate-spin rounded-full h-12 w-12 border-4 border-rose-600 border-t-transparent"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-600 border-t-transparent"></div>
         </div>
       </div>
     );
@@ -83,14 +83,14 @@ export default function BlogDetailPage() {
 
   if (notFound || !blog) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-rose-50/40">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50/40">
         <MainNavbar />
         <div className="container mx-auto px-4 pt-32 text-center">
           <FileText className="w-16 h-16 mx-auto text-gray-300 mb-4" />
           <h1 className="text-2xl font-bold text-gray-900 mb-2">Article not found</h1>
           <p className="text-gray-500 mb-6">The blog post you're looking for doesn't exist or has been removed.</p>
           <Link href="/blogs">
-            <Button className="bg-rose-600 hover:bg-rose-700">Back to Blog</Button>
+            <Button className="bg-brand-600 hover:bg-brand-700">Back to Blog</Button>
           </Link>
         </div>
       </div>
@@ -98,7 +98,7 @@ export default function BlogDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-rose-50/40">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50/40">
       <MainNavbar />
 
       <article className="pt-20">
@@ -110,19 +110,19 @@ export default function BlogDetailPage() {
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
             </div>
           ) : (
-            <div className="h-40 bg-gradient-to-r from-rose-100 via-white to-rose-100"></div>
+            <div className="h-40 bg-gradient-to-r from-brand-100 via-white to-brand-100"></div>
           )}
         </div>
 
         <div className="container mx-auto px-4 -mt-24 md:-mt-32 relative z-10 pb-16">
           <div className="max-w-3xl mx-auto">
-            <Link href="/blogs" className="inline-flex items-center text-white mb-4 hover:text-rose-200 transition-colors drop-shadow">
+            <Link href="/blogs" className="inline-flex items-center text-white mb-4 hover:text-brand-200 transition-colors drop-shadow">
               <ArrowLeft className="w-4 h-4 mr-2" /> All Articles
             </Link>
 
             <Card className="border-0 shadow-2xl bg-white/90 backdrop-blur">
               <CardContent className="p-6 md:p-10">
-                <Badge className="bg-rose-100 text-rose-700 mb-4">Blog</Badge>
+                <Badge className="bg-brand-100 text-brand-700 mb-4">Blog</Badge>
                 <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 leading-tight">
                   {blog.title}
                 </h1>
@@ -169,18 +169,18 @@ export default function BlogDetailPage() {
                   {related.map((r) => (
                     <Link key={r.id} href={`/blogs/${r.slug}`} className="group">
                       <Card className="overflow-hidden h-full border-0 shadow-md hover:shadow-xl transition-all bg-white/80 backdrop-blur">
-                        <div className="h-32 overflow-hidden bg-gradient-to-br from-rose-100 to-rose-100">
+                        <div className="h-32 overflow-hidden bg-gradient-to-br from-brand-100 to-brand-100">
                           {r.image ? (
                             <img src={r.image} alt={r.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              <FileText className="w-10 h-10 text-rose-400" />
+                              <FileText className="w-10 h-10 text-brand-400" />
                             </div>
                           )}
                         </div>
                         <CardContent className="p-4">
                           <p className="text-xs text-gray-500 mb-1">{formatDate(r.publishDate)}</p>
-                          <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 group-hover:text-rose-600 transition-colors">
+                          <h3 className="text-sm font-semibold text-gray-900 line-clamp-2 group-hover:text-brand-600 transition-colors">
                             {r.title}
                           </h3>
                         </CardContent>

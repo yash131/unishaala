@@ -358,7 +358,7 @@ Sample Test,Math Basics,2,Solve this equation,q2.jpg,90,Algebra,x = 5,Isolate va
             <Button 
               onClick={handleImport} 
               disabled={loading || !selectedTest || !csvFile}
-              className="w-full bg-rose-600 hover:bg-rose-700"
+              className="w-full bg-brand-600 hover:bg-brand-700"
               size="lg"
             >
               {loading ? (

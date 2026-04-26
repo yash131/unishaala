@@ -39,7 +39,7 @@ export default function PaymentFailedPage() {
 
             <div className="space-y-3">
               <Link href="/exams">
-                <Button className="w-full bg-rose-600 hover:bg-rose-700">
+                <Button className="w-full bg-brand-600 hover:bg-brand-700">
                   <RefreshCw className="w-4 h-4 mr-2" /> Try Again
                 </Button>
               </Link>

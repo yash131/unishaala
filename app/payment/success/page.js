@@ -67,7 +67,7 @@ export default function PaymentSuccessPage() {
 
             {loading ? (
               <div className="flex items-center justify-center gap-2 py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-rose-600" />
+                <Loader2 className="w-6 h-6 animate-spin text-brand-600" />
                 <span className="text-gray-500">Loading...</span>
               </div>
             ) : transaction ? (
@@ -76,12 +76,12 @@ export default function PaymentSuccessPage() {
                   {transaction.status}
                 </Badge>
 
-                <div className="bg-gradient-to-r from-rose-500 to-rose-600 rounded-xl p-6 mb-6 text-white">
+                <div className="bg-gradient-to-r from-brand-500 to-brand-600 rounded-xl p-6 mb-6 text-white">
                   <div className="flex items-center justify-center gap-2 mb-2">
                     <IndianRupee className="w-8 h-8" />
                     <span className="text-4xl font-bold">{transaction.amount}</span>
                   </div>
-                  <p className="text-rose-100">Amount Paid</p>
+                  <p className="text-brand-100">Amount Paid</p>
                 </div>
 
                 <div className="text-left mb-6 space-y-2">
@@ -108,19 +108,19 @@ export default function PaymentSuccessPage() {
             <div className="space-y-3 mt-6">
               {transaction?.mockTestId ? (
                 <Link href={`/mock-test/${transaction.mockTestId}`}>
-                  <Button className="w-full bg-rose-600 hover:bg-rose-700">
+                  <Button className="w-full bg-brand-600 hover:bg-brand-700">
                     Start Test Now <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </Link>
               ) : transaction?.examId ? (
                 <Link href={`/exams/${transaction.examSlug || transaction.examId}`}>
-                  <Button className="w-full bg-rose-600 hover:bg-rose-700">
+                  <Button className="w-full bg-brand-600 hover:bg-brand-700">
                     Go to Exam <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </Link>
               ) : (
                 <Link href="/exams">
-                  <Button className="w-full bg-rose-600 hover:bg-rose-700">
+                  <Button className="w-full bg-brand-600 hover:bg-brand-700">
                     Go to Exams <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </Link>

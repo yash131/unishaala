@@ -107,8 +107,8 @@ export function MainNavbar() {
                 href={link.href}
                 className={`font-medium transition-colors ${
                   pathname === link.href 
-                    ? 'text-rose-600' 
-                    : 'text-gray-700 hover:text-rose-600'
+                    ? 'text-brand-600' 
+                    : 'text-gray-700 hover:text-brand-600'
                 }`}
               >
                 {link.label}
@@ -122,7 +122,7 @@ export function MainNavbar() {
                 <span className="text-gray-600">Hi, {user.name?.split(' ')[0]}</span>
                 {(user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') && (
                   <Link href="/admin">
-                    <Button variant="outline" className="border-rose-600 text-rose-600 hover:bg-rose-50">
+                    <Button variant="outline" className="border-brand-600 text-brand-600 hover:bg-brand-50">
                       Admin Panel
                     </Button>
                   </Link>
@@ -138,12 +138,12 @@ export function MainNavbar() {
             ) : (
               <>
                 <Link href="/login">
-                  <Button variant="outline" className="border-rose-600 text-rose-600 hover:bg-rose-50">
+                  <Button variant="outline" className="border-brand-600 text-brand-600 hover:bg-brand-50">
                     Login
                   </Button>
                 </Link>
                 <Link href="/signup">
-                  <Button className="bg-rose-500 hover:bg-rose-600 text-white">
+                  <Button className="bg-brand-500 hover:bg-brand-600 text-white">
                     Sign Up
                   </Button>
                 </Link>
@@ -168,8 +168,8 @@ export function MainNavbar() {
                 href={link.href}
                 className={`block py-2 ${
                   pathname === link.href 
-                    ? 'text-rose-600 font-medium' 
-                    : 'text-gray-700 hover:text-rose-600'
+                    ? 'text-brand-600 font-medium' 
+                    : 'text-gray-700 hover:text-brand-600'
                 }`}
                 onClick={() => setIsMenuOpen(false)}
               >
@@ -182,7 +182,7 @@ export function MainNavbar() {
                   <span className="flex-1 py-2 text-gray-600">Hi, {user.name?.split(' ')[0]}</span>
                   {(user.role === 'SUPER_ADMIN' || user.role === 'ADMIN') && (
                     <Link href="/admin" className="flex-1">
-                      <Button variant="outline" className="w-full border-rose-600 text-rose-600">Admin</Button>
+                      <Button variant="outline" className="w-full border-brand-600 text-brand-600">Admin</Button>
                     </Link>
                   )}
                   <Button className="flex-1 bg-gray-200 text-gray-700" onClick={handleLogout}>Logout</Button>
@@ -190,10 +190,10 @@ export function MainNavbar() {
               ) : (
                 <>
                   <Link href="/login" className="flex-1">
-                    <Button variant="outline" className="w-full border-rose-600 text-rose-600">Login</Button>
+                    <Button variant="outline" className="w-full border-brand-600 text-brand-600">Login</Button>
                   </Link>
                   <Link href="/signup" className="flex-1">
-                    <Button className="w-full bg-rose-500 hover:bg-rose-600">Sign Up</Button>
+                    <Button className="w-full bg-brand-500 hover:bg-brand-600">Sign Up</Button>
                   </Link>
                 </>
               )}

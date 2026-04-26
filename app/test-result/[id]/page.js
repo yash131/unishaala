@@ -92,13 +92,13 @@ export default function TestResultPage() {
     if (rank === 1) return <Crown className="w-8 h-8 text-yellow-500" />;
     if (rank === 2) return <Medal className="w-8 h-8 text-gray-400" />;
     if (rank === 3) return <Medal className="w-8 h-8 text-amber-600" />;
-    return <Trophy className="w-8 h-8 text-rose-600" />;
+    return <Trophy className="w-8 h-8 text-brand-600" />;
   };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-rose-600 border-t-transparent"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-brand-600 border-t-transparent"></div>
       </div>
     );
   }
@@ -121,7 +121,7 @@ export default function TestResultPage() {
           <div className="flex items-center justify-between h-16">
             <Logo size="default" showText={false} />
             <Link href="/exams">
-              <Button variant="outline" className="border-rose-600 text-rose-600">
+              <Button variant="outline" className="border-brand-600 text-brand-600">
                 <ArrowLeft className="w-4 h-4 mr-2" /> Back to Exams
               </Button>
             </Link>
@@ -132,17 +132,17 @@ export default function TestResultPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Result Summary */}
         <Card className="mb-8 shadow-lg overflow-hidden">
-          <div className="bg-gradient-to-r from-rose-600 to-rose-700 p-8 text-white">
+          <div className="bg-gradient-to-r from-brand-600 to-brand-700 p-8 text-white">
             <div className="flex items-center justify-center gap-4 mb-4">
               <Trophy className="w-12 h-12" />
               <h1 className="text-3xl font-bold">Test Completed!</h1>
             </div>
-            <p className="text-rose-100 text-center">Here's how you performed</p>
+            <p className="text-brand-100 text-center">Here's how you performed</p>
           </div>
           <CardContent className="p-8">
             <div className="grid md:grid-cols-4 gap-6">
-              <div className="text-center p-6 bg-rose-50 rounded-xl">
-                <p className="text-4xl font-bold text-rose-600">{attempt.score.toFixed(1)}</p>
+              <div className="text-center p-6 bg-brand-50 rounded-xl">
+                <p className="text-4xl font-bold text-brand-600">{attempt.score.toFixed(1)}</p>
                 <p className="text-gray-600">Score</p>
                 <p className="text-sm text-gray-400">out of {attempt.totalMarks}</p>
               </div>
@@ -240,10 +240,10 @@ export default function TestResultPage() {
         {/* Detailed Analysis */}
         <Tabs defaultValue="solutions" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-8 bg-white shadow rounded-lg h-14">
-            <TabsTrigger value="solutions" className="data-[state=active]:bg-rose-600 data-[state=active]:text-white rounded-lg">
+            <TabsTrigger value="solutions" className="data-[state=active]:bg-brand-600 data-[state=active]:text-white rounded-lg">
               <FileText className="w-4 h-4 mr-2" /> Solutions
             </TabsTrigger>
-            <TabsTrigger value="analysis" className="data-[state=active]:bg-rose-600 data-[state=active]:text-white rounded-lg">
+            <TabsTrigger value="analysis" className="data-[state=active]:bg-brand-600 data-[state=active]:text-white rounded-lg">
               <BarChart3 className="w-4 h-4 mr-2" /> Analysis
             </TabsTrigger>
           </TabsList>

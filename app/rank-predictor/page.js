@@ -110,7 +110,7 @@ function ResponseSheetPredictor() {
       <Card className="lg:col-span-3 shadow-lg">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-rose-600" />
+            <Sparkles className="w-5 h-5 text-brand-600" />
             Predict from Response Sheet
           </CardTitle>
         </CardHeader>
@@ -139,7 +139,7 @@ function ResponseSheetPredictor() {
               </Select>
             )}
             {selectedKey && (
-              <div className="mt-2 text-xs text-gray-600 bg-rose-50 border border-rose-200 rounded px-3 py-2">
+              <div className="mt-2 text-xs text-gray-600 bg-brand-50 border border-brand-200 rounded px-3 py-2">
                 Marking: <span className="text-green-600 font-semibold">+{selectedKey.positiveMarks}</span> correct, <span className="text-red-600 font-semibold">−{selectedKey.negativeMarks}</span> wrong · {selectedKey.totalQuestions} questions
               </div>
             )}
@@ -178,7 +178,7 @@ function ResponseSheetPredictor() {
                   onClick={() => setResponseMode(opt.id)}
                   className={`flex items-center justify-center gap-2 py-2 px-3 rounded-md border transition-colors text-sm ${
                     responseMode === opt.id
-                      ? 'bg-rose-50 border-rose-500 text-rose-700 font-medium'
+                      ? 'bg-brand-50 border-brand-500 text-brand-700 font-medium'
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
@@ -207,7 +207,7 @@ function ResponseSheetPredictor() {
                       <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
                       <p className="text-sm text-gray-700 font-medium">Click to upload response sheet HTML</p>
                       <p className="text-xs text-gray-500 mt-1">
-                        {fileName ? <span className="text-rose-600">{fileName} ✓</span> : 'Save the response page from your browser (Ctrl+S → "Webpage, HTML Only") and upload the .html file.'}
+                        {fileName ? <span className="text-brand-600">{fileName} ✓</span> : 'Save the response page from your browser (Ctrl+S → "Webpage, HTML Only") and upload the .html file.'}
                       </p>
                     </div>
                     <input type="file" accept=".html,.htm,text/html" className="hidden" onChange={handleFile} />
@@ -229,7 +229,7 @@ function ResponseSheetPredictor() {
             </div>
           </div>
 
-          <Button onClick={handleSubmit} disabled={submitting} className="w-full h-12 bg-rose-600 hover:bg-rose-700 text-base">
+          <Button onClick={handleSubmit} disabled={submitting} className="w-full h-12 bg-brand-600 hover:bg-brand-700 text-base">
             {submitting ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Calculating...</> : <>Predict My Rank <TrendingUp className="w-4 h-4 ml-2" /></>}
           </Button>
         </CardContent>
@@ -264,7 +264,7 @@ function ResponseSheetPredictor() {
             )}
 
             {/* Marks hero */}
-            <Card className="shadow-lg border-0 bg-gradient-to-br from-rose-500 to-cyan-600 text-white">
+            <Card className="shadow-lg border-0 bg-gradient-to-br from-brand-500 to-cyan-600 text-white">
               <CardContent className="p-6 text-center">
                 <p className="text-sm opacity-90 mb-1">Your Marks</p>
                 <p className="text-5xl font-bold mb-2">{result.marks}</p>
@@ -290,7 +290,7 @@ function ResponseSheetPredictor() {
                     <Trophy className="w-5 h-5 text-amber-500" />
                     <span className="font-semibold text-gray-900">Overall Rank</span>
                   </div>
-                  <div className="text-2xl font-bold text-rose-600">{result.overallRank}</div>
+                  <div className="text-2xl font-bold text-brand-600">{result.overallRank}</div>
                 </div>
                 <p className="text-xs text-gray-500">out of {result.totalParticipants} {result.totalParticipants === 1 ? 'participant' : 'participants'}</p>
                 <div className="border-t pt-3 flex items-center justify-between">
@@ -334,7 +334,7 @@ function ResponseSheetPredictor() {
                 {/* Per-question breakdown */}
                 {Array.isArray(result.details) && result.details.length > 0 && (
                   <details className="mt-4">
-                    <summary className="text-sm text-rose-700 cursor-pointer hover:underline">View per-question breakdown</summary>
+                    <summary className="text-sm text-brand-700 cursor-pointer hover:underline">View per-question breakdown</summary>
                     <div className="mt-2 max-h-64 overflow-y-auto border rounded">
                       <table className="w-full text-xs">
                         <thead className="bg-gray-50 sticky top-0">
@@ -415,7 +415,7 @@ function QuickEstimate() {
   return (
     <div className="grid lg:grid-cols-2 gap-6">
       <Card className="shadow-lg">
-        <CardHeader><CardTitle className="flex items-center gap-2"><TrendingUp className="w-5 h-5 text-rose-600" /> Enter Details</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><TrendingUp className="w-5 h-5 text-brand-600" /> Enter Details</CardTitle></CardHeader>
         <CardContent>
           <form onSubmit={submit} className="space-y-4">
             <div>
@@ -433,24 +433,24 @@ function QuickEstimate() {
               <Label>Total Marks</Label>
               <Input type="number" value={formData.totalMarks} readOnly className="h-12 bg-gray-50" />
             </div>
-            <Button type="submit" className="w-full h-12 bg-rose-600 hover:bg-rose-700" disabled={loading || !formData.exam || !formData.score}>
+            <Button type="submit" className="w-full h-12 bg-brand-600 hover:bg-brand-700" disabled={loading || !formData.exam || !formData.score}>
               {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Predict My Rank'}
             </Button>
           </form>
         </CardContent>
       </Card>
       <Card className={`shadow-lg transition-all ${result ? 'opacity-100' : 'opacity-50'}`}>
-        <CardHeader><CardTitle className="flex items-center gap-2"><Target className="w-5 h-5 text-rose-600" /> Estimated Results</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Target className="w-5 h-5 text-brand-600" /> Estimated Results</CardTitle></CardHeader>
         <CardContent>
           {result ? (
             <div className="space-y-4">
-              <div className="text-center p-5 bg-rose-50 rounded-xl">
+              <div className="text-center p-5 bg-brand-50 rounded-xl">
                 <p className="text-sm text-gray-600 mb-1">Your Score Percentage</p>
-                <p className="text-4xl font-bold text-rose-600">{result.percentage.toFixed(1)}%</p>
+                <p className="text-4xl font-bold text-brand-600">{result.percentage.toFixed(1)}%</p>
               </div>
-              <div className="text-center p-5 bg-rose-50 rounded-xl">
+              <div className="text-center p-5 bg-brand-50 rounded-xl">
                 <p className="text-sm text-gray-600 mb-1">Expected Rank Range</p>
-                <p className="text-3xl font-bold text-rose-600">{result.rankRange.min.toLocaleString()} – {result.rankRange.max.toLocaleString()}</p>
+                <p className="text-3xl font-bold text-brand-600">{result.rankRange.min.toLocaleString()} – {result.rankRange.max.toLocaleString()}</p>
               </div>
               {result.recommendations && (
                 <div>
@@ -479,10 +479,10 @@ export default function RankPredictorPage() {
     <div className="min-h-screen bg-gray-50">
       <MainNavbar />
 
-      <div className="pt-20 pb-12 bg-gradient-to-b from-rose-50 to-white">
+      <div className="pt-20 pb-12 bg-gradient-to-b from-brand-50 to-white">
         <div className="container mx-auto px-4 text-center">
-          <div className="w-20 h-20 bg-rose-100 rounded-full flex items-center justify-center mx-auto mb-5">
-            <Target className="w-10 h-10 text-rose-600" />
+          <div className="w-20 h-20 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-5">
+            <Target className="w-10 h-10 text-brand-600" />
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-3">Rank Predictor</h1>
           <p className="text-gray-600 max-w-2xl mx-auto">
