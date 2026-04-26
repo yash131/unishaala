@@ -66,20 +66,20 @@ export default function BlogsPage() {
   const rest = filtered.slice(1);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-teal-50/40">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-pink-50/40">
       <MainNavbar />
 
       {/* Hero Header */}
       <section className="pt-24 pb-10 relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-10 -right-10 w-72 h-72 rounded-full bg-teal-200/40 blur-3xl"></div>
+          <div className="absolute -top-10 -right-10 w-72 h-72 rounded-full bg-pink-200/40 blur-3xl"></div>
           <div className="absolute top-20 -left-10 w-72 h-72 rounded-full bg-rose-200/40 blur-3xl"></div>
         </div>
         <div className="container mx-auto px-4 relative">
           <div className="max-w-3xl">
-            <Badge className="bg-teal-100 text-teal-700 mb-3">Unishaala Blog</Badge>
+            <Badge className="bg-pink-100 text-pink-700 mb-3">Unishaala Blog</Badge>
             <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              Insights, Tips & <span className="text-teal-600">Study Guides</span>
+              Insights, Tips & <span className="text-pink-600">Study Guides</span>
             </h1>
             <p className="text-lg text-gray-600 mb-6">
               Stay ahead with expert articles on exam strategies, study techniques, and career guidance.
@@ -100,7 +100,7 @@ export default function BlogsPage() {
       <div className="container mx-auto px-4 pb-20">
         {loading ? (
           <div className="flex justify-center py-16">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-teal-600 border-t-transparent"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-pink-600 border-t-transparent"></div>
           </div>
         ) : filtered.length === 0 ? (
           <Card className="max-w-xl mx-auto border-dashed">
@@ -119,7 +119,7 @@ export default function BlogsPage() {
               <Link href={`/blogs/${hero.slug}`} className="block mb-10 group">
                 <Card className="overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-500 bg-white/70 backdrop-blur">
                   <div className="grid md:grid-cols-2">
-                    <div className="relative h-64 md:h-auto overflow-hidden bg-gradient-to-br from-teal-100 to-rose-100">
+                    <div className="relative h-64 md:h-auto overflow-hidden bg-gradient-to-br from-pink-100 to-rose-100">
                       {hero.image ? (
                         <img
                           src={hero.image}
@@ -128,7 +128,7 @@ export default function BlogsPage() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <FileText className="w-20 h-20 text-teal-400" />
+                          <FileText className="w-20 h-20 text-pink-400" />
                         </div>
                       )}
                       <Badge className="absolute top-4 left-4 bg-rose-500 text-white">Featured</Badge>
@@ -147,13 +147,13 @@ export default function BlogsPage() {
                           </span>
                         )}
                       </div>
-                      <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 group-hover:text-teal-600 transition-colors">
+                      <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3 group-hover:text-pink-600 transition-colors">
                         {hero.title}
                       </h2>
                       <p className="text-gray-600 mb-6 line-clamp-3">
                         {hero.description || stripHtml(hero.content).slice(0, 180)}
                       </p>
-                      <div className="inline-flex items-center text-teal-600 font-semibold">
+                      <div className="inline-flex items-center text-pink-600 font-semibold">
                         Read full article <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
                       </div>
                     </CardContent>
@@ -167,7 +167,7 @@ export default function BlogsPage() {
               {(search ? filtered : rest).map((blog) => (
                 <Link key={blog.id} href={`/blogs/${blog.slug}`} className="group">
                   <Card className="overflow-hidden h-full border-0 shadow-md hover:shadow-xl transition-all duration-300 bg-white/70 backdrop-blur hover:-translate-y-1">
-                    <div className="relative h-48 overflow-hidden bg-gradient-to-br from-teal-100 to-rose-100">
+                    <div className="relative h-48 overflow-hidden bg-gradient-to-br from-pink-100 to-rose-100">
                       {blog.image ? (
                         <img
                           src={blog.image}
@@ -176,7 +176,7 @@ export default function BlogsPage() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <FileText className="w-14 h-14 text-teal-400" />
+                          <FileText className="w-14 h-14 text-pink-400" />
                         </div>
                       )}
                     </div>
@@ -189,18 +189,18 @@ export default function BlogsPage() {
                           <Clock className="w-3 h-3" /> {readTime(blog.content)}
                         </span>
                       </div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-teal-600 transition-colors">
+                      <h3 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 group-hover:text-pink-600 transition-colors">
                         {blog.title}
                       </h3>
                       <p className="text-sm text-gray-600 line-clamp-2 mb-3">
                         {blog.description || stripHtml(blog.content).slice(0, 140)}
                       </p>
                       <div className="flex items-center justify-between">
-                        <div className="inline-flex items-center text-sm text-teal-600 font-medium">
+                        <div className="inline-flex items-center text-sm text-pink-600 font-medium">
                           Read more <ArrowRight className="w-3 h-3 ml-1 group-hover:translate-x-1 transition-transform" />
                         </div>
                         {blog.pdfFileId && (
-                          <span className="inline-flex items-center gap-1 text-[10px] bg-teal-50 text-teal-700 border border-teal-200 rounded-full px-2 py-0.5">
+                          <span className="inline-flex items-center gap-1 text-[10px] bg-pink-50 text-pink-700 border border-pink-200 rounded-full px-2 py-0.5">
                             <FileText className="w-3 h-3" /> PDF
                           </span>
                         )}

@@ -10,19 +10,19 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 174 58% 45%;
+    --primary: 344 80% 62%;
     --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 349 89% 60%;
+    --accent: 174 58% 45%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 174 58% 45%;
+    --ring: 344 80% 62%;
     --radius: 0.5rem;
   }
 }
@@ -36,12 +36,27 @@
   }
 }
 
+/* Brand pink gradient (logo-inspired). Class name kept as `gradient-teal`
+   for backward compatibility across existing pages; visual is now pink. */
 .gradient-teal {
-  background: linear-gradient(135deg, #0d9488 0%, #14b8a6 50%, #5eead4 100%);
+  background: linear-gradient(135deg, #be185d 0%, #ec4899 50%, #f9a8d4 100%);
 }
 
 .gradient-light-teal {
-  background: linear-gradient(180deg, #ccfbf1 0%, #f0fdfa 100%);
+  background: linear-gradient(180deg, #fce7f3 0%, #fdf2f8 100%);
+}
+
+.gradient-pink {
+  background: linear-gradient(135deg, #be185d 0%, #ec4899 50%, #f9a8d4 100%);
+}
+
+.gradient-light-pink {
+  background: linear-gradient(180deg, #fce7f3 0%, #fdf2f8 100%);
+}
+
+/* Accent gradient using the secondary teal for visual balance */
+.gradient-pink-teal {
+  background: linear-gradient(135deg, #ec4899 0%, #db2777 50%, #0d9488 100%);
 }
 
 .card-hover {
@@ -49,9 +64,9 @@
 }
 
 .btn-primary {
-  @apply bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200;
+  @apply bg-pink-600 hover:bg-pink-700 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200;
 }
 
 .btn-accent {
-  @apply bg-rose-500 hover:bg-rose-600 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200;
+  @apply bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200;
 }

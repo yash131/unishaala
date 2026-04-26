@@ -87,7 +87,7 @@ function AccessGateBannerInner() {
                 {reason === 'required' ? (
                   <>
                     <Link href={loginHref}>
-                      <Button size="sm" className="bg-teal-600 hover:bg-teal-700 h-8">
+                      <Button size="sm" className="bg-pink-600 hover:bg-pink-700 h-8">
                         <LogIn className="w-3.5 h-3.5 mr-1" /> Login
                       </Button>
                     </Link>
@@ -100,7 +100,7 @@ function AccessGateBannerInner() {
                 ) : (
                   <Button
                     size="sm"
-                    className="bg-teal-600 hover:bg-teal-700 h-8"
+                    className="bg-pink-600 hover:bg-pink-700 h-8"
                     onClick={() => setShowVerify(true)}
                   >
                     <ShieldCheck className="w-3.5 h-3.5 mr-1" /> Verify phone
@@ -144,13 +144,13 @@ function AccessGateBannerInner() {
             </p>
             <ul className="space-y-1.5 text-sm text-gray-600">
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-teal-600" /> Access blogs, test series & job notifications
+                <CheckCircle2 className="w-4 h-4 text-pink-600" /> Access blogs, test series & job notifications
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-teal-600" /> Predict your rank & track progress
+                <CheckCircle2 className="w-4 h-4 text-pink-600" /> Predict your rank & track progress
               </li>
               <li className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-teal-600" /> Download study PDFs & resources
+                <CheckCircle2 className="w-4 h-4 text-pink-600" /> Download study PDFs & resources
               </li>
             </ul>
           </div>
@@ -164,14 +164,14 @@ function AccessGateBannerInner() {
                   </Button>
                 </Link>
                 <Link href={loginHref} className="flex-1">
-                  <Button className="w-full bg-teal-600 hover:bg-teal-700">
+                  <Button className="w-full bg-pink-600 hover:bg-pink-700">
                     <LogIn className="w-4 h-4 mr-2" /> Log in
                   </Button>
                 </Link>
               </>
             ) : (
               <Button
-                className="w-full bg-teal-600 hover:bg-teal-700"
+                className="w-full bg-pink-600 hover:bg-pink-700"
                 onClick={() => {
                   setOpen(false);
                   setShowVerify(true);
@@ -296,7 +296,7 @@ function PhoneVerifyModal({ open, onOpenChange, redirectTo }) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Phone className="w-5 h-5 text-teal-600" />
+            <Phone className="w-5 h-5 text-pink-600" />
             Verify your phone number
           </DialogTitle>
         </DialogHeader>
@@ -335,7 +335,7 @@ function PhoneVerifyModal({ open, onOpenChange, redirectTo }) {
               </div>
               <button
                 type="button"
-                className="text-xs text-teal-600 hover:underline"
+                className="text-xs text-pink-600 hover:underline"
                 onClick={() => setStep('phone')}
               >
                 Change phone number
@@ -349,7 +349,7 @@ function PhoneVerifyModal({ open, onOpenChange, redirectTo }) {
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={sending}>
                 Cancel
               </Button>
-              <Button onClick={sendOtp} disabled={sending} className="bg-teal-600 hover:bg-teal-700">
+              <Button onClick={sendOtp} disabled={sending} className="bg-pink-600 hover:bg-pink-700">
                 {sending ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending…</> : 'Send OTP'}
               </Button>
             </>
@@ -358,7 +358,7 @@ function PhoneVerifyModal({ open, onOpenChange, redirectTo }) {
               <Button variant="outline" onClick={() => setStep('phone')} disabled={verifying}>
                 Back
               </Button>
-              <Button onClick={verifyOtp} disabled={verifying} className="bg-teal-600 hover:bg-teal-700">
+              <Button onClick={verifyOtp} disabled={verifying} className="bg-pink-600 hover:bg-pink-700">
                 {verifying ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying…</> : 'Verify & unlock'}
               </Button>
             </>

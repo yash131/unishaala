@@ -65,7 +65,7 @@ export default function JobsPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-teal-600 border-t-transparent"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-pink-600 border-t-transparent"></div>
       </div>
     );
   }
@@ -74,7 +74,7 @@ export default function JobsPage() {
     <div className="min-h-screen bg-gray-50">
       <MainNavbar />
       
-      <div className="pt-20 pb-12 bg-gradient-to-b from-teal-50 to-white">
+      <div className="pt-20 pb-12 bg-gradient-to-b from-pink-50 to-white">
         <div className="container mx-auto px-4">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Job Notifications</h1>
           <p className="text-gray-600 mb-8">Find the latest government and private sector job opportunities</p>
@@ -111,14 +111,14 @@ export default function JobsPage() {
             <Card key={job.id} className="card-hover">
               <CardContent className="p-6">
                 <div className="flex items-start justify-between mb-4">
-                  <div className="w-14 h-14 bg-teal-100 rounded-xl flex items-center justify-center">
-                    <Briefcase className="w-7 h-7 text-teal-600" />
+                  <div className="w-14 h-14 bg-pink-100 rounded-xl flex items-center justify-center">
+                    <Briefcase className="w-7 h-7 text-pink-600" />
                   </div>
                   <Badge className="bg-green-100 text-green-700">{job.vacancies} Posts</Badge>
                 </div>
                 
                 <h3 className="text-xl font-bold text-gray-900 mb-1">{job.title}</h3>
-                <p className="text-teal-600 font-medium mb-4">{job.organization}</p>
+                <p className="text-pink-600 font-medium mb-4">{job.organization}</p>
                 
                 <div className="space-y-2 text-sm text-gray-600 mb-4">
                   <div className="flex items-center gap-2">
@@ -135,7 +135,7 @@ export default function JobsPage() {
                 <Badge variant="secondary" className="mb-4">{job.category}</Badge>
 
                 <Link href={`/jobs/${job.id}`}>
-                  <Button className="w-full bg-teal-600 hover:bg-teal-700">
+                  <Button className="w-full bg-pink-600 hover:bg-pink-700">
                     View Details <ArrowRight className="ml-2 w-4 h-4" />
                   </Button>
                 </Link>

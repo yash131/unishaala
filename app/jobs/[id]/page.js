@@ -28,7 +28,7 @@ function Navbar() {
           <Logo size="default" showText={false} />
           <div className="hidden md:flex items-center gap-4">
             <Link href="/login">
-              <Button variant="outline" className="border-teal-600 text-teal-600">Login</Button>
+              <Button variant="outline" className="border-pink-600 text-pink-600">Login</Button>
             </Link>
             <Link href="/signup">
               <Button className="bg-rose-500 hover:bg-rose-600">Sign Up</Button>
@@ -67,7 +67,7 @@ export default function JobDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-teal-600 border-t-transparent"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-pink-600 border-t-transparent"></div>
       </div>
     );
   }
@@ -84,19 +84,19 @@ export default function JobDetailPage() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
-      <div className="pt-20 bg-gradient-to-b from-teal-50 to-white">
+      <div className="pt-20 bg-gradient-to-b from-pink-50 to-white">
         <div className="container mx-auto px-4 py-8">
-          <Link href="/jobs" className="inline-flex items-center text-teal-600 hover:text-teal-700 mb-6">
+          <Link href="/jobs" className="inline-flex items-center text-pink-600 hover:text-pink-700 mb-6">
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Jobs
           </Link>
           
           <div className="flex flex-col md:flex-row md:items-start gap-6">
-            <div className="w-20 h-20 bg-teal-100 rounded-2xl flex items-center justify-center flex-shrink-0">
-              <Briefcase className="w-10 h-10 text-teal-600" />
+            <div className="w-20 h-20 bg-pink-100 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <Briefcase className="w-10 h-10 text-pink-600" />
             </div>
             <div className="flex-1">
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{job.title}</h1>
-              <p className="text-xl text-teal-600 font-medium mb-4">{job.organization}</p>
+              <p className="text-xl text-pink-600 font-medium mb-4">{job.organization}</p>
               <div className="flex flex-wrap gap-4 text-gray-600">
                 <span className="flex items-center gap-1">
                   <MapPin className="w-4 h-4" /> {job.location}
@@ -129,28 +129,28 @@ export default function JobDetailPage() {
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Job Details</h2>
                 <div className="grid md:grid-cols-2 gap-4">
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <Briefcase className="w-5 h-5 text-teal-600" />
+                    <Briefcase className="w-5 h-5 text-pink-600" />
                     <div>
                       <p className="text-sm text-gray-500">Category</p>
                       <p className="font-medium">{job.category}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <BookOpen className="w-5 h-5 text-teal-600" />
+                    <BookOpen className="w-5 h-5 text-pink-600" />
                     <div>
                       <p className="text-sm text-gray-500">Qualification</p>
                       <p className="font-medium">{job.qualification}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <IndianRupee className="w-5 h-5 text-teal-600" />
+                    <IndianRupee className="w-5 h-5 text-pink-600" />
                     <div>
                       <p className="text-sm text-gray-500">Salary Range</p>
                       <p className="font-medium">{job.salary}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                    <Users className="w-5 h-5 text-teal-600" />
+                    <Users className="w-5 h-5 text-pink-600" />
                     <div>
                       <p className="text-sm text-gray-500">Total Vacancies</p>
                       <p className="font-medium">{job.vacancies}</p>

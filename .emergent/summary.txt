@@ -1,45 +1,50 @@
 <analysis>**original_problem_statement**: 
-The user requested enhancements to the Rank Predictor system to parse TCS iON/GATE response sheet HTML URLs, extract Question IDs and answers (MCQ, MSQ, NAT, Range, MAT), and evaluate them against an Admin-uploaded CSV answer key. Additionally, the user requested full CRUD functionality in the Admin Panel for Testimonials, Contact Leads, Colleges, and Jobs. Earlier, the user also requested completion of the Blog Management Panel and replacing Exam with Test Series on the user panel.
+The user requested enhancements to the Rank Predictor system to parse TCS iON/GATE response sheet HTML URLs, extract Question IDs and answers, and evaluate them against an Admin-uploaded CSV answer key. Additionally, the user requested full CRUD functionality in the Admin Panel for Testimonials, Contact Leads, Colleges, and Jobs. 
+*New requests in this session:* 
+1. Build and integrate a PDF Management Feature inside the Blog Panel (Admin upload, View/Download permissions) and a user-facing embedded PDF viewer (page 1 preview for unauthenticated users, full access for logged-in & phone-verified users). 
+2. Implement a site-wide user access control system using phone number verification (OTP-based). Unverified/anonymous users should only access the first page (home) and public auth routes, with all other content locked behind a redirection and CTA banner.
 
 **PRODUCT REQUIREMENTS**:
-1. Rank Predictor Logic: Parse response sheets, map student answers to CSV keys by Question ID, and apply admin-defined positive/negative marks.
-2. Support advanced evaluations: Exact match (MCQ), exact set match (MSQ), numerical tolerance (NAT), range bounds (Range), and attempted-bonus (MAT).
-3. Admin Panel CRUD: Build out Testimonials, Contacts, Colleges, Jobs, and Answer Keys tabs.
+1. Rank Predictor Logic: Parse response sheets, map student answers to CSV keys by Question ID.
+2. Admin Panel CRUD: Testimonials, Contacts, Colleges, Jobs, and Answer Keys.
+3. PDF Management: Upload PDFs to blogs (GridFS), generate page 1 previews, gate access/downloads based on admin-defined permissions and user authentication status.
+4. Site-wide Access Control: Edge middleware to restrict access to core routes (, , , etc.) ensuring only logged-in users with a verified phone number can access them.
 
 **User's preferred language**: English (INSTRUCT next agent to respond in English only)
 
 **what currently exists?** 
-A Next.js full-stack mock test platform with MongoDB. It features user auth, Mock Test unlocking (Razorpay), a Blog system, Admin dashboard (Exams, Domains, Tests, Blogs, Contacts, Colleges, Jobs, Testimonials, Answer Keys), and an advanced Rank Predictor that parses digialm (TCS iON) HTML response sheets to estimate ranks based on real-time data.
+A Next.js full-stack platform with MongoDB. It features user auth (with Twilio OTP verification), Razorpay mock test unlocking, a Blog system with GridFS-based PDF attachment management, an Admin dashboard, and a Rank Predictor. The platform is secured by Next.js edge middleware that restricts most pages to users who are logged in and have a verified phone number.
 
 **Last working item**:
-- **Last item agent was working**: Fixing a critical extraction and mapping bug in the Rank Predictor. The parser was incorrectly mapping NAT answers (e.g., 327.36) to the previous Question ID. The agent identified the root cause: in the TCS iON HTML layout, the  section appears *before* the  section for NAT questions. The agent rewrote the parser in  to split the HTML by question blocks () rather than relying on global regex, ensuring data isn't mixed between questions.
+- **Last item agent was working**: Implementing the site-wide access control system (Next.js middleware,  JWT integration, and the  UI for redirect messaging).
 - **Status**: USER VERIFICATION PENDING
 - **Agent Testing Done**: Y
-- **Which testing method agent to use?**: Backend testing agent / python -c script test.
+- **Which testing method agent to use?**: Frontend testing agent (pending user approval to test the UI flow).
 - **User Testing Done**: N
 
 **All Pending/In progress Issue list**:
 - **Issue 1: Verify Rank Predictor NAT Mapping Fix**
-  - **Priority**: P0
-  - **Attempted fixes**: The agent applied a fix to split the HTML document by question blocks to isolate properties.
-  - **Next debug checklist**: Verify the output for Question ID  and  to ensure 16.27 and 327.36 map accurately. If successful, finalize the task with the user.
-  - **Why fix this issue and what will be achieved with the fix?**: Ensures accurate score calculation for NAT questions in the Rank Predictor.
+  - **Attempted fixes**: Previous agent applied a fix to split HTML by question blocks to isolate properties.
+  - **Next debug checklist**: Verify output for Question ID  and  to ensure 16.27 and 327.36 map accurately. Run a quick test and finalize with the user.
+  - **Why fix this issue and what will be achieved with the fix?**: Ensures accurate score calculation for NAT questions in Rank Predictor.
   - **Status**: TESTING PENDING
   - **Is recurring issue?**: N
   - **Should Test frontend/backend/both after fix?**: Backend (Test via script)
   - **Blocked on other issue**: None
+  - **Priority**: P0
 
 - **Issue 2: CSV Bulk Question Upload Duplicate Bug**
-  - **Priority**: P2
-  - **Attempted fixes**: None in this session.
-  - **Next debug checklist**: Check . Ensure the CSV upsert logic handles duplicate  correctly without dropping rows.
-  - **Why fix this issue and what will be achieved with the fix?**: Prevents silent failure when admins bulk-upload questions.
+  - **Attempted fixes**: None.
+  - **Next debug checklist**: Check . Ensure CSV upsert logic handles duplicate  correctly without dropping rows.
+  - **Why fix this issue and what will be achieved with the fix?**: Prevents silent failure when admins bulk-upload questions. Previous uploads dropped 6 out of 7 questions.
   - **Status**: NOT STARTED
   - **Is recurring issue?**: Y
   - **Should Test frontend/backend/both after fix?**: Backend
+  - **Blocked on other issue**: None
+  - **Priority**: P2
 
 **In progress Task List**:
-None currently active (waiting on Issue 1 verification).
+None currently active.
 
 **Upcoming and Future Tasks**:
 - **P1**: Add Clear submissions admin button per Answer Key.
@@ -48,103 +53,115 @@ None currently active (waiting on Issue 1 verification).
 - **P2**: Email notification to admin on new contact form submission.
 
 **Completed work in this session**:
-- Created User-facing Blog pages (, ) (DONE)
-- Implemented  component in Admin Panel (DONE)
-- Fixed  404 error on Admin Blogs API (DONE)
-- Renamed all user-facing Exam references to Test Series (DONE)
-- Implemented CRUD Tabs for Testimonials, Contacts, Colleges, and Jobs in Admin (DONE)
-- Built Answer Key Management CRUD + CSV bulk upload (DONE)
-- Built advanced Rank Predictor parser supporting MCQ, MSQ, NAT, Range, and MAT logic (DONE)
-- Fixed geo-blocked URL fetching logic and regex parsing bugs for digialm.com response sheets (DONE)
+- Built Admin PDF upload functionality for Blogs using GridFS () (DONE)
+- Created  integration to generate first-page previews of PDFs securely (DONE)
+- Built User-facing  with auth/OTP gating (DONE)
+- Configured Next.js Middleware () to block unverified access to core pages (DONE)
+- Injected  into the Home Page to handle blocked route redirects and prompt login/OTP verification (DONE)
+- Updated JWT authentication payload to include  state to prevent DB hits on edge routing (DONE)
 
 **Earlier issues found/mentioned but not fixed**:
 - **Issue 1: CSV Bulk Question Upload Duplicate Bug**
-  - **Debug checklist**: Review the  logic for  collision handling.
-  - **Why to solve this issue**: Previous uploads dropped 6 out of 7 questions.
+  - **Debug checklist**: Review  logic for  collision handling.
+  - **Why to solve this issue and what will be achieved with this?**: Users lose data silently on bulk uploads.
   - **Should Test frontend/backend/both after fix**: Backend
   - **Is recurring issue?**: Y
 
+- **Issue 2: Verify Rank Predictor NAT Mapping**
+  - **Debug checklist**: Run  or curl to ensure NAT answers map to the correct Question ID.
+  - **Why to solve this issue and what will be achieved with this?**: Carried over from the previous session. Fix was applied but never verified with the user.
+  - **Should Test frontend/backend/both after fix**: Backend
+  - **Is recurring issue?**: N
+
 **Known issue recurrence from previous fork**:
+- **Issue recurrence in previous fork**: Ephemeral storage and SelectItem empty value bugs.
 - **Recurrence count**: 0
-- **Status**: RESOLVED (Ephemeral storage and SelectItem empty value bugs were fixed in the previous fork and did not recur).
+- **Status**: RESOLVED
 
 **Code Architecture**:
 
 
 **Key Technical Concepts**:
-- Next.js App Router (React, Tailwind CSS, shadcn/ui)
-- MongoDB unified collection helper
-- Digialm / TCS iON HTML parsing using Cheerio/Regex
-- Advanced Evaluation Algorithms (Exact matching, string bounds checking, numerical tolerances)
+- Next.js App Router & Edge Middleware ()
+- JWT Authentication (Custom token carrying  state)
+- MongoDB GridFS for large file/PDF storage
+-  for server-side PDF manipulation
+- Advanced Evaluation Algorithms (Rank Predictor)
 
 **key DB schema**:
 - : 
 - : 
-- : 
-- : 
--  |  |  | 
+-  & : MongoDB GridFS default collections for PDF storage.
 
 **changes in tech stack**:
-None.
+- Added  for PDF document processing.
+- Utilizing MongoDB GridFS for storing blog attachments (PDFs) instead of base64 strings to handle large files efficiently.
 
 **All files of reference**:
-1. : Contains all new endpoints for blogs, contacts, colleges, jobs, answer keys, and the  parser logic. (Over 3,300 lines long).
-2. : Monolithic admin dashboard, now includes Tabs for Testimonials, Contacts, Colleges, Jobs, and Answer Keys. (Over 2,800 lines long).
-3. : Redesigned to accept response sheet URLs/HTML files and display calculated score and rank.
-4.  & : New public facing blog views.
+1. : Core routing guard. Redirects anonymous or unverified users attempting to access locked pages.
+2.  & : Created to handle PDF page extraction and GridFS streaming safely without OOM errors.
+3.  & : Created for the new auth-gated UX.
+4. : Heavily updated for Auth flows (re-issuing cookies with ) and Blog deletion GridFS cleanup.
 
 **Areas that need refactoring**:
--  and  are massive monolithic files that run the risk of breaking sibling logic when edited. They desperately need breaking down into modular routes/components.
+-  and  are massive monolithic files (4000+ lines). They urgently need breaking down into modular components to avoid breaking sibling functionality.
 
 **key api endpoints**:
-- : Evaluates a student's HTML response sheet against a selected Answer Key.
-- : Bulk CSV upload for answers.
-- 
--  (and Colleges, Jobs, Testimonials).
+- , , : GridFS streaming endpoints with strict role/auth gating.
+- : Verifies OTP and re-issues JWT cookie with .
+- : GridFS chunked upload.
 
 **Critical Info for New Agent**:
-- **Rank Predictor Parser Design**: The digialm HTML response sheet places  *before*  for NAT questions. Do not use global sequential regex. The parser in  now splits the HTML using  to parse each question independently.
-- **CSV Data Mapping**: Matching *must* strictly use  as a string ().
-- Always update  if changing auth keys. Use Admin credentials  /  for testing.
+- **Middleware is Active**: Any new public routes must be explicitly excluded in  or they will 307 redirect to the home page .
+- **JWT State Management**: If a user's verification state changes anywhere, the  cookie MUST be explicitly re-issued, as the edge middleware reads  directly from the token payload, not the database.
+- **File Storage**: Do not store PDFs as base64 in standard collections; always use the implemented GridFS helper methods.
 
 **documents and test reports created in this job**:
--  (Updated repeatedly by testing agents)
+-  (Updated with Blog PDF Backend Tests and Site-wide Access Control Middleware Tests)
 
 **Last 10 User Messages and any pending HUMAN messages**:
-1. **[PENDING]** User reported a mapping bug in Rank Predictor where NAT answers (e.g., 327.36) mapped to the previous Question ID. (Agent applied the fix but hasn't finalized).
-2. **[RESOLVED]** User reported Rank Predictor failed to extract any answers from their specific digialm URL.
-3. **[RESOLVED]** User reported the Rank Predictor Question IDs weren't matching the CSV IDs properly.
-4. **[RESOLVED]** User uploaded sample CSVs and a screenshot demonstrating the mismatch issue.
-5. **[RESOLVED]** User requested advanced evaluation logic (MCQ, MSQ, NAT, Range, MAT) with precise rule sets.
-6. **[RESOLVED]** User reported that fetching the URL in Rank Predictor evaluated everything incorrectly.
-7. **[RESOLVED]** User requested to build out the Rank Predictor + Answer Key management feature.
-8. **[RESOLVED]** User requested to build out CRUD for Testimonials, Contacts, Colleges, and Jobs in the Admin panel.
-9. **[RESOLVED]** User provided a screenshot showing a 404 error when clicking Publish on a blog post.
-10. **[RESOLVED]** User provided instructions on blog SEO fields and renaming Exams to Test Series.
+1. **[PENDING]** User needs to decide whether to run automated frontend testing on the new Site-wide Access Control UI, test manually, or move to the next task.
+2. **[RESOLVED]** User requested to implement a site-wide user access control system using phone number verification.
+3. **[PENDING]** User needs to decide whether to run automated frontend testing on the PDF feature. (Agent moved on to access control before getting a reply on this specific UI test).
+4. **[RESOLVED]** User requested a PDF Management Feature inside the Blog Panel.
+5. **[RESOLVED]** User bypassed clarification phase, telling the agent to proceed with best judgment.
+6. **[RESOLVED]** User asked the agent to use  tool to confirm the plan.
+7. **[RESOLVED]** User reported a mapping bug in Rank Predictor (from previous fork, fix pending confirmation).
+8. **[RESOLVED]** User reported Rank Predictor failed to extract any answers.
+9. **[RESOLVED]** User reported Rank Predictor Question IDs weren't matching CSV IDs.
+10. **[RESOLVED]** User requested advanced evaluation logic (MCQ, MSQ, NAT, Range, MAT).
 
 **Project Health Check:**
-- **Broken**: None (Pending NAT parsing verification).
-- **Mocked**: None.
+- **Broken**: None detected.
+- **Mocked**: Twilio OTP is configured but uses mock success bypass locally.
 
 **3rd Party Integrations**:
+- Twilio (Phone OTP) — requires User API Key.
 - Razorpay (Payments) — requires User API Key.
 
 **Testing status**:
-- Testing agent used after significant changes: YES
+- Testing agent used after significant changes: YES (backend testing agent used twice: passed 20/20 for PDFs, passed 9/9 for Middleware).
 - Troubleshoot agent used after agent stuck in loop: NO
-- Test files created: , , , .
-- Known regressions: None detected.
+- Test files created: , 
+- Known regressions: None
 
 **Credentials to test flow:**
 - Admin Login:  / 
 
 **What agent forgot to execute**:
-The agent implemented the NAT parsing layout fix but never responded to the user to confirm the fix was complete and successful. 
+The agent in this session completely ignored the P0/P2 issues (NAT mapping verification and CSV duplicate question upload bug) inherited from the previous handoff summary. These must be addressed.
 
 **Debugging checklist for current issue**
-    Issue: Verify Rank Predictor NAT Question ID mapping.
+    Issue: Need to verify CSV Bulk Question Upload Duplicate Bug
 
     Backend files to check:
-    -  (Check the  block, specifically where it splits  to ensure NAT  is safely mapped to the correct ID).
+    - 
+    
+    Action: Check if the upsert logic uses  effectively without wiping out previous items in the bulk array.
 
-    Action: Run a quick test (via  or via curl) and then  the interaction with the user.</analysis>
+    Issue: Need to verify Rank Predictor NAT Question ID mapping
+    
+    Backend files to check:
+    -  (predict-rank endpoint)
+    
+    Action: Run the previous test script or manually verify  maps correctly.</analysis>

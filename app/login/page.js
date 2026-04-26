@@ -91,7 +91,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-teal-50 to-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
           <Logo size="large" showText={false} />
@@ -180,14 +180,14 @@ export default function LoginPage() {
                   <input type="checkbox" className="rounded border-gray-300" />
                   <span className="text-gray-600">Remember me</span>
                 </label>
-                <Link href="/forgot-password" className="text-teal-600 hover:underline">
+                <Link href="/forgot-password" className="text-pink-600 hover:underline">
                   Forgot password?
                 </Link>
               </div>
 
               <Button 
                 type="submit" 
-                className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-lg"
+                className="w-full h-12 bg-pink-600 hover:bg-pink-700 text-lg"
                 disabled={loading}
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Login'}
@@ -197,7 +197,7 @@ export default function LoginPage() {
             <div className="mt-6 text-center">
               <p className="text-gray-600">
                 Don't have an account?{' '}
-                <Link href="/signup" className="text-teal-600 font-semibold hover:underline">
+                <Link href="/signup" className="text-pink-600 font-semibold hover:underline">
                   Sign Up
                 </Link>
               </p>

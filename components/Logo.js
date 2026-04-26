@@ -26,7 +26,7 @@ export function Logo({ size = 'default', showText = true, className = '' }) {
         style={{ height: img, width: 'auto' }}
       />
       {showText && (
-        <span className={`${text} font-bold text-teal-600`}>Unishaala</span>
+        <span className={`${text} font-bold text-pink-600`}>Unishaala</span>
       )}
     </Link>
   );

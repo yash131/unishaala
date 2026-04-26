@@ -63,7 +63,7 @@ export default function ExamsPage() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-teal-600 border-t-transparent"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-pink-600 border-t-transparent"></div>
       </div>
     );
   }
@@ -72,7 +72,7 @@ export default function ExamsPage() {
     <div className="min-h-screen bg-gray-50">
       <MainNavbar />
       
-      <div className="pt-20 pb-12 bg-gradient-to-b from-teal-50 to-white">
+      <div className="pt-20 pb-12 bg-gradient-to-b from-pink-50 to-white">
         <div className="container mx-auto px-4">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">All Test Series</h1>
           <p className="text-gray-600 mb-8">Choose from 50+ competitive test series and start your preparation</p>
@@ -108,11 +108,11 @@ export default function ExamsPage() {
           {filteredExams.map((exam) => (
             <Card key={exam.id} className="card-hover h-full">
               <CardContent className="p-6">
-                <div className="w-16 h-16 bg-teal-100 rounded-2xl flex items-center justify-center mb-4 text-3xl">
+                <div className="w-16 h-16 bg-pink-100 rounded-2xl flex items-center justify-center mb-4 text-3xl">
                   {exam.icon}
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-1">{exam.name}</h3>
-                <p className="text-sm text-teal-600 font-medium mb-2">{exam.fullName}</p>
+                <p className="text-sm text-pink-600 font-medium mb-2">{exam.fullName}</p>
                 <p className="text-sm text-gray-500 mb-4 line-clamp-2">{exam.description}</p>
                 
                 <div className="flex items-center gap-4 mb-4 text-sm text-gray-600">
@@ -124,10 +124,10 @@ export default function ExamsPage() {
                   </span>
                 </div>
                 
-                <Badge className="bg-teal-100 text-teal-700 mb-4">{exam.category}</Badge>
+                <Badge className="bg-pink-100 text-pink-700 mb-4">{exam.category}</Badge>
                 
                 <Link href={`/exams/${exam.slug}`}>
-                  <Button className="w-full bg-teal-600 hover:bg-teal-700">
+                  <Button className="w-full bg-pink-600 hover:bg-pink-700">
                     Explore <ArrowRight className="ml-2 w-4 h-4" />
                   </Button>
                 </Link>

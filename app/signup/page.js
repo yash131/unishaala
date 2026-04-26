@@ -156,7 +156,7 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-teal-50 to-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-pink-50 to-white flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
           <Logo size="large" showText={false} />
@@ -294,8 +294,8 @@ export default function SignupPage() {
               </>
             ) : (
               <form onSubmit={handleVerifyAndSignup} className="space-y-4">
-                <div className="bg-teal-50 p-4 rounded-lg mb-4">
-                  <div className="flex items-center gap-2 text-teal-700">
+                <div className="bg-pink-50 p-4 rounded-lg mb-4">
+                  <div className="flex items-center gap-2 text-pink-700">
                     <CheckCircle className="w-5 h-5" />
                     <span className="font-medium">OTP sent to {formData.phone}</span>
                   </div>
@@ -320,7 +320,7 @@ export default function SignupPage() {
                   <span className="text-gray-500">Didn't receive OTP?</span>
                   <button 
                     type="button" 
-                    className="text-teal-600 hover:underline font-medium"
+                    className="text-pink-600 hover:underline font-medium"
                     onClick={handleResendOTP}
                     disabled={otpSending}
                   >
@@ -330,7 +330,7 @@ export default function SignupPage() {
 
                 <Button 
                   type="submit" 
-                  className="w-full h-12 bg-teal-600 hover:bg-teal-700 text-lg"
+                  className="w-full h-12 bg-pink-600 hover:bg-pink-700 text-lg"
                   disabled={loading || otp.length !== 6}
                 >
                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Verify & Create Account'}
@@ -350,7 +350,7 @@ export default function SignupPage() {
               <div className="mt-6 text-center">
                 <p className="text-gray-600">
                   Already have an account?{' '}
-                  <Link href="/login" className="text-teal-600 font-semibold hover:underline">
+                  <Link href="/login" className="text-pink-600 font-semibold hover:underline">
                     Login
                   </Link>
                 </p>

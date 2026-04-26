@@ -13,7 +13,7 @@ import time
 from urllib.parse import urlencode, unquote
 
 # Configuration
-BASE_URL = "https://admin-suite-46.preview.emergentagent.com"
+BASE_URL = "https://rank-predict-test.preview.emergentagent.com"
 API_BASE = f"{BASE_URL}/api"
 JWT_SECRET = "unishaala-secret-key-2025"
 

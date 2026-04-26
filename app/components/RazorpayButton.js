@@ -94,7 +94,7 @@ export default function RazorpayButton({ examId, mockTestId, amount, buttonText 
     <Button
       onClick={handlePayment}
       disabled={loading}
-      className="bg-teal-600 hover:bg-teal-700 text-white"
+      className="bg-pink-600 hover:bg-pink-700 text-white"
     >
       {loading ? (
         <>

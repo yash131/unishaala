@@ -15,7 +15,7 @@ export default function PrivacyPolicyPage() {
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-3xl">
           {/* Back Link */}
-          <Link href="/" className="inline-flex items-center text-teal-600 hover:text-teal-700 mb-8 text-sm">
+          <Link href="/" className="inline-flex items-center text-pink-600 hover:text-pink-700 mb-8 text-sm">
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Home
           </Link>
 
@@ -59,7 +59,7 @@ export default function PrivacyPolicyPage() {
                 We may update this Privacy Policy from time to time to reflect changes in our practices, technology, or legal requirements. Any updates will be posted on this page with a revised effective date.
               </p>
               <p className="text-gray-600 text-justify">
-                If you have any questions, concerns, or requests regarding this Privacy Policy, you may contact us at <a href="mailto:admin@unishaala.com" className="text-teal-600 hover:underline">admin@unishaala.com</a>.
+                If you have any questions, concerns, or requests regarding this Privacy Policy, you may contact us at <a href="mailto:admin@unishaala.com" className="text-pink-600 hover:underline">admin@unishaala.com</a>.
               </p>
             </section>
 
@@ -85,7 +85,7 @@ export default function PrivacyPolicyPage() {
                 We retain personal data only for as long as necessary to fulfill the purposes for which it was collected or as required by law. Once no longer required, data is securely deleted or anonymized.
               </p>
               <p className="text-gray-600 mb-4 text-justify">
-                We have appointed a Grievance Officer / Data Protection Contact to address user concerns related to data privacy. For any such concerns, please contact <a href="mailto:admin@unishaala.com" className="text-teal-600 hover:underline">admin@unishaala.com</a>.
+                We have appointed a Grievance Officer / Data Protection Contact to address user concerns related to data privacy. For any such concerns, please contact <a href="mailto:admin@unishaala.com" className="text-pink-600 hover:underline">admin@unishaala.com</a>.
               </p>
               <p className="text-gray-600 text-justify">
                 By continuing to use the Platform, you acknowledge and consent to the collection and processing of your data as described in this Privacy Policy and related documents.
@@ -115,7 +115,7 @@ export default function PrivacyPolicyPage() {
                 We may update this Cookie Policy from time to time to reflect changes in technology, law, or our practices. Continued use of the Platform after such updates constitutes your acceptance of the revised policy.
               </p>
               <p className="text-gray-600 text-justify">
-                For any questions regarding this Cookie Policy, please contact us at <a href="mailto:admin@unishaala.com" className="text-teal-600 hover:underline">admin@unishaala.com</a>.
+                For any questions regarding this Cookie Policy, please contact us at <a href="mailto:admin@unishaala.com" className="text-pink-600 hover:underline">admin@unishaala.com</a>.
               </p>
             </section>
 
@@ -139,7 +139,7 @@ export default function PrivacyPolicyPage() {
                 If you believe your content was wrongly removed due to a mistake or misidentification, you may submit a counter-notification with supporting information.
               </p>
               <p className="text-gray-600 text-justify">
-                For all copyright-related concerns, please contact <a href="mailto:admin@unishaala.com" className="text-teal-600 hover:underline">admin@unishaala.com</a>.
+                For all copyright-related concerns, please contact <a href="mailto:admin@unishaala.com" className="text-pink-600 hover:underline">admin@unishaala.com</a>.
               </p>
             </section>
 

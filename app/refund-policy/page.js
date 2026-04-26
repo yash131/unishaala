@@ -15,7 +15,7 @@ export default function RefundPolicyPage() {
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-3xl">
           {/* Back Link */}
-          <Link href="/" className="inline-flex items-center text-teal-600 hover:text-teal-700 mb-8 text-sm">
+          <Link href="/" className="inline-flex items-center text-pink-600 hover:text-pink-700 mb-8 text-sm">
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Home
           </Link>
 
@@ -61,7 +61,7 @@ export default function RefundPolicyPage() {
               <div className="bg-gray-50 p-6 rounded-lg">
                 <p className="text-gray-700">
                   <strong>Contact for Refund Requests:</strong><br />
-                  Email: <a href="mailto:admin@unishaala.com" className="text-teal-600 hover:underline">admin@unishaala.com</a>
+                  Email: <a href="mailto:admin@unishaala.com" className="text-pink-600 hover:underline">admin@unishaala.com</a>
                 </p>
               </div>
             </section>
@@ -99,7 +99,7 @@ export default function RefundPolicyPage() {
                 For any refund or cancellation-related queries, users may contact us at:
               </p>
               <div className="bg-gray-50 p-6 rounded-lg">
-                <p className="text-gray-700"><strong>Email:</strong> <a href="mailto:admin@unishaala.com" className="text-teal-600 hover:underline">admin@unishaala.com</a></p>
+                <p className="text-gray-700"><strong>Email:</strong> <a href="mailto:admin@unishaala.com" className="text-pink-600 hover:underline">admin@unishaala.com</a></p>
               </div>
             </section>
 

@@ -11,7 +11,7 @@ import json
 import sys
 
 # Configuration
-BASE_URL = "https://admin-suite-46.preview.emergentagent.com"
+BASE_URL = "https://rank-predict-test.preview.emergentagent.com"
 API_BASE = f"{BASE_URL}/api"
 
 # Test credentials

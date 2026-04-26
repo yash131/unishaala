@@ -15,7 +15,7 @@ export default function TermsOfServicePage() {
       <main className="pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-3xl">
           {/* Back Link */}
-          <Link href="/" className="inline-flex items-center text-teal-600 hover:text-teal-700 mb-8 text-sm">
+          <Link href="/" className="inline-flex items-center text-pink-600 hover:text-pink-700 mb-8 text-sm">
             <ArrowLeft className="w-4 h-4 mr-2" /> Back to Home
           </Link>
 
@@ -59,7 +59,7 @@ export default function TermsOfServicePage() {
                 These Terms shall be governed by and construed in accordance with the laws of India. Any disputes arising out of or relating to these Terms shall be subject to the exclusive jurisdiction of the courts located in Jaipur.
               </p>
               <p className="text-gray-600 text-justify">
-                If you have any questions regarding these Terms, you may contact us at <a href="mailto:admin@unishaala.com" className="text-teal-600 hover:underline">admin@unishaala.com</a>
+                If you have any questions regarding these Terms, you may contact us at <a href="mailto:admin@unishaala.com" className="text-pink-600 hover:underline">admin@unishaala.com</a>
               </p>
             </section>
 
@@ -86,7 +86,7 @@ export default function TermsOfServicePage() {
                 Unishaala reserves the right to suspend or terminate Instructor access in cases of policy violations, misconduct, or failure to maintain content standards. Upon termination, Unishaala may retain or remove content at its discretion.
               </p>
               <p className="text-gray-600 text-justify">
-                For any queries regarding Instructor participation, please contact <a href="mailto:admin@unishaala.com" className="text-teal-600 hover:underline">admin@unishaala.com</a>.
+                For any queries regarding Instructor participation, please contact <a href="mailto:admin@unishaala.com" className="text-pink-600 hover:underline">admin@unishaala.com</a>.
               </p>
             </section>
 
@@ -137,7 +137,7 @@ export default function TermsOfServicePage() {
                 If you uninstall the application, your rights under these Terms will terminate, although certain provisions may continue to apply.
               </p>
               <p className="text-gray-600 text-justify">
-                For any mobile-related support or inquiries, please contact <a href="mailto:admin@unishaala.com" className="text-teal-600 hover:underline">admin@unishaala.com</a>
+                For any mobile-related support or inquiries, please contact <a href="mailto:admin@unishaala.com" className="text-pink-600 hover:underline">admin@unishaala.com</a>
               </p>
             </section>
 
