@@ -96,6 +96,51 @@ export default function PreviousYearPage() {
     setStep(step - 1);
   };
 
+  const handleBuyExamFromCard = async (exam) => {
+    if (!me?.id) { router.push('/login?next=/previous-year'); return; }
+    const price = Number(exam?.pyqPrice || 0);
+    if (!price) { toast.error('Price not set yet.'); return; }
+    setSelectedExam(exam);
+    try {
+      const res = await fetch('/api/payment/create-order', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ paymentType: 'exam_pyq_purchase', examId: exam.id, amount: price })
+      });
+      const d = await res.json();
+      if (!d.success) { toast.error(d.error || 'Failed to create order'); return; }
+      await ensureRzp();
+      const { orderId, keyId, name, description, prefill, amount, currency } = d.data;
+      const rzp = new window.Razorpay({
+        key: keyId,
+        amount, currency, name, description,
+        order_id: orderId, prefill,
+        theme: { color: '#7c3aed' },
+        handler: async function (response) {
+          try {
+            const v = await fetch('/api/payment/verify', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(response)
+            });
+            const vd = await v.json();
+            if (vd.success) {
+              toast.success(`Unlocked full PYQ access for ${exam.name}`);
+              await loadAccess();
+            } else {
+              window.location.href = `/payment/failed?reason=${encodeURIComponent(vd.error || 'Verification failed')}`;
+            }
+          } catch (err) {
+            window.location.href = `/payment/failed?reason=${encodeURIComponent(err.message)}`;
+          }
+        },
+      });
+      rzp.on('payment.failed', (resp) => toast.error(resp.error?.description || 'Payment failed'));
+      rzp.open();
+    } catch (err) {
+      toast.error('Could not start payment');
+    }
+  };
+
   const handleStartTest = (t) => {
     if (t.isFree || domainUnlocked || examUnlocked || hasActivePass) {
       router.push(`/practice-test/${t.id}`);
@@ -232,7 +277,7 @@ export default function PreviousYearPage() {
           <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-purple-600" /></div>
         ) : (
           <>
-            {step === 0 && <ExamPicker exams={exams} onPick={pickExam} />}
+            {step === 0 && <ExamPicker exams={exams} purchasedPyqExams={purchasedPyqExams} hasActivePass={hasActivePass} onPick={pickExam} onBuy={handleBuyExamFromCard} />}
             {step === 1 && (
               <>
                 {/* Exam-level Buy banner */}
@@ -357,7 +402,7 @@ function EmptyState({ icon, title, hint }) {
   );
 }
 
-function ExamPicker({ exams, onPick }) {
+function ExamPicker({ exams, purchasedPyqExams, hasActivePass, onPick, onBuy }) {
   if (!exams || exams.length === 0) {
     return <EmptyState icon={<GraduationCap className="w-7 h-7" />} title="No exams available" hint="Please check back later." />;
   }
@@ -365,19 +410,48 @@ function ExamPicker({ exams, onPick }) {
     <div>
       <h2 className="text-xl font-bold text-gray-900 mb-4">Step 1 — Select an exam</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {exams.map(e => (
-          <Card key={e.id} className="hover:ring-2 hover:ring-purple-300 cursor-pointer transition" onClick={() => onPick(e)}>
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center"><GraduationCap className="w-6 h-6" /></div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-gray-900 truncate">{e.name}</h3>
-                {e.shortName && <p className="text-xs text-gray-500">{e.shortName}</p>}
-                {Number(e.pyqPrice) > 0 && <p className="text-xs text-amber-600 font-semibold mt-1">Full PYQ ₹{e.pyqPrice}</p>}
-              </div>
-              <ArrowRight className="w-4 h-4 text-gray-400" />
-            </CardContent>
-          </Card>
-        ))}
+        {exams.map(e => {
+          const unlocked = hasActivePass || purchasedPyqExams.has(e.id);
+          const price = Number(e.pyqPrice || 0);
+          return (
+            <Card key={e.id} className="hover:shadow-lg transition border-2 hover:border-purple-300">
+              <CardContent className="p-5">
+                <div className="flex items-start gap-3 mb-3 cursor-pointer" onClick={() => onPick(e)}>
+                  <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0"><GraduationCap className="w-6 h-6" /></div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-900 truncate">{e.name}</h3>
+                    {e.shortName && <p className="text-xs text-gray-500">{e.shortName}</p>}
+                  </div>
+                </div>
+
+                {/* Price + Access row */}
+                <div className="flex items-center justify-between mb-3 mt-3 pt-3 border-t border-gray-100">
+                  {unlocked ? (
+                    <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Unlocked</Badge>
+                  ) : price > 0 ? (
+                    <div className="flex flex-col">
+                      <span className="text-xs text-gray-500">Full PYQ Access</span>
+                      <span className="text-2xl font-bold text-gray-900">₹{price.toLocaleString('en-IN')}</span>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-500">Price not set</span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => onPick(e)}>
+                    <ArrowRight className="w-4 h-4 mr-1" /> Browse
+                  </Button>
+                  {!unlocked && price > 0 && (
+                    <Button size="sm" className="flex-1 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white" onClick={() => onBuy(e)}>
+                      <ShieldCheck className="w-4 h-4 mr-1" /> Purchase
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
