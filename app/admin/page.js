@@ -87,6 +87,7 @@ function AdminSidebar({ activeTab, setActiveTab }) {
     { id: 'questions', label: 'Questions', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'blogs', label: 'Blogs', icon: <FileText className="w-5 h-5" /> },
     { id: 'notes', label: 'Notes', icon: <FileDown className="w-5 h-5" /> },
+    { id: 'notifications', label: 'Exam Notifications', icon: <Bell className="w-5 h-5" /> },
     { id: 'answer-keys', label: 'Answer Keys', icon: <ClipboardList className="w-5 h-5" /> },
     { id: 'transactions', label: 'Transactions', icon: <CreditCard className="w-5 h-5" /> },
     { id: 'jobs', label: 'Jobs', icon: <Briefcase className="w-5 h-5" /> },
@@ -4572,6 +4573,7 @@ export default function AdminPage() {
           {activeTab === 'questions' && <QuestionsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'blogs' && <BlogsTab />}
           {activeTab === 'notes' && <NotesTab exams={data.exams} />}
+          {activeTab === 'notifications' && <NotificationsTab exams={data.exams} />}
           {activeTab === 'answer-keys' && <AnswerKeysTab />}
           {activeTab === 'transactions' && <TransactionsTab />}
           {activeTab === 'jobs' && <JobsTab />}
@@ -5157,3 +5159,168 @@ function NotesTab({ exams }) {
     </div>
   );
 }
+
+// =========================== EXAM NOTIFICATIONS TAB ===========================
+function NotificationsTab({ exams }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const emptyForm = { title: '', examName: '', description: '', date: '', link: '', isNew: true };
+  const [form, setForm] = useState(emptyForm);
+
+  const fetchAll = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch('/api/admin/notifications', { credentials: 'include' });
+      const d = await r.json();
+      if (d.success) setItems(d.data || []);
+    } catch (_e) { toast.error('Failed to load notifications'); }
+    setLoading(false);
+  };
+  useEffect(() => { fetchAll(); }, []);
+
+  const openCreate = () => { setEditing(null); setForm({ ...emptyForm, date: new Date().toISOString().slice(0, 10) }); setDialogOpen(true); };
+  const openEdit = (n) => {
+    setEditing(n);
+    setForm({
+      title: n.title || '', examName: n.examName || '',
+      description: n.description || '', date: n.date || '',
+      link: n.link || '', isNew: !!n.isNew,
+    });
+    setDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.title.trim()) { toast.error('Title is required'); return; }
+    setSaving(true);
+    try {
+      const url = editing ? `/api/admin/notifications/${editing.id}` : '/api/admin/notifications';
+      const method = editing ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method, headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', body: JSON.stringify(form)
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success(editing ? 'Notification updated' : 'Notification created');
+        setDialogOpen(false);
+        fetchAll();
+      } else toast.error(d.error || 'Save failed');
+    } catch (_e) { toast.error('Save failed'); }
+    setSaving(false);
+  };
+
+  const handleDelete = async (n) => {
+    if (!confirm(`Delete notification "${n.title}"?`)) return;
+    const res = await fetch(`/api/admin/notifications/${n.id}`, { method: 'DELETE', credentials: 'include' });
+    const d = await res.json();
+    if (d.success) { toast.success('Notification deleted'); fetchAll(); } else toast.error('Delete failed');
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Exam Notifications</h2>
+          <p className="text-sm text-gray-500">Create announcements shown on the home page marquee and the public /notifications page.</p>
+        </div>
+        <Button onClick={openCreate} className="bg-brand-600 hover:bg-brand-700">
+          <Plus className="w-4 h-4 mr-2" /> New Notification
+        </Button>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
+          ) : items.length === 0 ? (
+            <div className="p-12 text-center">
+              <Bell className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500">No notifications yet. Click &quot;New Notification&quot; to create one.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Exam</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>New</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map(n => (
+                  <TableRow key={n.id}>
+                    <TableCell className="font-medium max-w-sm">
+                      <div className="truncate">{n.title}</div>
+                      {n.description && <div className="text-xs text-gray-500 truncate">{n.description}</div>}
+                    </TableCell>
+                    <TableCell>{n.examName || '—'}</TableCell>
+                    <TableCell>{n.date || '—'}</TableCell>
+                    <TableCell>
+                      {n.isNew ? <Badge className="bg-brand-500">NEW</Badge> : <Badge variant="outline">—</Badge>}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(n)}><Edit className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(n)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!saving) setDialogOpen(o); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>{editing ? 'Edit Notification' : 'Create Notification'}</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Title *</Label>
+              <Input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. JEE Main 2026 Session 1 Registration Open" />
+            </div>
+            <div>
+              <Label>Exam</Label>
+              <Select value={form.examName || '__none__'} onValueChange={v => setForm(p => ({ ...p, examName: v === '__none__' ? '' : v }))}>
+                <SelectTrigger><SelectValue placeholder="Pick an exam label" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">— None —</SelectItem>
+                  {exams?.map(e => <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea rows={4} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Full details — dates, eligibility, other key points users should know." />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Date</Label>
+                <Input type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} />
+              </div>
+              <div>
+                <Label>External link</Label>
+                <Input value={form.link} onChange={e => setForm(p => ({ ...p, link: e.target.value }))} placeholder="https://…" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={form.isNew} onCheckedChange={v => setForm(p => ({ ...p, isNew: v }))} id="notif-new" />
+              <Label htmlFor="notif-new" className="cursor-pointer">Show &quot;NEW&quot; badge</Label>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+            <Button className="bg-brand-600 hover:bg-brand-700" onClick={handleSave} disabled={saving}>
+              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : <><Save className="w-4 h-4 mr-2" /> {editing ? 'Update' : 'Create'}</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+

@@ -103,43 +103,64 @@ function HeroSection() {
   );
 }
 
-// Exam Notifications Section
+// Exam Notifications Section - Marquee scrolling format
 function ExamNotifications({ notifications }) {
+  const list = notifications && notifications.length > 0 ? notifications : [];
+  // Duplicate list for seamless marquee loop
+  const loop = list.length > 0 ? [...list, ...list] : [];
   return (
     <section className="py-16 bg-white">
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-8 gap-4">
           <div>
             <h2 className="text-3xl font-bold text-gray-900">Exam Notifications</h2>
             <p className="text-gray-600 mt-2">Stay updated with latest exam announcements</p>
           </div>
           <Link href="/notifications">
-            <Button variant="outline" className="hidden md:flex">
+            <Button variant="outline">
               View All <ChevronRight className="ml-1 w-4 h-4" />
             </Button>
           </Link>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {notifications?.map((notif) => (
-            <Card key={notif.id} className="card-hover border-l-4 border-l-teal-500">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between mb-2">
-                  <Badge variant="secondary" className="bg-brand-100 text-brand-700">
-                    {notif.examName}
-                  </Badge>
-                  {notif.isNew && (
-                    <Badge className="bg-brand-500 text-white text-xs">NEW</Badge>
-                  )}
-                </div>
-                <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{notif.title}</h3>
-                <p className="text-sm text-gray-500 flex items-center gap-1">
-                  <Clock className="w-3 h-3" /> {notif.date}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {list.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="py-12 text-center text-gray-500">
+              No notifications yet. Check back soon.
+            </CardContent>
+          </Card>
+        ) : (
+          <div
+            className="relative overflow-hidden marquee-wrapper"
+            style={{ maskImage: 'linear-gradient(to right, transparent, black 5%, black 95%, transparent)', WebkitMaskImage: 'linear-gradient(to right, transparent, black 5%, black 95%, transparent)' }}
+          >
+            <div className="marquee-track gap-6" style={{ gap: '1.5rem' }}>
+              {loop.map((notif, idx) => (
+                <Link key={`${notif.id}-${idx}`} href={`/notifications/${notif.id}`} className="w-72 flex-shrink-0 mr-6">
+                  <Card className="card-hover border-l-4 border-l-teal-500 h-full hover:shadow-lg transition">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-2 gap-2">
+                        <Badge variant="secondary" className="bg-brand-100 text-brand-700">
+                          {notif.examName || 'Update'}
+                        </Badge>
+                        {notif.isNew && (
+                          <Badge className="bg-brand-500 text-white text-xs">NEW</Badge>
+                        )}
+                      </div>
+                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{notif.title}</h3>
+                      {notif.description && (
+                        <p className="text-xs text-gray-600 line-clamp-2 mb-2">{notif.description}</p>
+                      )}
+                      <p className="text-sm text-gray-500 flex items-center gap-1">
+                        <Clock className="w-3 h-3" /> {notif.date || ''}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );

@@ -1032,6 +1032,15 @@ export async function GET(request) {
       });
     }
 
+    // Single Notification by id
+    if (path.startsWith('/notifications/')) {
+      const notifId = path.split('/notifications/')[1];
+      const notifications = await getCollection('exam_notifications');
+      const notif = await notifications.findOne({ id: notifId });
+      if (!notif) return jsonResponse({ success: false, error: 'Notification not found' }, 404);
+      return jsonResponse({ success: true, data: notif });
+    }
+
     // User Profile
     if (path === '/profile') {
       const user = await getAuthUser(request);
@@ -1412,6 +1421,12 @@ export async function GET(request) {
       if (path === '/admin/jobs') {
         const jobs = await getCollection('jobs');
         return jsonResponse({ success: true, data: await jobs.find({}).toArray() });
+      }
+
+      // Admin - Get all exam notifications
+      if (path === '/admin/notifications') {
+        const notifs = await getCollection('exam_notifications');
+        return jsonResponse({ success: true, data: await notifs.find({}).sort({ createdAt: -1 }).toArray() });
       }
 
       // Admin - Get all colleges
@@ -3761,6 +3776,41 @@ export async function POST(request) {
         return jsonResponse({ success: true, data: jobData });
       }
 
+      // Create Exam Notification
+      if (path === '/admin/notifications') {
+        const { title, examName, description, date, link, isNew } = body;
+        if (!title) return jsonResponse({ success: false, error: 'Title is required' }, 400);
+        const notifData = {
+          id: uuidv4(),
+          title: String(title).trim(),
+          examName: examName || '',
+          description: description || '',
+          date: date || '',
+          link: link || '',
+          isNew: !!isNew,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        const notifs = await getCollection('exam_notifications');
+        await notifs.insertOne(notifData);
+        return jsonResponse({ success: true, data: notifData });
+      }
+
+      // Update Exam Notification
+      if (path.startsWith('/admin/notifications/')) {
+        const notifId = path.split('/admin/notifications/')[1];
+        const notifs = await getCollection('exam_notifications');
+        const updateData = { updatedAt: new Date() };
+        ['title', 'examName', 'description', 'date', 'link'].forEach(k => {
+          if (body[k] !== undefined) updateData[k] = body[k];
+        });
+        if (body.isNew !== undefined) updateData.isNew = !!body.isNew;
+        const r = await notifs.updateOne({ id: notifId }, { $set: updateData });
+        if (r.matchedCount === 0) return jsonResponse({ success: false, error: 'Notification not found' }, 404);
+        const updated = await notifs.findOne({ id: notifId });
+        return jsonResponse({ success: true, data: updated });
+      }
+
       // Create College
       if (path === '/admin/colleges') {
         const { name, location } = body;
@@ -4402,6 +4452,14 @@ export async function DELETE(request) {
       const testimonials = await getCollection('testimonials');
       await testimonials.deleteOne({ id: testimonialId });
       return jsonResponse({ success: true, message: 'Testimonial deleted' });
+    }
+
+    // Delete Exam Notification
+    if (path.startsWith('/admin/notifications/')) {
+      const notifId = path.split('/admin/notifications/')[1];
+      const notifs = await getCollection('exam_notifications');
+      await notifs.deleteOne({ id: notifId });
+      return jsonResponse({ success: true, message: 'Notification deleted' });
     }
 
     // Delete College

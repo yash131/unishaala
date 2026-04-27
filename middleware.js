@@ -53,6 +53,7 @@ const PUBLIC_PREFIXES = [
   '/admin',   // Admin panel has its own role-based guard
   '/api',     // API routes implement their own auth
   '/auth',    // OAuth callback (e.g. /auth/callback) — must be reachable pre-login
+  '/notifications', // Public exam notifications list & details
   '/_next',   // Next.js internals/assets
   '/favicon',
   '/robots',
