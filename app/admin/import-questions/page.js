@@ -16,6 +16,13 @@ import {
 
 export default function ImportQuestionsPage() {
   const [tests, setTests] = useState([]);
+  const [exams, setExams] = useState([]);
+  const [domains, setDomains] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [filterExamId, setFilterExamId] = useState('');
+  const [filterDomainId, setFilterDomainId] = useState('');
+  const [filterTestType, setFilterTestType] = useState('');
+  const [filterSubjectId, setFilterSubjectId] = useState('');
   const [selectedTest, setSelectedTest] = useState('');
   const [csvFile, setCsvFile] = useState(null);
   const [zipFile, setZipFile] = useState(null);
@@ -32,6 +39,7 @@ export default function ImportQuestionsPage() {
 
   useEffect(() => {
     fetchTests();
+    fetchMeta();
   }, []);
 
   const fetchTests = async () => {
@@ -43,6 +51,24 @@ export default function ImportQuestionsPage() {
       }
     } catch (e) {
       console.error('Error fetching tests:', e);
+    }
+  };
+
+  const fetchMeta = async () => {
+    try {
+      const [eRes, dRes, sRes] = await Promise.all([
+        fetch('/api/admin/exams', { credentials: 'include' }),
+        fetch('/api/admin/domains', { credentials: 'include' }),
+        fetch('/api/admin/subjects', { credentials: 'include' })
+      ]);
+      const eD = await eRes.json();
+      const dD = await dRes.json();
+      const sD = await sRes.json();
+      if (eD.success) setExams(eD.data || []);
+      if (dD.success) setDomains(dD.data || []);
+      if (sD.success) setSubjects(sD.data || []);
+    } catch (e) {
+      console.error('Error fetching meta:', e);
     }
   };
 
@@ -271,7 +297,83 @@ Sample Test,Math Basics,2,Solve this equation,q2.jpg,90,Algebra,x = 5,Isolate va
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Test Selection */}
+            {/* Cascading filters: Exam → Domain → Test Type → (Subject if practice) → Test */}
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Exam *</Label>
+                <Select value={filterExamId || 'all'} onValueChange={(v) => {
+                  setFilterExamId(v === 'all' ? '' : v);
+                  setFilterDomainId('');
+                  setFilterSubjectId('');
+                  setSelectedTest('');
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Select exam" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Exams</SelectItem>
+                    {exams.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Domain *</Label>
+                <Select
+                  value={filterDomainId || 'all'}
+                  onValueChange={(v) => {
+                    setFilterDomainId(v === 'all' ? '' : v);
+                    setFilterSubjectId('');
+                    setSelectedTest('');
+                  }}
+                  disabled={!filterExamId}
+                >
+                  <SelectTrigger><SelectValue placeholder={filterExamId ? 'Select domain' : 'Pick exam first'} /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Domains</SelectItem>
+                    {domains.filter(d => d.examId === filterExamId).map(d =>
+                      <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Test Type *</Label>
+                <Select value={filterTestType || 'all'} onValueChange={(v) => {
+                  setFilterTestType(v === 'all' ? '' : v);
+                  setFilterSubjectId('');
+                  setSelectedTest('');
+                }}>
+                  <SelectTrigger><SelectValue placeholder="Select test type" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    <SelectItem value="mock_test">📝 Mock Test</SelectItem>
+                    <SelectItem value="practice_questions">📚 Practice Questions</SelectItem>
+                    <SelectItem value="previous_year">🎯 Previous Year</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {filterTestType === 'practice_questions' && (
+                <div className="space-y-2">
+                  <Label>Subject *</Label>
+                  <Select
+                    value={filterSubjectId || 'all'}
+                    onValueChange={(v) => { setFilterSubjectId(v === 'all' ? '' : v); setSelectedTest(''); }}
+                    disabled={!filterDomainId}
+                  >
+                    <SelectTrigger><SelectValue placeholder={filterDomainId ? 'Select subject' : 'Pick domain first'} /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Subjects</SelectItem>
+                      {subjects
+                        .filter(s => (!filterExamId || s.examId === filterExamId) && (!filterDomainId || s.domainId === filterDomainId))
+                        .map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  {subjects.filter(s => s.examId === filterExamId && s.domainId === filterDomainId).length === 0 && (
+                    <p className="text-xs text-amber-700">No subjects yet for this domain. Create one in Admin → Subjects.</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Test Selection (filtered) */}
             <div className="space-y-2">
               <Label>Select Test *</Label>
               <Select value={selectedTest} onValueChange={setSelectedTest}>
@@ -279,13 +381,28 @@ Sample Test,Math Basics,2,Solve this equation,q2.jpg,90,Algebra,x = 5,Isolate va
                   <SelectValue placeholder="Choose a test..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {tests.map((test) => (
-                    <SelectItem key={test.id} value={test.id}>
-                      {test.title}
-                    </SelectItem>
-                  ))}
+                  {tests
+                    .filter(t => {
+                      if (filterExamId && t.examId !== filterExamId) return false;
+                      if (filterDomainId && t.domainId !== filterDomainId) return false;
+                      if (filterTestType) {
+                        const tt = t.testType || 'mock_test';
+                        if (tt !== filterTestType) return false;
+                      }
+                      if (filterTestType === 'practice_questions' && filterSubjectId && t.subjectId !== filterSubjectId) return false;
+                      return true;
+                    })
+                    .map((test) => (
+                      <SelectItem key={test.id} value={test.id}>
+                        {test.title}
+                        {test.testType ? ` · ${test.testType.replace('_', ' ')}` : ''}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
+              {filterTestType === 'practice_questions' && !filterSubjectId && (
+                <p className="text-xs text-amber-700">Tip: pick a Subject above to narrow down practice tests.</p>
+              )}
             </div>
 
             {/* CSV Upload */}

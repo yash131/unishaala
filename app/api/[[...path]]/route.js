@@ -1156,13 +1156,42 @@ export async function GET(request) {
       return jsonResponse({ success: true, data: withCount.filter(t => t.questionCount > 0) });
     }
 
+    if (path === '/previous-year-tests') {
+      const examId = searchParams.get('examId');
+      const domainId = searchParams.get('domainId');
+      if (!examId || !domainId) {
+        return jsonResponse({ success: false, error: 'examId and domainId are required' }, 400);
+      }
+      const mockTests = await getCollection('mock_tests');
+      const questions = await getCollection('questions');
+      const tests = await mockTests.find({
+        examId,
+        domainId,
+        testType: 'previous_year',
+        isPublished: true,
+        status: 'Active'
+      }).sort({ createdAt: -1 }).toArray();
+      const withCount = await Promise.all(tests.map(async (t) => {
+        const qc = await questions.countDocuments({
+          $and: [
+            { $or: [{ mockTestId: t.id }, { test_id: t.id }] },
+            { $or: [{ status: 'Active' }, { status: 'active' }, { status: { $exists: false } }] }
+          ]
+        });
+        return { ...t, questionCount: qc };
+      }));
+      return jsonResponse({ success: true, data: withCount.filter(t => t.questionCount > 0) });
+    }
+
     if (path.startsWith('/practice-test-questions/')) {
       const testId = path.split('/practice-test-questions/')[1];
       const mockTests = await getCollection('mock_tests');
       const test = await mockTests.findOne({ id: testId });
       if (!test) return jsonResponse({ success: false, error: 'Test not found' }, 404);
-      if (test.testType && test.testType !== 'practice_questions') {
-        return jsonResponse({ success: false, error: 'This endpoint is for Practice Question tests only' }, 400);
+      // Allow both practice_questions AND previous_year (these have View Solution UX).
+      // Mock tests must NOT use this endpoint (their answers are revealed only after submission).
+      if (test.testType && test.testType !== 'practice_questions' && test.testType !== 'previous_year') {
+        return jsonResponse({ success: false, error: 'View-Solution mode is only for Practice Questions and Previous Year tests' }, 400);
       }
       const questions = await getCollection('questions');
       const testQuestions = await questions.find({

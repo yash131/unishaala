@@ -93,7 +93,10 @@ export default function ExamDetailPage() {
       const response = await fetch(`/api/domains/${domain.id}`);
       const result = await response.json();
       if (result.success) {
-        setTests(result.data.tests || []);
+        // Mock Tests page must show ONLY mock tests. Practice Questions and
+        // Previous Year tests have their own dedicated flows.
+        const all = result.data.tests || [];
+        setTests(all.filter(t => !t.testType || t.testType === 'mock_test'));
       }
     } catch (error) {
       console.error('Error fetching tests:', error);
