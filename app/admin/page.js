@@ -1005,9 +1005,11 @@ function TestsTab({ mockTests, exams, onRefresh }) {
 // Questions Tab with Exam -> Test Type -> Test -> CSV flow
 function QuestionsTab({ mockTests, exams, onRefresh }) {
   const [domains, setDomains] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [selectedExamId, setSelectedExamId] = useState('');
   const [selectedDomainId, setSelectedDomainId] = useState('');
   const [selectedTestType, setSelectedTestType] = useState('');
+  const [selectedSubjectId, setSelectedSubjectId] = useState('');
   const [selectedTestId, setSelectedTestId] = useState('');
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -1034,6 +1036,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
   // Fetch domains on mount
   useEffect(() => {
     fetchDomains();
+    fetchSubjects();
   }, []);
 
   const fetchDomains = async () => {
@@ -1046,15 +1049,33 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
     }
   };
 
+  const fetchSubjects = async () => {
+    try {
+      const res = await fetch('/api/admin/subjects', { credentials: 'include' });
+      const data = await res.json();
+      if (data.success) setSubjects(data.data || []);
+    } catch (e) {
+      console.error('Failed to fetch subjects:', e);
+    }
+  };
+
   // Filtered domains for selected exam
   const filteredDomains = domains.filter(d => d.examId === selectedExamId);
 
-  // Filter mock tests by selected exam, domain and test type
+  // Subjects scoped to selected exam + domain
+  const filteredSubjects = subjects.filter(
+    s => s.examId === selectedExamId && s.domainId === selectedDomainId
+  );
+
+  // Filter mock tests by selected exam, domain, test type, and (when practice) subject
   const filteredMockTests = mockTests.filter(t => {
     const matchesExam = !selectedExamId || t.examId === selectedExamId;
     const matchesDomain = !selectedDomainId || t.domainId === selectedDomainId;
     const matchesType = !selectedTestType || t.testType === selectedTestType;
-    return matchesExam && matchesDomain && matchesType;
+    const matchesSubject = selectedTestType !== 'practice_questions'
+      || !selectedSubjectId
+      || t.subjectId === selectedSubjectId;
+    return matchesExam && matchesDomain && matchesType && matchesSubject;
   });
 
   // Reset subsequent selections when parent changes
@@ -1070,6 +1091,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
 
   useEffect(() => {
     setSelectedTestType('');
+    setSelectedSubjectId('');
     setSelectedTestId('');
     setQuestions([]);
     setPreviewData([]);
@@ -1078,6 +1100,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
   }, [selectedDomainId]);
 
   useEffect(() => {
+    setSelectedSubjectId('');
     setSelectedTestId('');
     setQuestions([]);
     setPreviewData([]);
@@ -1548,11 +1571,40 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
       )}
 
       {/* Step 4: Select Test (only if test type selected) */}
-      {selectedExamId && selectedDomainId && selectedTestType && (
+      {/* Step 4 (Practice Questions only): Select Subject */}
+      {selectedExamId && selectedDomainId && selectedTestType === 'practice_questions' && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="text-lg flex items-center gap-2">
-              <BookOpen className="w-5 h-5 text-blue-600" /> Step 4: Select Test
+              <BookOpen className="w-5 h-5 text-green-600" /> Step 4: Select Subject
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Select value={selectedSubjectId || 'none'} onValueChange={v => setSelectedSubjectId(v === 'none' ? '' : v)}>
+              <SelectTrigger className="w-full md:w-96">
+                <SelectValue placeholder="Choose a subject..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">-- Select Subject --</SelectItem>
+                {filteredSubjects.map(s => (
+                  <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {filteredSubjects.length === 0 && (
+              <p className="text-xs text-amber-700 mt-2">
+                No subjects yet for this exam &amp; domain. Create one in the <strong>Subjects</strong> tab first.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {selectedExamId && selectedDomainId && selectedTestType && (selectedTestType !== 'practice_questions' || selectedSubjectId) && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-blue-600" /> {selectedTestType === 'practice_questions' ? 'Step 5' : 'Step 4'}: Select Test
             </CardTitle>
           </CardHeader>
           <CardContent>
