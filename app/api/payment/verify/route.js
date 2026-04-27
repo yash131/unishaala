@@ -66,14 +66,16 @@ export async function POST(request) {
     const addToSet = {};
 
     if (transaction.paymentType === 'get_pass') {
-      // All-access pass. Also store the pass expiry (default 1 year from now).
-      const expires = new Date();
-      expires.setFullYear(expires.getFullYear() + 1);
+      // All-access pass. Duration configured by admin in pricing_config.getPassDurationDays (default 365).
+      const cfg = await getCollection('pricing_config');
+      const pc = await cfg.findOne({ id: 'global' });
+      const days = Math.max(1, parseInt(pc?.getPassDurationDays, 10) || 365);
+      const expires = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
       userUpdate.$set.hasPass = true;
       userUpdate.$set.passExpiresAt = expires;
     } else if (transaction.paymentType === 'exam_purchase' && transaction.examId) {
       addToSet.purchasedExams = transaction.examId;
-      // Also unlock all domains for this exam (so per-domain checks succeed too)
+      // Also unlock all Test-Series domains for this exam (so per-domain checks succeed too)
       try {
         const domainsCol = await getCollection('domains');
         const domainIds = (await domainsCol.find({ examId: transaction.examId }).toArray()).map(d => d.id);
@@ -83,6 +85,17 @@ export async function POST(request) {
       } catch (_e) {}
     } else if (transaction.paymentType === 'domain_purchase' && transaction.domainId) {
       addToSet.purchasedDomains = transaction.domainId;
+    } else if (transaction.paymentType === 'exam_pyq_purchase' && transaction.examId) {
+      addToSet.purchasedPyqExams = transaction.examId;
+      try {
+        const domainsCol = await getCollection('domains');
+        const domainIds = (await domainsCol.find({ examId: transaction.examId }).toArray()).map(d => d.id);
+        if (domainIds.length > 0) {
+          addToSet.purchasedPyqDomains = { $each: domainIds };
+        }
+      } catch (_e) {}
+    } else if (transaction.paymentType === 'domain_pyq_purchase' && transaction.domainId) {
+      addToSet.purchasedPyqDomains = transaction.domainId;
     }
 
     if (Object.keys(addToSet).length > 0) {

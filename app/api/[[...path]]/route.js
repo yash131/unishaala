@@ -1035,8 +1035,12 @@ export async function GET(request) {
     // Public pricing config (Get Pass price; 0 means "not available")
     if (path === '/pricing') {
       const pc = await getCollection('pricing_config');
-      const cfg = await pc.findOne({ id: 'global' }) || { id: 'global', getPassPrice: 0, getPassEnabled: false };
-      return jsonResponse({ success: true, data: { getPassPrice: Number(cfg.getPassPrice) || 0, getPassEnabled: !!cfg.getPassEnabled } });
+      const cfg = await pc.findOne({ id: 'global' }) || { id: 'global', getPassPrice: 0, getPassEnabled: false, getPassDurationDays: 365 };
+      return jsonResponse({ success: true, data: {
+        getPassPrice: Number(cfg.getPassPrice) || 0,
+        getPassEnabled: !!cfg.getPassEnabled,
+        getPassDurationDays: Number(cfg.getPassDurationDays) || 365,
+      }});
     }
 
     // Current user's analytics (requires login). Used by /dashboard.
@@ -1527,10 +1531,11 @@ export async function GET(request) {
       // Admin - Get global pricing config
       if (path === '/admin/pricing') {
         const pc = await getCollection('pricing_config');
-        const cfg = await pc.findOne({ id: 'global' }) || { id: 'global', getPassPrice: 0, getPassEnabled: false };
+        const cfg = await pc.findOne({ id: 'global' }) || { id: 'global', getPassPrice: 0, getPassEnabled: false, getPassDurationDays: 365 };
         return jsonResponse({ success: true, data: {
           getPassPrice: Number(cfg.getPassPrice) || 0,
           getPassEnabled: !!cfg.getPassEnabled,
+          getPassDurationDays: Number(cfg.getPassDurationDays) || 365,
           updatedAt: cfg.updatedAt || null,
         }});
       }
@@ -3526,8 +3531,9 @@ export async function POST(request) {
       }
 
       // Practice questions are ALWAYS free, regardless of price fields.
-      // Unified gate for other tests: hasPass > exam purchase > domain purchase > isFree.
+      // Unified gate for other tests: hasPass > exam/domain purchase (mock vs pyq bucket by testType) > isFree.
       const isPractice = test.testType === 'practice_questions';
+      const isPyq = test.testType === 'previous_year';
       if (!isPractice && !test.isFree && test.price > 0) {
         const transactions = await getCollection('transactions');
         const users = await getCollection('users');
@@ -3536,30 +3542,41 @@ export async function POST(request) {
         const hasPass = !!dbUser?.hasPass && (!dbUser.passExpiresAt || new Date(dbUser.passExpiresAt) > new Date());
         let hasPurchased = hasPass;
 
+        // PYQ tests look up pyq-specific purchases; mock tests use the standard bucket.
         if (!hasPurchased && test.examId) {
-          hasPurchased = (dbUser?.purchasedExams || []).includes(test.examId);
+          const examList = isPyq ? (dbUser?.purchasedPyqExams || []) : (dbUser?.purchasedExams || []);
+          hasPurchased = examList.includes(test.examId);
         }
         if (!hasPurchased && test.domainId) {
-          hasPurchased = (dbUser?.purchasedDomains || []).includes(test.domainId);
+          const domainList = isPyq ? (dbUser?.purchasedPyqDomains || []) : (dbUser?.purchasedDomains || []);
+          hasPurchased = domainList.includes(test.domainId);
         }
-        // Fallback: check transactions collection directly (covers users migrated before passthrough flag).
+        // Fallback: check transactions collection directly.
         if (!hasPurchased) {
+          const purchaseTypes = isPyq
+            ? [
+                { paymentType: 'get_pass' },
+                ...(test.examId ? [{ examId: test.examId, paymentType: 'exam_pyq_purchase' }] : []),
+                ...(test.domainId ? [{ domainId: test.domainId, paymentType: 'domain_pyq_purchase' }] : []),
+              ]
+            : [
+                { paymentType: 'get_pass' },
+                ...(test.examId ? [{ examId: test.examId, paymentType: 'exam_purchase' }] : []),
+                ...(test.domainId ? [{ domainId: test.domainId, paymentType: 'domain_purchase' }] : []),
+              ];
           hasPurchased = await transactions.findOne({
             userId: user.id,
             status: 'SUCCESS',
-            $or: [
-              { paymentType: 'get_pass' },
-              ...(test.examId ? [{ examId: test.examId, paymentType: 'exam_purchase' }] : []),
-              ...(test.domainId ? [{ domainId: test.domainId, paymentType: 'domain_purchase' }] : []),
-            ],
+            $or: purchaseTypes,
           });
         }
 
         if (!hasPurchased) {
           return jsonResponse({
             success: false,
-            error: 'Please purchase this Test Series or Domain to continue',
+            error: isPyq ? 'Please purchase this PYQ Exam or Domain to continue' : 'Please purchase this Test Series or Domain to continue',
             requirePayment: true,
+            testType: test.testType,
             price: test.price,
             examId: test.examId || null,
             domainId: test.domainId || null,
@@ -4585,11 +4602,16 @@ export async function PUT(request) {
           updateData.getPassPrice = isNaN(v) ? 0 : Math.max(0, v);
         }
         if (body.getPassEnabled !== undefined) updateData.getPassEnabled = !!body.getPassEnabled;
+        if (body.getPassDurationDays !== undefined) {
+          const d = parseInt(body.getPassDurationDays, 10);
+          updateData.getPassDurationDays = (!isNaN(d) && d > 0) ? d : 365;
+        }
         await pc.updateOne({ id: 'global' }, { $set: updateData, $setOnInsert: { createdAt: new Date() } }, { upsert: true });
         const cfg = await pc.findOne({ id: 'global' });
         return jsonResponse({ success: true, data: {
           getPassPrice: Number(cfg.getPassPrice) || 0,
           getPassEnabled: !!cfg.getPassEnabled,
+          getPassDurationDays: Number(cfg.getPassDurationDays) || 365,
           updatedAt: cfg.updatedAt || null,
         }});
       }

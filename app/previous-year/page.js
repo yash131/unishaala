@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -8,8 +8,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Logo } from '@/components/Logo';
 import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle
+} from '@/components/ui/dialog';
+import {
   GraduationCap, ArrowLeft, ArrowRight, Loader2, Layers,
-  Target, FileText, Clock, ChevronRight, CheckCircle, BookOpen
+  Target, FileText, Clock, ChevronRight, CheckCircle, BookOpen, Lock, Crown, ShieldCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -25,6 +28,28 @@ export default function PreviousYearPage() {
   const [selectedExam, setSelectedExam] = useState(null);
   const [selectedDomain, setSelectedDomain] = useState(null);
 
+  // Access flags
+  const [me, setMe] = useState(null);
+  const [purchasedPyqExams, setPurchasedPyqExams] = useState(new Set());
+  const [purchasedPyqDomains, setPurchasedPyqDomains] = useState(new Set());
+  const [unlockOpen, setUnlockOpen] = useState(false);
+
+  const hasActivePass = !!me?.hasPass && (!me.passExpiresAt || new Date(me.passExpiresAt) > new Date());
+  const examUnlocked = !!selectedExam && (hasActivePass || purchasedPyqExams.has(selectedExam.id));
+  const domainUnlocked = !!selectedDomain && (examUnlocked || purchasedPyqDomains.has(selectedDomain.id));
+
+  const loadAccess = useCallback(async () => {
+    try {
+      const r = await fetch('/api/auth/me', { credentials: 'include' });
+      const d = await r.json();
+      if (d.success && d.data) {
+        setMe(d.data);
+        setPurchasedPyqExams(new Set(d.data.purchasedPyqExams || []));
+        setPurchasedPyqDomains(new Set(d.data.purchasedPyqDomains || []));
+      }
+    } catch (_e) {}
+  }, []);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -35,7 +60,8 @@ export default function PreviousYearPage() {
       } catch (_e) { toast.error('Failed to load exams'); }
       setLoading(false);
     })();
-  }, []);
+    loadAccess();
+  }, [loadAccess]);
 
   const pickExam = async (exam) => {
     setSelectedExam(exam);
@@ -70,6 +96,78 @@ export default function PreviousYearPage() {
     setStep(step - 1);
   };
 
+  const handleStartTest = (t) => {
+    if (t.isFree || domainUnlocked || examUnlocked || hasActivePass) {
+      router.push(`/practice-test/${t.id}`);
+    } else {
+      setUnlockOpen(true);
+    }
+  };
+
+  const ensureRzp = async () => {
+    if (window.Razorpay) return;
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      s.onload = resolve; s.onerror = reject;
+      document.body.appendChild(s);
+    });
+  };
+
+  const handlePayment = async (kind) => {
+    if (!me?.id) { router.push('/login?next=/previous-year'); return; }
+    const examPrice = Number(selectedExam?.pyqPrice || 0);
+    const domainPrice = Number(selectedDomain?.pyqPrice || 0);
+    const payload = kind === 'exam'
+      ? { paymentType: 'exam_pyq_purchase', examId: selectedExam.id, amount: examPrice }
+      : { paymentType: 'domain_pyq_purchase', domainId: selectedDomain.id, amount: domainPrice };
+
+    if (!payload.amount || payload.amount <= 0) {
+      toast.error('This item is not available for purchase yet.');
+      return;
+    }
+    try {
+      const res = await fetch('/api/payment/create-order', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', body: JSON.stringify(payload)
+      });
+      const d = await res.json();
+      if (!d.success) { toast.error(d.error || 'Failed to create order'); return; }
+      await ensureRzp();
+      const { orderId, keyId, name, description, prefill, amount, currency } = d.data;
+      const rzp = new window.Razorpay({
+        key: keyId,
+        amount, currency, name, description,
+        order_id: orderId, prefill,
+        theme: { color: '#7c3aed' },
+        handler: async function (response) {
+          try {
+            const v = await fetch('/api/payment/verify', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(response)
+            });
+            const vd = await v.json();
+            if (vd.success) {
+              toast.success('Payment successful! Content unlocked.');
+              setUnlockOpen(false);
+              await loadAccess();
+            } else {
+              window.location.href = `/payment/failed?reason=${encodeURIComponent(vd.error || 'Verification failed')}`;
+            }
+          } catch (err) {
+            window.location.href = `/payment/failed?reason=${encodeURIComponent(err.message)}`;
+          }
+        },
+      });
+      rzp.on('payment.failed', (resp) => {
+        toast.error(resp.error?.description || 'Payment failed');
+      });
+      rzp.open();
+    } catch (err) {
+      toast.error('Could not start payment');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50/30 via-white to-white">
       <nav className="bg-white shadow-sm sticky top-0 z-30 border-b">
@@ -82,11 +180,20 @@ export default function PreviousYearPage() {
       </nav>
 
       <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 flex items-center gap-3">
-            <Target className="w-8 h-8 text-purple-600" /> Previous Year Questions
-          </h1>
-          <p className="text-gray-600 mt-2">Understand exam patterns with authentic previous-year questions. Pick an exam and domain to see available tests.</p>
+        <div className="flex flex-wrap items-start justify-between gap-3 mb-6">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 flex items-center gap-3">
+              <Target className="w-8 h-8 text-purple-600" /> Previous Year Questions
+            </h1>
+            <p className="text-gray-600 mt-2">Authentic previous year papers with full solutions.</p>
+          </div>
+          {hasActivePass ? (
+            <Badge className="bg-amber-500 text-white flex items-center gap-1 text-sm py-1.5 px-3">
+              <Crown className="w-4 h-4" /> Get Pass active
+            </Badge>
+          ) : (
+            <Link href="/get-pass"><Button variant="outline" className="border-amber-400 text-amber-700 hover:bg-amber-50"><Crown className="w-4 h-4 mr-2" /> Get Pass</Button></Link>
+          )}
         </div>
 
         {/* Stepper */}
@@ -112,6 +219,7 @@ export default function PreviousYearPage() {
           ))}
         </div>
 
+        {/* Breadcrumb */}
         {step > 0 && (
           <div className="mb-6 flex flex-wrap items-center gap-2 text-sm">
             {selectedExam && <Badge variant="outline" className="px-3 py-1">{selectedExam.name}</Badge>}
@@ -124,18 +232,115 @@ export default function PreviousYearPage() {
           <div className="py-20 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-purple-600" /></div>
         ) : (
           <>
-            {step === 0 && (
-              <ExamPickerInner exams={exams} onPick={pickExam} />
-            )}
+            {step === 0 && <ExamPicker exams={exams} onPick={pickExam} />}
             {step === 1 && (
-              <DomainPickerInner domains={domains} onPick={pickDomain} />
+              <>
+                {/* Exam-level Buy banner */}
+                {selectedExam && !examUnlocked && !hasActivePass && Number(selectedExam.pyqPrice) > 0 && (
+                  <BuyBanner
+                    color="amber"
+                    title={`Unlock all PYQs for ${selectedExam.name}`}
+                    subtitle="Full access to every domain's PYQ papers under this exam."
+                    amount={Number(selectedExam.pyqPrice)}
+                    onBuy={() => handlePayment('exam')}
+                  />
+                )}
+                <DomainPicker
+                  domains={domains}
+                  purchasedPyqDomains={purchasedPyqDomains}
+                  examUnlocked={examUnlocked}
+                  hasActivePass={hasActivePass}
+                  onPick={pickDomain}
+                />
+              </>
             )}
             {step === 2 && (
-              <TestListInner tests={tests} domain={selectedDomain} />
+              <>
+                {/* Domain-level Buy banner (only shown if exam not already unlocked) */}
+                {selectedDomain && !domainUnlocked && !hasActivePass && Number(selectedDomain.pyqPrice) > 0 && (
+                  <BuyBanner
+                    color="blue"
+                    title={`Unlock all PYQs in ${selectedDomain.name}`}
+                    subtitle={`Access every PYQ paper in this domain only.`}
+                    amount={Number(selectedDomain.pyqPrice)}
+                    onBuy={() => handlePayment('domain')}
+                  />
+                )}
+                <TestList tests={tests} domain={selectedDomain} unlocked={domainUnlocked || hasActivePass} onStart={handleStartTest} />
+              </>
             )}
           </>
         )}
       </div>
+
+      {/* Unlock Modal */}
+      <Dialog open={unlockOpen} onOpenChange={setUnlockOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Unlock PYQs</DialogTitle>
+            <DialogDescription>Choose how you want to access these previous year papers.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {selectedDomain && Number(selectedDomain.pyqPrice) > 0 && (
+              <div className="border-2 border-blue-400 rounded-lg p-4 bg-blue-50">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">This Domain (PYQ)</h4>
+                    <p className="text-xs text-gray-600">{selectedDomain.name}</p>
+                  </div>
+                  <span className="text-xl font-bold text-blue-600">₹{Number(selectedDomain.pyqPrice)}</span>
+                </div>
+                <Button className="w-full bg-blue-500 hover:bg-blue-600" onClick={() => handlePayment('domain')}>
+                  Pay ₹{Number(selectedDomain.pyqPrice)} for Domain
+                </Button>
+              </div>
+            )}
+            {selectedExam && Number(selectedExam.pyqPrice) > 0 && (
+              <div className="border-2 border-amber-400 rounded-lg p-4 bg-amber-50">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">Full Exam PYQ</h4>
+                    <Badge className="bg-amber-200 text-amber-800 text-xs">Best Value</Badge>
+                  </div>
+                  <span className="text-xl font-bold text-amber-600">₹{Number(selectedExam.pyqPrice)}</span>
+                </div>
+                <p className="text-sm text-gray-600 mb-3">{selectedExam.name} — every PYQ in this exam.</p>
+                <Button className="w-full bg-amber-500 hover:bg-amber-600" onClick={() => handlePayment('exam')}>
+                  Pay ₹{Number(selectedExam.pyqPrice)} for Full Exam
+                </Button>
+              </div>
+            )}
+            <Link href="/get-pass" className="block">
+              <div className="border-2 border-dashed border-brand-400 rounded-lg p-4 bg-gradient-to-r from-amber-50 via-white to-brand-50 hover:shadow-md transition">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">Get Pass — All Access</h4>
+                    <p className="text-xs text-gray-600">One pass unlocks every Test Series, Domain and PYQ.</p>
+                  </div>
+                  <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white">View</Badge>
+                </div>
+              </div>
+            </Link>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function BuyBanner({ title, subtitle, amount, onBuy, color = 'amber' }) {
+  const bg = color === 'blue' ? 'from-blue-50 to-white border-blue-200' : 'from-amber-50 to-white border-amber-200';
+  const btn = color === 'blue' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-amber-600 hover:bg-amber-700';
+  return (
+    <div className={`mb-6 p-5 rounded-xl border-2 bg-gradient-to-r ${bg} flex flex-wrap items-center gap-4`}>
+      <Lock className={`w-6 h-6 ${color === 'blue' ? 'text-blue-600' : 'text-amber-600'}`} />
+      <div className="flex-1 min-w-[240px]">
+        <h3 className="font-bold text-gray-900">{title}</h3>
+        <p className="text-sm text-gray-600">{subtitle}</p>
+      </div>
+      <Button className={btn} onClick={onBuy}>
+        <ShieldCheck className="w-4 h-4 mr-2" /> Buy for ₹{Number(amount).toLocaleString('en-IN')}
+      </Button>
     </div>
   );
 }
@@ -152,7 +357,7 @@ function EmptyState({ icon, title, hint }) {
   );
 }
 
-function ExamPickerInner({ exams, onPick }) {
+function ExamPicker({ exams, onPick }) {
   if (!exams || exams.length === 0) {
     return <EmptyState icon={<GraduationCap className="w-7 h-7" />} title="No exams available" hint="Please check back later." />;
   }
@@ -167,6 +372,7 @@ function ExamPickerInner({ exams, onPick }) {
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold text-gray-900 truncate">{e.name}</h3>
                 {e.shortName && <p className="text-xs text-gray-500">{e.shortName}</p>}
+                {Number(e.pyqPrice) > 0 && <p className="text-xs text-amber-600 font-semibold mt-1">Full PYQ ₹{e.pyqPrice}</p>}
               </div>
               <ArrowRight className="w-4 h-4 text-gray-400" />
             </CardContent>
@@ -177,7 +383,7 @@ function ExamPickerInner({ exams, onPick }) {
   );
 }
 
-function DomainPickerInner({ domains, onPick }) {
+function DomainPicker({ domains, purchasedPyqDomains, examUnlocked, hasActivePass, onPick }) {
   if (!domains || domains.length === 0) {
     return <EmptyState icon={<Layers className="w-7 h-7" />} title="No domains for this exam" hint="Pick another exam or check back later." />;
   }
@@ -185,24 +391,31 @@ function DomainPickerInner({ domains, onPick }) {
     <div>
       <h2 className="text-xl font-bold text-gray-900 mb-4">Step 2 — Select a domain</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {domains.map(d => (
-          <Card key={d.id} className="hover:ring-2 hover:ring-purple-300 cursor-pointer transition" onClick={() => onPick(d)}>
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center"><Layers className="w-6 h-6" /></div>
-              <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-gray-900 truncate">{d.name}</h3>
-                {d.description && <p className="text-xs text-gray-500 truncate">{d.description}</p>}
-              </div>
-              <ArrowRight className="w-4 h-4 text-gray-400" />
-            </CardContent>
-          </Card>
-        ))}
+        {domains.map(d => {
+          const unlocked = examUnlocked || hasActivePass || purchasedPyqDomains.has(d.id);
+          return (
+            <Card key={d.id} className="hover:ring-2 hover:ring-purple-300 cursor-pointer transition" onClick={() => onPick(d)}>
+              <CardContent className="p-5 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center"><Layers className="w-6 h-6" /></div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-gray-900 truncate">{d.name}</h3>
+                  {unlocked ? (
+                    <Badge className="bg-green-500 text-xs mt-1"><CheckCircle className="w-3 h-3 mr-1" /> Unlocked</Badge>
+                  ) : Number(d.pyqPrice) > 0 ? (
+                    <Badge className="bg-blue-600 text-xs mt-1">₹{d.pyqPrice}</Badge>
+                  ) : null}
+                </div>
+                <ArrowRight className="w-4 h-4 text-gray-400" />
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function TestListInner({ tests, domain }) {
+function TestList({ tests, domain, unlocked, onStart }) {
   if (!tests || tests.length === 0) {
     return <EmptyState icon={<FileText className="w-7 h-7" />} title="No tests available" hint={`No published previous-year tests under ${domain?.name || 'this domain'} yet.`} />;
   }
@@ -210,31 +423,33 @@ function TestListInner({ tests, domain }) {
     <div>
       <h2 className="text-xl font-bold text-gray-900 mb-4">Step 3 — Pick a test to start</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {tests.map(t => (
-          <Card key={t.id} className="hover:shadow-lg transition">
-            <CardContent className="p-5">
-              <div className="flex items-start gap-3">
-                <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
-                  <Target className="w-6 h-6" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-gray-900">{t.title}</h3>
-                  {t.description && <p className="text-sm text-gray-600 line-clamp-2 mt-1">{t.description}</p>}
-                  <div className="mt-3 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
-                    <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> {t.questionCount || 0} questions</span>
-                    {t.duration ? <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {t.duration} min</span> : null}
-                    {t.isFree ? <Badge className="bg-green-500">Free</Badge> : <Badge className="bg-brand-600">₹{t.price || 0}</Badge>}
+        {tests.map(t => {
+          const free = t.isFree;
+          const canStart = free || unlocked;
+          return (
+            <Card key={t.id} className="hover:shadow-lg transition">
+              <CardContent className="p-5">
+                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
+                    <Target className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-gray-900">{t.title}</h3>
+                    {t.description && <p className="text-sm text-gray-600 line-clamp-2 mt-1">{t.description}</p>}
+                    <div className="mt-3 flex items-center gap-3 text-xs text-gray-500 flex-wrap">
+                      <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> {t.questionCount || 0} questions</span>
+                      {t.duration ? <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {t.duration} min</span> : null}
+                      {free ? <Badge className="bg-green-500">Free</Badge> : unlocked ? <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Unlocked</Badge> : <Badge className="bg-gray-500"><Lock className="w-3 h-3 mr-1" /> Locked</Badge>}
+                    </div>
                   </div>
                 </div>
-              </div>
-              <Link href={`/practice-test/${t.id}`}>
-                <Button className="w-full mt-4 bg-purple-600 hover:bg-purple-700">
-                  <BookOpen className="w-4 h-4 mr-2" /> Start with Solutions
+                <Button onClick={() => onStart(t)} className={`w-full mt-4 ${canStart ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-500 hover:bg-gray-600'}`}>
+                  {canStart ? <><BookOpen className="w-4 h-4 mr-2" /> Start with Solutions</> : <><Lock className="w-4 h-4 mr-2" /> Unlock to start</>}
                 </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

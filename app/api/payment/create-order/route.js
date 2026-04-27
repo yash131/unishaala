@@ -20,8 +20,8 @@ export async function POST(request) {
     const body = await request.json();
     const { examId, domainId, amount, paymentType } = body;
 
-    // Only exam/domain/get_pass purchases are supported. Individual test purchases are disabled.
-    const ALLOWED = new Set(['exam_purchase', 'domain_purchase', 'get_pass']);
+    // Only exam/domain/get_pass/PYQ-exam/PYQ-domain purchases are supported. Individual test purchases are disabled.
+    const ALLOWED = new Set(['exam_purchase', 'domain_purchase', 'exam_pyq_purchase', 'domain_pyq_purchase', 'get_pass']);
     if (!ALLOWED.has(paymentType)) {
       return NextResponse.json(
         { success: false, error: 'Invalid payment type. Only exam, domain or pass purchases are supported.' },
@@ -40,11 +40,19 @@ export async function POST(request) {
     if (paymentType === 'exam_purchase' && examId) {
       const exams = await getCollection('exams');
       const exam = await exams.findOne({ id: examId });
-      if (exam) itemName = `${exam.name} — Full Access`;
+      if (exam) itemName = `${exam.name} — Full Test Series`;
     } else if (paymentType === 'domain_purchase' && domainId) {
       const domains = await getCollection('domains');
       const domain = await domains.findOne({ id: domainId });
-      if (domain) itemName = `${domain.name} — Domain Access`;
+      if (domain) itemName = `${domain.name} — Domain (Test Series)`;
+    } else if (paymentType === 'exam_pyq_purchase' && examId) {
+      const exams = await getCollection('exams');
+      const exam = await exams.findOne({ id: examId });
+      if (exam) itemName = `${exam.name} — Full PYQ Access`;
+    } else if (paymentType === 'domain_pyq_purchase' && domainId) {
+      const domains = await getCollection('domains');
+      const domain = await domains.findOne({ id: domainId });
+      if (domain) itemName = `${domain.name} — Domain (PYQ)`;
     } else if (paymentType === 'get_pass') {
       itemName = 'Unishaala Get Pass — All-Access';
     }
@@ -59,7 +67,7 @@ export async function POST(request) {
         userId: user.id,
         examId: examId || '',
         domainId: domainId || '',
-        mockTestId: mockTestId || '',
+        paymentType,
         itemName,
       },
     });
@@ -74,8 +82,8 @@ export async function POST(request) {
       userName: user.name,
       userEmail: user.email,
       userPhone: user.phone || '',
-      examId: paymentType === 'exam_purchase' ? (examId || null) : null,
-      domainId: paymentType === 'domain_purchase' ? (domainId || null) : null,
+      examId: (paymentType === 'exam_purchase' || paymentType === 'exam_pyq_purchase') ? (examId || null) : null,
+      domainId: (paymentType === 'domain_purchase' || paymentType === 'domain_pyq_purchase') ? (domainId || null) : null,
       mockTestId: null,
       paymentType,
       itemName,

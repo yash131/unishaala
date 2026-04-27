@@ -99,8 +99,8 @@ function AdminSidebar({ activeTab, setActiveTab }) {
   ];
 
   return (
-    <aside className="w-64 bg-white shadow-lg min-h-screen fixed left-0 top-0 z-40">
-      <div className="p-4 border-b">
+    <aside className="w-64 bg-white shadow-lg fixed left-0 top-0 bottom-0 z-40 flex flex-col">
+      <div className="p-4 border-b flex-shrink-0">
         <Link href="/" className="flex items-center gap-3">
           <img 
             src="https://customer-assets.emergentagent.com/job_unishaala-web/artifacts/2nf9p203_Unishaala-logo.jpg"
@@ -113,8 +113,8 @@ function AdminSidebar({ activeTab, setActiveTab }) {
           </div>
         </Link>
       </div>
-      <nav className="p-4">
-        <ul className="space-y-1">
+      <nav className="p-4 flex-1 overflow-y-auto">
+        <ul className="space-y-1 pb-4">
           {menuItems.map((item) => (
             <li key={item.id}>
               <button
@@ -5330,13 +5330,28 @@ function NotificationsTab({ exams }) {
 // =========================== PRICING TAB ===========================
 function PricingTab({ exams }) {
   const [loading, setLoading] = useState(true);
-  const [pass, setPass] = useState({ getPassPrice: 0, getPassEnabled: false });
+  const [pass, setPass] = useState({ getPassPrice: 0, getPassEnabled: false, getPassDurationDays: 365 });
   const [savingPass, setSavingPass] = useState(false);
   const [domains, setDomains] = useState([]);
-  const [examPrices, setExamPrices] = useState({});
-  const [domainPrices, setDomainPrices] = useState({});
-  const [examFilter, setExamFilter] = useState('');
   const [rowSaving, setRowSaving] = useState({});
+
+  // Structured selection state
+  const [contentType, setContentType] = useState('mock_test'); // 'mock_test' | 'previous_year'
+  const [section, setSection] = useState('exam'); // 'exam' | 'domain'
+  const [selectedExamId, setSelectedExamId] = useState('');
+  const [selectedDomainId, setSelectedDomainId] = useState('');
+  const [examPriceInput, setExamPriceInput] = useState('');
+  const [domainPriceInput, setDomainPriceInput] = useState('');
+
+  // Preset duration options
+  const DURATION_OPTIONS = [
+    { days: 30, label: '1 Month' },
+    { days: 90, label: '3 Months' },
+    { days: 180, label: '6 Months' },
+    { days: 365, label: '1 Year' },
+    { days: 730, label: '2 Years' },
+    { days: 1825, label: '5 Years' },
+  ];
 
   const fetchAll = async () => {
     setLoading(true);
@@ -5347,20 +5362,33 @@ function PricingTab({ exams }) {
       ]);
       const p = await pRes.json();
       const d = await dRes.json();
-      if (p.success) setPass({ getPassPrice: p.data.getPassPrice || 0, getPassEnabled: !!p.data.getPassEnabled });
-      if (d.success) {
-        setDomains(d.data || []);
-        const dp = {};
-        (d.data || []).forEach(dom => { dp[dom.id] = dom.price || 0; });
-        setDomainPrices(dp);
-      }
-      const ep = {};
-      (exams || []).forEach(e => { ep[e.id] = e.price || 0; });
-      setExamPrices(ep);
+      if (p.success) setPass({
+        getPassPrice: p.data.getPassPrice || 0,
+        getPassEnabled: !!p.data.getPassEnabled,
+        getPassDurationDays: p.data.getPassDurationDays || 365,
+      });
+      if (d.success) setDomains(d.data || []);
     } catch (_e) { toast.error('Failed to load pricing'); }
     setLoading(false);
   };
   useEffect(() => { fetchAll(); }, [exams]);
+
+  // Derive the "currently effective" price for the selected exam/domain/type
+  const selectedExam = exams?.find(e => e.id === selectedExamId);
+  const selectedDomain = domains.find(d => d.id === selectedDomainId);
+  const examPriceField = contentType === 'previous_year' ? 'pyqPrice' : 'price';
+  const domainPriceField = contentType === 'previous_year' ? 'pyqPrice' : 'price';
+
+  // When the user changes exam/type, load its price into the input
+  useEffect(() => {
+    if (selectedExam) setExamPriceInput(String(selectedExam[examPriceField] || 0));
+    else setExamPriceInput('');
+  }, [selectedExamId, contentType, exams]);
+
+  useEffect(() => {
+    if (selectedDomain) setDomainPriceInput(String(selectedDomain[domainPriceField] || 0));
+    else setDomainPriceInput('');
+  }, [selectedDomainId, contentType, domains]);
 
   const savePass = async () => {
     setSavingPass(true);
@@ -5369,49 +5397,62 @@ function PricingTab({ exams }) {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ getPassPrice: pass.getPassPrice, getPassEnabled: pass.getPassEnabled })
+        body: JSON.stringify({
+          getPassPrice: pass.getPassPrice,
+          getPassEnabled: pass.getPassEnabled,
+          getPassDurationDays: pass.getPassDurationDays,
+        })
       });
       const d = await res.json();
-      if (d.success) toast.success('Get Pass pricing saved');
+      if (d.success) toast.success('Get Pass settings saved');
       else toast.error(d.error || 'Save failed');
     } catch (_e) { toast.error('Save failed'); }
     setSavingPass(false);
   };
 
-  const saveExamPrice = async (exam) => {
-    setRowSaving(s => ({ ...s, ['e-' + exam.id]: true }));
+  const saveExamPrice = async () => {
+    if (!selectedExam) { toast.error('Select an exam first'); return; }
+    setRowSaving(s => ({ ...s, exam: true }));
     try {
-      const res = await fetch(`/api/admin/exams/${exam.id}`, {
+      const payload = {};
+      payload[examPriceField] = parseFloat(examPriceInput) || 0;
+      const res = await fetch(`/api/admin/exams/${selectedExam.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ price: parseFloat(examPrices[exam.id]) || 0 })
+        body: JSON.stringify(payload)
       });
       const d = await res.json();
-      if (d.success) toast.success(`Saved price for ${exam.name}`);
-      else toast.error(d.error || 'Save failed');
+      if (d.success) {
+        toast.success(`Saved ${contentType === 'previous_year' ? 'PYQ' : 'Test Series'} price for ${selectedExam.name}`);
+        await fetchAll();
+      } else toast.error(d.error || 'Save failed');
     } catch (_e) { toast.error('Save failed'); }
-    setRowSaving(s => ({ ...s, ['e-' + exam.id]: false }));
+    setRowSaving(s => ({ ...s, exam: false }));
   };
 
-  const saveDomainPrice = async (dom) => {
-    setRowSaving(s => ({ ...s, ['d-' + dom.id]: true }));
+  const saveDomainPrice = async () => {
+    if (!selectedDomain) { toast.error('Select a domain first'); return; }
+    setRowSaving(s => ({ ...s, domain: true }));
     try {
-      const res = await fetch(`/api/admin/domains/${dom.id}`, {
+      const payload = {};
+      payload[domainPriceField] = parseFloat(domainPriceInput) || 0;
+      const res = await fetch(`/api/admin/domains/${selectedDomain.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ price: parseFloat(domainPrices[dom.id]) || 0 })
+        body: JSON.stringify(payload)
       });
       const d = await res.json();
-      if (d.success) toast.success(`Saved price for ${dom.name}`);
-      else toast.error(d.error || 'Save failed');
+      if (d.success) {
+        toast.success(`Saved ${contentType === 'previous_year' ? 'PYQ' : 'Test Series'} price for ${selectedDomain.name}`);
+        await fetchAll();
+      } else toast.error(d.error || 'Save failed');
     } catch (_e) { toast.error('Save failed'); }
-    setRowSaving(s => ({ ...s, ['d-' + dom.id]: false }));
+    setRowSaving(s => ({ ...s, domain: false }));
   };
 
-  const examName = (id) => exams?.find(e => e.id === id)?.name || '—';
-  const visibleDomains = examFilter ? domains.filter(d => d.examId === examFilter) : domains;
+  const examDomains = domains.filter(d => d.examId === selectedExamId);
 
   if (loading) return <div className="p-10 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
 
@@ -5419,7 +5460,7 @@ function PricingTab({ exams }) {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Pricing</h2>
-        <p className="text-sm text-gray-500">Set the price for the platform-wide Get Pass, full Test Series (per exam), and individual Domains. Individual tests are not sold separately.</p>
+        <p className="text-sm text-gray-500">Set prices for Get Pass, Test Series (Mock Tests), and Previous Year Questions. Individual tests are not sold separately.</p>
       </div>
 
       {/* Get Pass card */}
@@ -5431,12 +5472,22 @@ function PricingTab({ exams }) {
             </div>
             <div className="flex-1">
               <h3 className="text-xl font-bold text-gray-900">Get Pass (all-access)</h3>
-              <p className="text-sm text-gray-600">When enabled, users can buy a pass that unlocks every Test Series, every Domain, and every PYQ paper for 1 year.</p>
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+              <p className="text-sm text-gray-600">Unlocks every Test Series, every Domain, every PYQ paper (including all <b>future/upcoming</b> tests) for the validity period below.</p>
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div>
                   <Label>Price (₹)</Label>
                   <Input type="number" min="0" step="1" value={pass.getPassPrice}
                     onChange={e => setPass(p => ({ ...p, getPassPrice: e.target.value }))} />
+                </div>
+                <div>
+                  <Label>Validity</Label>
+                  <Select value={String(pass.getPassDurationDays)}
+                    onValueChange={v => setPass(p => ({ ...p, getPassDurationDays: parseInt(v, 10) }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {DURATION_OPTIONS.map(o => <SelectItem key={o.days} value={String(o.days)}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="flex items-end gap-2">
                   <Switch id="pass-enabled" checked={pass.getPassEnabled}
@@ -5454,99 +5505,151 @@ function PricingTab({ exams }) {
         </CardContent>
       </Card>
 
-      {/* Exam prices */}
+      {/* Structured flow: Type -> Section -> Exam/Domain */}
       <Card>
-        <CardContent className="p-0">
-          <div className="p-5 border-b flex items-center gap-2">
-            <ClipboardList className="w-5 h-5 text-brand-600" />
-            <h3 className="text-lg font-bold text-gray-900">Test Series (per exam)</h3>
-            <span className="ml-auto text-xs text-gray-500">Unlocks all domains & tests of that exam</span>
-          </div>
-          {(!exams || exams.length === 0) ? (
-            <div className="p-8 text-center text-gray-500">No exams. Create an exam first.</div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Exam</TableHead>
-                  <TableHead className="w-56">Price (₹)</TableHead>
-                  <TableHead className="text-right">Save</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {exams.map(e => (
-                  <TableRow key={e.id}>
-                    <TableCell className="font-medium">{e.name}</TableCell>
-                    <TableCell>
-                      <Input type="number" min="0" step="1" value={examPrices[e.id] ?? 0}
-                        onChange={(ev) => setExamPrices(p => ({ ...p, [e.id]: ev.target.value }))} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button size="sm" onClick={() => saveExamPrice(e)} disabled={rowSaving['e-' + e.id]}
-                        className="bg-brand-600 hover:bg-brand-700">
-                        {rowSaving['e-' + e.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+        <CardContent className="p-6">
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Content Pricing</h3>
 
-      {/* Domain prices */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="p-5 border-b flex flex-wrap items-center gap-3">
-            <Layers className="w-5 h-5 text-brand-600" />
-            <h3 className="text-lg font-bold text-gray-900">Domains</h3>
-            <span className="text-xs text-gray-500">Unlocks all tests in that domain</span>
-            <div className="ml-auto">
-              <Select value={examFilter || 'all'} onValueChange={v => setExamFilter(v === 'all' ? '' : v)}>
-                <SelectTrigger className="w-56"><SelectValue placeholder="Filter by exam" /></SelectTrigger>
+          {/* Step 1: Content Type */}
+          <div className="mb-4">
+            <Label className="mb-2 block">Step 1 — Content Type</Label>
+            <div className="flex gap-2">
+              <Button
+                variant={contentType === 'mock_test' ? 'default' : 'outline'}
+                className={contentType === 'mock_test' ? 'bg-brand-600 hover:bg-brand-700' : ''}
+                onClick={() => { setContentType('mock_test'); setSelectedExamId(''); setSelectedDomainId(''); }}
+              >
+                <ClipboardList className="w-4 h-4 mr-2" /> Mock Test (Test Series)
+              </Button>
+              <Button
+                variant={contentType === 'previous_year' ? 'default' : 'outline'}
+                className={contentType === 'previous_year' ? 'bg-purple-600 hover:bg-purple-700' : ''}
+                onClick={() => { setContentType('previous_year'); setSelectedExamId(''); setSelectedDomainId(''); }}
+              >
+                <ScrollText className="w-4 h-4 mr-2" /> Previous Year (PYQ)
+              </Button>
+            </div>
+          </div>
+
+          {/* Step 2: Section */}
+          <div className="mb-4">
+            <Label className="mb-2 block">Step 2 — Pricing Section</Label>
+            <div className="flex gap-2">
+              <Button
+                variant={section === 'exam' ? 'default' : 'outline'}
+                className={section === 'exam' ? 'bg-amber-600 hover:bg-amber-700' : ''}
+                onClick={() => { setSection('exam'); setSelectedDomainId(''); }}
+              >
+                <GraduationCap className="w-4 h-4 mr-2" /> Exam Pricing <span className="ml-2 text-xs opacity-80">(full access)</span>
+              </Button>
+              <Button
+                variant={section === 'domain' ? 'default' : 'outline'}
+                className={section === 'domain' ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                onClick={() => setSection('domain')}
+              >
+                <Layers className="w-4 h-4 mr-2" /> Domain Pricing <span className="ml-2 text-xs opacity-80">(that domain only)</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Info banner */}
+          <div className={`mb-5 p-3 rounded-lg text-sm flex items-start gap-2 ${
+            section === 'exam' ? 'bg-amber-50 border border-amber-200 text-amber-800' : 'bg-blue-50 border border-blue-200 text-blue-800'
+          }`}>
+            <div className="font-semibold flex-shrink-0">Rule:</div>
+            <div>
+              {section === 'exam'
+                ? <>Exam purchase → unlocks <b>every domain and every {contentType === 'previous_year' ? 'PYQ' : 'mock'} test</b> within that exam.</>
+                : <>Domain purchase → unlocks <b>only the {contentType === 'previous_year' ? 'PYQ' : 'mock'} tests inside that domain</b>.</>
+              }
+            </div>
+          </div>
+
+          {/* Step 3: Exam selection (both sections) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div>
+              <Label>Step 3 — Select Exam</Label>
+              <Select value={selectedExamId || ''} onValueChange={v => { setSelectedExamId(v); setSelectedDomainId(''); }}>
+                <SelectTrigger><SelectValue placeholder="Pick an exam" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Exams</SelectItem>
                   {exams?.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
+            {section === 'domain' && (
+              <div>
+                <Label>Step 4 — Select Domain</Label>
+                <Select value={selectedDomainId || ''} onValueChange={setSelectedDomainId} disabled={!selectedExamId}>
+                  <SelectTrigger><SelectValue placeholder={selectedExamId ? "Pick a domain" : "Pick exam first"} /></SelectTrigger>
+                  <SelectContent>
+                    {examDomains.length === 0 ? (
+                      <SelectItem value="__none__" disabled>No domains for this exam</SelectItem>
+                    ) : examDomains.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
-          {visibleDomains.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No domains in this selection.</div>
+
+          {/* Price editor */}
+          {section === 'exam' ? (
+            selectedExam && (
+              <div className="border-2 border-dashed border-amber-300 rounded-lg p-4 bg-amber-50/50">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-sm text-gray-600">Setting <b>{contentType === 'previous_year' ? 'PYQ Exam' : 'Test Series (Exam)'}</b> price for</p>
+                    <h4 className="font-bold text-lg text-gray-900">{selectedExam.name}</h4>
+                  </div>
+                  <Badge className={contentType === 'previous_year' ? 'bg-purple-600' : 'bg-amber-600'}>
+                    {contentType === 'previous_year' ? 'PYQ' : 'Mock'} · Exam-level
+                  </Badge>
+                </div>
+                <div className="flex items-end gap-3">
+                  <div className="flex-1">
+                    <Label>Price (₹)</Label>
+                    <Input type="number" min="0" step="1" value={examPriceInput}
+                      onChange={(e) => setExamPriceInput(e.target.value)} />
+                  </div>
+                  <Button className="bg-brand-600 hover:bg-brand-700" onClick={saveExamPrice} disabled={rowSaving.exam}>
+                    {rowSaving.exam ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : <><Save className="w-4 h-4 mr-2" /> Save Price</>}
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Current saved: <b>₹{Number(selectedExam[examPriceField] || 0).toLocaleString('en-IN')}</b></p>
+              </div>
+            )
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Domain</TableHead>
-                  <TableHead>Exam</TableHead>
-                  <TableHead className="w-56">Price (₹)</TableHead>
-                  <TableHead className="text-right">Save</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visibleDomains.map(d => (
-                  <TableRow key={d.id}>
-                    <TableCell className="font-medium">{d.name}</TableCell>
-                    <TableCell>{examName(d.examId)}</TableCell>
-                    <TableCell>
-                      <Input type="number" min="0" step="1" value={domainPrices[d.id] ?? 0}
-                        onChange={(ev) => setDomainPrices(p => ({ ...p, [d.id]: ev.target.value }))} />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button size="sm" onClick={() => saveDomainPrice(d)} disabled={rowSaving['d-' + d.id]}
-                        className="bg-brand-600 hover:bg-brand-700">
-                        {rowSaving['d-' + d.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            selectedDomain && (
+              <div className="border-2 border-dashed border-blue-300 rounded-lg p-4 bg-blue-50/50">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <p className="text-sm text-gray-600">Setting <b>{contentType === 'previous_year' ? 'PYQ Domain' : 'Test Series (Domain)'}</b> price for</p>
+                    <h4 className="font-bold text-lg text-gray-900">{selectedDomain.name}</h4>
+                    <p className="text-xs text-gray-500">Under {selectedExam?.name}</p>
+                  </div>
+                  <Badge className={contentType === 'previous_year' ? 'bg-purple-600' : 'bg-blue-600'}>
+                    {contentType === 'previous_year' ? 'PYQ' : 'Mock'} · Domain-level
+                  </Badge>
+                </div>
+                <div className="flex items-end gap-3">
+                  <div className="flex-1">
+                    <Label>Price (₹)</Label>
+                    <Input type="number" min="0" step="1" value={domainPriceInput}
+                      onChange={(e) => setDomainPriceInput(e.target.value)} />
+                  </div>
+                  <Button className="bg-brand-600 hover:bg-brand-700" onClick={saveDomainPrice} disabled={rowSaving.domain}>
+                    {rowSaving.domain ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : <><Save className="w-4 h-4 mr-2" /> Save Price</>}
+                  </Button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Current saved: <b>₹{Number(selectedDomain[domainPriceField] || 0).toLocaleString('en-IN')}</b></p>
+              </div>
+            )
+          )}
+
+          {!selectedExamId && (
+            <div className="text-sm text-gray-500 italic">Select an exam to begin.</div>
           )}
         </CardContent>
       </Card>
     </div>
   );
 }
-
