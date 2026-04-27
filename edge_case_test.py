@@ -8,7 +8,7 @@ import json
 import sys
 
 # Configuration
-BASE_URL = "https://rank-predictor-fix.preview.emergentagent.com"
+BASE_URL = "https://admin-cleanup-18.preview.emergentagent.com"
 API_BASE = f"{BASE_URL}/api"
 
 # Test credentials

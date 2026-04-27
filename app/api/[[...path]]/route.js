@@ -1098,6 +1098,42 @@ export async function GET(request) {
       });
     }
 
+    // ======= PUBLIC NOTES ROUTES =======
+    // Public list of notes (filterable). User can view inline or download if permitted.
+    if (path === '/notes') {
+      const examId = searchParams.get('examId');
+      const domainId = searchParams.get('domainId');
+      const subjectId = searchParams.get('subjectId');
+      const notesCol = await getCollection('notes');
+      const query = { status: { $ne: 'Inactive' }, pdfFileId: { $exists: true, $ne: null } };
+      if (examId) query.examId = examId;
+      if (domainId) query.domainId = domainId;
+      if (subjectId) query.subjectId = subjectId;
+      const all = await notesCol.find(query).sort({ createdAt: -1 }).toArray();
+      return jsonResponse({ success: true, data: all });
+    }
+
+    // Public: subjects that have notes attached (used by /notes flow)
+    if (path === '/notes-subjects') {
+      const examId = searchParams.get('examId');
+      const domainId = searchParams.get('domainId');
+      if (!examId || !domainId) {
+        return jsonResponse({ success: false, error: 'examId and domainId are required' }, 400);
+      }
+      const subjects = await getCollection('subjects');
+      const notesCol = await getCollection('notes');
+      const all = await subjects.find({ examId, domainId, status: { $ne: 'Inactive' } }).sort({ name: 1 }).toArray();
+      const enriched = await Promise.all(all.map(async (s) => {
+        const noteCount = await notesCol.countDocuments({
+          subjectId: s.id,
+          status: { $ne: 'Inactive' },
+          pdfFileId: { $exists: true, $ne: null }
+        });
+        return { ...s, noteCount };
+      }));
+      return jsonResponse({ success: true, data: enriched });
+    }
+
     // ======= PUBLIC PRACTICE QUESTIONS ROUTES =======
     if (path === '/subjects') {
       const examId = searchParams.get('examId');
@@ -1301,6 +1337,29 @@ export async function GET(request) {
         if (domainId) query.domainId = domainId;
         const all = await subjects.find(query).sort({ createdAt: 1 }).toArray();
         return jsonResponse({ success: true, data: all });
+      }
+
+      // Admin - Get all notes (optionally filter by exam/domain/subject)
+      if (path === '/admin/notes') {
+        const examId = searchParams.get('examId');
+        const domainId = searchParams.get('domainId');
+        const subjectId = searchParams.get('subjectId');
+        const notesCol = await getCollection('notes');
+        const query = {};
+        if (examId) query.examId = examId;
+        if (domainId) query.domainId = domainId;
+        if (subjectId) query.subjectId = subjectId;
+        const all = await notesCol.find(query).sort({ createdAt: -1 }).toArray();
+        return jsonResponse({ success: true, data: all });
+      }
+
+      // Admin - Get single note
+      if (path.startsWith('/admin/notes/')) {
+        const noteId = path.split('/admin/notes/')[1];
+        const notesCol = await getCollection('notes');
+        const n = await notesCol.findOne({ id: noteId });
+        if (!n) return jsonResponse({ success: false, error: 'Note not found' }, 404);
+        return jsonResponse({ success: true, data: n });
       }
 
       // Admin - Get all blog posts
@@ -3788,6 +3847,29 @@ export async function POST(request) {
         return jsonResponse({ success: true, data: updated });
       }
 
+      // Create Note (metadata only; PDF uploaded via /api/admin/notes/:id/upload-pdf)
+      if (path === '/admin/notes') {
+        const { examId, domainId, subjectId, title, description } = body;
+        if (!examId || !domainId || !subjectId || !title) {
+          return jsonResponse({ success: false, error: 'examId, domainId, subjectId and title are required' }, 400);
+        }
+        const notesCol = await getCollection('notes');
+        const noteData = {
+          id: uuidv4(),
+          examId,
+          domainId,
+          subjectId,
+          title: String(title).trim(),
+          description: description || '',
+          pdfPermission: body.pdfPermission === 'view_download' ? 'view_download' : 'view',
+          status: 'Active',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        await notesCol.insertOne(noteData);
+        return jsonResponse({ success: true, data: noteData });
+      }
+
       // Update Domain
       if (path.startsWith('/admin/domains/')) {
         const domainId = path.split('/admin/domains/')[1];
@@ -4142,6 +4224,25 @@ export async function PUT(request) {
         const updated = await blogs.findOne({ id: blogId });
         return jsonResponse({ success: true, data: updated });
       }
+
+      // Update Note metadata
+      if (path.startsWith('/admin/notes/') && !path.endsWith('/upload-pdf')) {
+        const noteId = path.split('/admin/notes/')[1];
+        const notesCol = await getCollection('notes');
+        const updateData = { updatedAt: new Date() };
+        ['title', 'description', 'status', 'examId', 'domainId', 'subjectId'].forEach(k => {
+          if (body[k] !== undefined) updateData[k] = body[k];
+        });
+        if (body.pdfPermission !== undefined) {
+          if (body.pdfPermission === 'view' || body.pdfPermission === 'view_download') {
+            updateData.pdfPermission = body.pdfPermission;
+          }
+        }
+        const r = await notesCol.updateOne({ id: noteId }, { $set: updateData });
+        if (r.matchedCount === 0) return jsonResponse({ success: false, error: 'Note not found' }, 404);
+        const updated = await notesCol.findOne({ id: noteId });
+        return jsonResponse({ success: true, data: updated });
+      }
     }
 
     return jsonResponse({ success: false, error: 'Endpoint not found' }, 404);
@@ -4229,6 +4330,26 @@ export async function DELETE(request) {
       await mockTests.updateMany({ subjectId }, { $unset: { subjectId: '' } });
       await subjects.deleteOne({ id: subjectId });
       return jsonResponse({ success: true, message: 'Subject deleted' });
+    }
+
+    // Delete Note (also remove any attached PDF from GridFS)
+    if (path.startsWith('/admin/notes/')) {
+      const noteId = path.split('/admin/notes/')[1];
+      const notesCol = await getCollection('notes');
+      const note = await notesCol.findOne({ id: noteId });
+      if (note && (note.pdfFileId || note.pdfPreviewFileId)) {
+        try {
+          const { ObjectId } = require('mongodb');
+          const { getPdfBucket } = require('@/lib/db');
+          const bucket = await getPdfBucket('pdfs');
+          for (const fid of [note.pdfFileId, note.pdfPreviewFileId]) {
+            if (!fid) continue;
+            try { await bucket.delete(new ObjectId(fid)); } catch (_e) {}
+          }
+        } catch (_e) {}
+      }
+      await notesCol.deleteOne({ id: noteId });
+      return jsonResponse({ success: true, message: 'Note deleted' });
     }
 
 

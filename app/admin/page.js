@@ -86,6 +86,7 @@ function AdminSidebar({ activeTab, setActiveTab }) {
     { id: 'tests', label: 'Tests', icon: <ClipboardList className="w-5 h-5" /> },
     { id: 'questions', label: 'Questions', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'blogs', label: 'Blogs', icon: <FileText className="w-5 h-5" /> },
+    { id: 'notes', label: 'Notes', icon: <FileDown className="w-5 h-5" /> },
     { id: 'answer-keys', label: 'Answer Keys', icon: <ClipboardList className="w-5 h-5" /> },
     { id: 'transactions', label: 'Transactions', icon: <CreditCard className="w-5 h-5" /> },
     { id: 'jobs', label: 'Jobs', icon: <Briefcase className="w-5 h-5" /> },
@@ -4570,6 +4571,7 @@ export default function AdminPage() {
           {activeTab === 'tests' && <TestsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'questions' && <QuestionsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'blogs' && <BlogsTab />}
+          {activeTab === 'notes' && <NotesTab exams={data.exams} />}
           {activeTab === 'answer-keys' && <AnswerKeysTab />}
           {activeTab === 'transactions' && <TransactionsTab />}
           {activeTab === 'jobs' && <JobsTab />}
@@ -4792,3 +4794,366 @@ function SubjectsTab({ exams }) {
   );
 }
 
+
+
+// =========================== NOTES TAB ===========================
+function NotesTab({ exams }) {
+  const [notes, setNotes] = useState([]);
+  const [domains, setDomains] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterExamId, setFilterExamId] = useState('');
+  const [filterDomainId, setFilterDomainId] = useState('');
+  const [filterSubjectId, setFilterSubjectId] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const emptyForm = { title: '', description: '', examId: '', domainId: '', subjectId: '', pdfPermission: 'view', status: 'Active' };
+  const [form, setForm] = useState(emptyForm);
+
+  // PDF upload state
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [pdfTarget, setPdfTarget] = useState(null);
+  const [pdfFile, setPdfFile] = useState(null);
+  const [pdfPermission, setPdfPermission] = useState('view');
+  const [uploading, setUploading] = useState(false);
+
+  const fetchAll = async () => {
+    setLoading(true);
+    try {
+      const [nRes, dRes, sRes] = await Promise.all([
+        fetch('/api/admin/notes', { credentials: 'include' }),
+        fetch('/api/admin/domains', { credentials: 'include' }),
+        fetch('/api/admin/subjects', { credentials: 'include' })
+      ]);
+      const n = await nRes.json();
+      const d = await dRes.json();
+      const s = await sRes.json();
+      if (n.success) setNotes(n.data || []);
+      if (d.success) setDomains(d.data || []);
+      if (s.success) setSubjects(s.data || []);
+    } catch (_e) { toast.error('Failed to load notes'); }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchAll(); }, []);
+
+  const formDomains = domains.filter(d => d.examId === form.examId);
+  const formSubjects = subjects.filter(s => s.examId === form.examId && s.domainId === form.domainId);
+
+  const filtered = notes.filter(n => {
+    if (filterExamId && n.examId !== filterExamId) return false;
+    if (filterDomainId && n.domainId !== filterDomainId) return false;
+    if (filterSubjectId && n.subjectId !== filterSubjectId) return false;
+    return true;
+  });
+
+  const examName = (id) => exams?.find(e => e.id === id)?.name || '—';
+  const domainName = (id) => domains.find(d => d.id === id)?.name || '—';
+  const subjectName = (id) => subjects.find(s => s.id === id)?.name || '—';
+
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setDialogOpen(true); };
+  const openEdit = (n) => {
+    setEditing(n);
+    setForm({
+      title: n.title || '', description: n.description || '',
+      examId: n.examId || '', domainId: n.domainId || '', subjectId: n.subjectId || '',
+      pdfPermission: n.pdfPermission || 'view',
+      status: n.status || 'Active'
+    });
+    setDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.examId) { toast.error('Select an exam'); return; }
+    if (!form.domainId) { toast.error('Select a domain'); return; }
+    if (!form.subjectId) { toast.error('Select a subject'); return; }
+    if (!form.title.trim()) { toast.error('Title is required'); return; }
+    setSaving(true);
+    try {
+      const url = editing ? `/api/admin/notes/${editing.id}` : '/api/admin/notes';
+      const method = editing ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(form)
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success(editing ? 'Note updated' : 'Note created');
+        setDialogOpen(false);
+        fetchAll();
+      } else toast.error(d.error || 'Save failed');
+    } catch (_e) { toast.error('Save failed'); }
+    setSaving(false);
+  };
+
+  const handleDelete = async (n) => {
+    if (!confirm(`Delete note "${n.title}"? The attached PDF will also be removed.`)) return;
+    const res = await fetch(`/api/admin/notes/${n.id}`, { method: 'DELETE', credentials: 'include' });
+    const d = await res.json();
+    if (d.success) { toast.success('Note deleted'); fetchAll(); } else toast.error('Delete failed');
+  };
+
+  const openPdfUpload = (n) => {
+    setPdfTarget(n);
+    setPdfFile(null);
+    setPdfPermission(n.pdfPermission || 'view');
+    setPdfDialogOpen(true);
+  };
+
+  const handlePdfUpload = async () => {
+    if (!pdfFile) { toast.error('Choose a PDF file'); return; }
+    if (!/\.pdf$/i.test(pdfFile.name) && !/pdf/i.test(pdfFile.type)) {
+      toast.error('File must be a PDF'); return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('pdf', pdfFile);
+      fd.append('permission', pdfPermission);
+      const res = await fetch(`/api/admin/notes/${pdfTarget.id}/upload-pdf`, {
+        method: 'POST', credentials: 'include', body: fd
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success('PDF uploaded');
+        setPdfDialogOpen(false);
+        fetchAll();
+      } else toast.error(d.error || 'Upload failed');
+    } catch (_e) { toast.error('Upload failed'); }
+    setUploading(false);
+  };
+
+  const handlePdfDelete = async (n) => {
+    if (!confirm('Remove the attached PDF from this note?')) return;
+    const res = await fetch(`/api/admin/notes/${n.id}/upload-pdf`, { method: 'DELETE', credentials: 'include' });
+    const d = await res.json();
+    if (d.success) { toast.success('PDF removed'); fetchAll(); } else toast.error('Failed');
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Notes</h2>
+          <p className="text-sm text-gray-500">Upload study note PDFs. Users can browse them via Exam → Domain → Subject on the Notes page.</p>
+        </div>
+        <Button onClick={openCreate} className="bg-brand-600 hover:bg-brand-700">
+          <Plus className="w-4 h-4 mr-2" /> New Note
+        </Button>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-3 mb-4">
+        <Select value={filterExamId || 'all'} onValueChange={v => { setFilterExamId(v === 'all' ? '' : v); setFilterDomainId(''); setFilterSubjectId(''); }}>
+          <SelectTrigger className="w-full md:w-56"><SelectValue placeholder="Filter by exam" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Exams</SelectItem>
+            {exams?.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filterDomainId || 'all'} onValueChange={v => { setFilterDomainId(v === 'all' ? '' : v); setFilterSubjectId(''); }}>
+          <SelectTrigger className="w-full md:w-56"><SelectValue placeholder="Filter by domain" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Domains</SelectItem>
+            {domains.filter(d => !filterExamId || d.examId === filterExamId).map(d =>
+              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+        <Select value={filterSubjectId || 'all'} onValueChange={v => setFilterSubjectId(v === 'all' ? '' : v)}>
+          <SelectTrigger className="w-full md:w-56"><SelectValue placeholder="Filter by subject" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Subjects</SelectItem>
+            {subjects.filter(s =>
+              (!filterExamId || s.examId === filterExamId) &&
+              (!filterDomainId || s.domainId === filterDomainId)
+            ).map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
+          ) : filtered.length === 0 ? (
+            <div className="p-12 text-center">
+              <FileDown className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500">No notes yet. Click &quot;New Note&quot; to create one.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Exam</TableHead>
+                  <TableHead>Domain</TableHead>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>PDF</TableHead>
+                  <TableHead>Access</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map(n => (
+                  <TableRow key={n.id}>
+                    <TableCell className="font-medium max-w-xs">
+                      <div className="truncate">{n.title}</div>
+                      {n.description && <div className="text-xs text-gray-500 truncate">{n.description}</div>}
+                    </TableCell>
+                    <TableCell>{examName(n.examId)}</TableCell>
+                    <TableCell>{domainName(n.domainId)}</TableCell>
+                    <TableCell>{subjectName(n.subjectId)}</TableCell>
+                    <TableCell>
+                      {n.pdfFileId ? (
+                        <Badge className="bg-green-500 whitespace-nowrap">
+                          <CheckCircle className="w-3 h-3 mr-1" />
+                          {n.pdfPageCount ? `${n.pdfPageCount}p` : 'PDF'}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-amber-700 border-amber-300">No PDF</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {n.pdfPermission === 'view_download' ? (
+                        <Badge className="bg-blue-600">View + Download</Badge>
+                      ) : (
+                        <Badge className="bg-gray-500">View only</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right whitespace-nowrap">
+                      <Button variant="ghost" size="sm" title="Upload PDF" onClick={() => openPdfUpload(n)}>
+                        <Upload className="w-4 h-4 text-brand-600" />
+                      </Button>
+                      {n.pdfFileId && (
+                        <Button variant="ghost" size="sm" title="Remove PDF" onClick={() => handlePdfDelete(n)}>
+                          <FileDown className="w-4 h-4 text-amber-600 rotate-180" />
+                        </Button>
+                      )}
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(n)}><Edit className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(n)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Create / Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!saving) setDialogOpen(o); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>{editing ? 'Edit Note' : 'Create Note'}</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Exam *</Label>
+              <Select value={form.examId} onValueChange={v => setForm(p => ({ ...p, examId: v, domainId: '', subjectId: '' }))}>
+                <SelectTrigger><SelectValue placeholder="Select exam" /></SelectTrigger>
+                <SelectContent>
+                  {exams?.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {form.examId && (
+              <div>
+                <Label>Domain *</Label>
+                <Select value={form.domainId} onValueChange={v => setForm(p => ({ ...p, domainId: v, subjectId: '' }))}>
+                  <SelectTrigger><SelectValue placeholder="Select domain" /></SelectTrigger>
+                  <SelectContent>
+                    {formDomains.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {form.domainId && (
+              <div>
+                <Label>Subject *</Label>
+                <Select value={form.subjectId} onValueChange={v => setForm(p => ({ ...p, subjectId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
+                  <SelectContent>
+                    {formSubjects.length === 0 ? (
+                      <SelectItem value="__none__" disabled>No subjects — create one under Subjects tab</SelectItem>
+                    ) : formSubjects.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div>
+              <Label>Title *</Label>
+              <Input value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))} placeholder="e.g. Derivatives — Formulae Sheet" />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea rows={3} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} placeholder="Short summary shown to users" />
+            </div>
+            <div>
+              <Label>Access Permission</Label>
+              <Select value={form.pdfPermission} onValueChange={v => setForm(p => ({ ...p, pdfPermission: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="view">View only</SelectItem>
+                  <SelectItem value="view_download">View + Download</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={v => setForm(p => ({ ...p, status: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {!editing && (
+              <p className="text-xs text-gray-500">After creating the note, click the <Upload className="inline w-3 h-3" /> icon in the table to upload the PDF.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+            <Button className="bg-brand-600 hover:bg-brand-700" onClick={handleSave} disabled={saving}>
+              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : <><Save className="w-4 h-4 mr-2" /> {editing ? 'Update' : 'Create'}</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* PDF Upload Dialog */}
+      <Dialog open={pdfDialogOpen} onOpenChange={(o) => { if (!uploading) setPdfDialogOpen(o); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader><DialogTitle>Upload PDF for &quot;{pdfTarget?.title}&quot;</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>PDF file (max 25 MB)</Label>
+              <Input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files?.[0] || null)} />
+              {pdfFile && <p className="text-xs text-gray-500 mt-1">{pdfFile.name} • {(pdfFile.size / 1024 / 1024).toFixed(2)} MB</p>}
+            </div>
+            <div>
+              <Label>Access Permission</Label>
+              <Select value={pdfPermission} onValueChange={setPdfPermission}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="view">View only</SelectItem>
+                  <SelectItem value="view_download">View + Download</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {pdfTarget?.pdfFileId && (
+              <p className="text-xs text-amber-700">⚠ Replacing the existing PDF &quot;{pdfTarget.pdfFileName}&quot;</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPdfDialogOpen(false)} disabled={uploading}>Cancel</Button>
+            <Button className="bg-brand-600 hover:bg-brand-700" onClick={handlePdfUpload} disabled={uploading || !pdfFile}>
+              {uploading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading…</> : <><Upload className="w-4 h-4 mr-2" /> Upload</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

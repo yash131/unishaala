@@ -5,7 +5,7 @@ import json
 import time
 
 # Configuration
-BASE_URL = "https://rank-predictor-fix.preview.emergentagent.com"
+BASE_URL = "https://admin-cleanup-18.preview.emergentagent.com"
 ADMIN_EMAIL = "admin@unishaala.com"
 ADMIN_PASSWORD = "Shivani@1234"
 
