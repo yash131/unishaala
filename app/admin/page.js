@@ -82,6 +82,7 @@ function AdminSidebar({ activeTab, setActiveTab }) {
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'exams', label: 'Test Series', icon: <GraduationCap className="w-5 h-5" /> },
     { id: 'domains', label: 'Domains', icon: <Layers className="w-5 h-5" /> },
+    { id: 'subjects', label: 'Subjects', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'tests', label: 'Tests', icon: <ClipboardList className="w-5 h-5" /> },
     { id: 'questions', label: 'Questions', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'blogs', label: 'Blogs', icon: <FileText className="w-5 h-5" /> },
@@ -636,6 +637,7 @@ function DomainsTab({ exams, onRefresh }) {
 // Tests Tab (replaces Mock Tests Tab) - with Test Type selection
 function TestsTab({ mockTests, exams, onRefresh }) {
   const [domains, setDomains] = useState([]);
+  const [subjects, setSubjects] = useState([]);
   const [search, setSearch] = useState('');
   const [filterExamId, setFilterExamId] = useState('');
   const [filterType, setFilterType] = useState('');
@@ -643,11 +645,12 @@ function TestsTab({ mockTests, exams, onRefresh }) {
   const [editingTest, setEditingTest] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
-    title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', domainId: '', testType: 'mock_test'
+    title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', domainId: '', subjectId: '', testType: 'mock_test'
   });
 
   useEffect(() => {
     fetchDomains();
+    fetchSubjects();
   }, []);
 
   const fetchDomains = async () => {
@@ -662,8 +665,22 @@ function TestsTab({ mockTests, exams, onRefresh }) {
     }
   };
 
+  const fetchSubjects = async () => {
+    try {
+      const res = await fetch('/api/admin/subjects', { credentials: 'include' });
+      const data = await res.json();
+      if (data.success) setSubjects(data.data || []);
+    } catch (e) {
+      console.error('Failed to fetch subjects:', e);
+    }
+  };
+
   // Get domains for selected exam
   const filteredDomains = domains.filter(d => d.examId === formData.examId);
+  // Subjects scoped to selected exam + domain
+  const filteredSubjects = subjects.filter(
+    s => s.examId === formData.examId && s.domainId === formData.domainId
+  );
 
   const filteredTests = mockTests.filter(t => {
     const matchesSearch = t.title?.toLowerCase().includes(search.toLowerCase());
@@ -705,6 +722,10 @@ function TestsTab({ mockTests, exams, onRefresh }) {
       toast.error('Please select a test type');
       return;
     }
+    if (formData.testType === 'practice_questions' && !formData.subjectId) {
+      toast.error('Please select a subject for Practice Questions');
+      return;
+    }
     setLoading(true);
     try {
       const url = editingTest ? `/api/admin/mock-tests/${editingTest.id}` : '/api/admin/mock-tests';
@@ -721,7 +742,7 @@ function TestsTab({ mockTests, exams, onRefresh }) {
         toast.success(editingTest ? 'Test updated!' : 'Test created!');
         setShowAddDialog(false);
         setEditingTest(null);
-        setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', testType: 'mock_test' });
+        setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', domainId: '', subjectId: '', testType: 'mock_test' });
         onRefresh();
       } else {
         toast.error(result.error);
@@ -795,7 +816,7 @@ function TestsTab({ mockTests, exams, onRefresh }) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <Input placeholder="Search..." className="pl-10 w-48" value={search} onChange={e => setSearch(e.target.value)} />
           </div>
-          <Button onClick={() => { setEditingTest(null); setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', domainId: '', testType: 'mock_test' }); setShowAddDialog(true); }} className="bg-brand-600 hover:bg-brand-700">
+          <Button onClick={() => { setEditingTest(null); setFormData({ title: '', description: '', duration: 60, isFree: true, price: 0, status: 'Active', examId: '', domainId: '', subjectId: '', testType: 'mock_test' }); setShowAddDialog(true); }} className="bg-brand-600 hover:bg-brand-700">
             <Plus className="w-4 h-4 mr-2" /> Add Test
           </Button>
         </div>
@@ -837,7 +858,7 @@ function TestsTab({ mockTests, exams, onRefresh }) {
                   </Button>
                 </TableCell>
                 <TableCell className="text-right">
-                  <Button variant="ghost" size="sm" onClick={() => { setEditingTest(test); setFormData({ title: test.title, description: test.description || '', duration: test.duration, isFree: test.isFree ?? true, price: test.price || 0, status: test.status, examId: test.examId || '', domainId: test.domainId || '', testType: test.testType || 'mock_test' }); setShowAddDialog(true); }}>
+                  <Button variant="ghost" size="sm" onClick={() => { setEditingTest(test); setFormData({ title: test.title, description: test.description || '', duration: test.duration, isFree: test.isFree ?? true, price: test.price || 0, status: test.status, examId: test.examId || '', domainId: test.domainId || '', subjectId: test.subjectId || '', testType: test.testType || 'mock_test' }); setShowAddDialog(true); }}>
                     <Edit className="w-4 h-4" />
                   </Button>
                   <Button variant="ghost" size="sm" className="text-red-500" onClick={() => handleDelete(test.id)}>
@@ -875,7 +896,7 @@ function TestsTab({ mockTests, exams, onRefresh }) {
             {formData.examId && (
               <div>
                 <Label>Domain *</Label>
-                <Select value={formData.domainId || "none"} onValueChange={v => setFormData({ ...formData, domainId: v === "none" ? "" : v })}>
+                <Select value={formData.domainId || "none"} onValueChange={v => setFormData({ ...formData, domainId: v === "none" ? "" : v, subjectId: '' })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select Domain" />
                   </SelectTrigger>
@@ -894,7 +915,7 @@ function TestsTab({ mockTests, exams, onRefresh }) {
             {formData.domainId && (
               <div>
                 <Label>Test Type *</Label>
-                <Select value={formData.testType} onValueChange={v => setFormData({ ...formData, testType: v })}>
+                <Select value={formData.testType} onValueChange={v => setFormData({ ...formData, testType: v, subjectId: '' })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select Test Type" />
                   </SelectTrigger>
@@ -907,6 +928,31 @@ function TestsTab({ mockTests, exams, onRefresh }) {
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-gray-500 mt-1">All test types have same behavior: timed, answers shown after submission</p>
+              </div>
+            )}
+            {/* Subject Selection - ONLY for Practice Questions */}
+            {formData.testType === 'practice_questions' && formData.domainId && (
+              <div>
+                <Label>Subject *</Label>
+                <Select
+                  value={formData.subjectId || 'none'}
+                  onValueChange={v => setFormData({ ...formData, subjectId: v === 'none' ? '' : v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select Subject" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">-- Select Subject --</SelectItem>
+                    {filteredSubjects.map(s => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {filteredSubjects.length === 0 && (
+                  <p className="text-xs text-amber-700 mt-1">
+                    No subjects yet for this domain. Create one in the <strong>Subjects</strong> tab first.
+                  </p>
+                )}
               </div>
             )}
             {/* Title - show after test type selected */}
@@ -4468,6 +4514,7 @@ export default function AdminPage() {
           {activeTab === 'dashboard' && <DashboardTab stats={stats} />}
           {activeTab === 'exams' && <ExamsTab exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'domains' && <DomainsTab exams={data.exams} onRefresh={fetchData} />}
+          {activeTab === 'subjects' && <SubjectsTab exams={data.exams} />}
           {activeTab === 'tests' && <TestsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'questions' && <QuestionsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'blogs' && <BlogsTab />}
@@ -4483,3 +4530,213 @@ export default function AdminPage() {
     </div>
   );
 }
+
+// ====================== SUBJECTS TAB ======================
+function SubjectsTab({ exams }) {
+  const [subjects, setSubjects] = useState([]);
+  const [domains, setDomains] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterExamId, setFilterExamId] = useState('');
+  const [filterDomainId, setFilterDomainId] = useState('');
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const emptyForm = { name: '', description: '', examId: '', domainId: '', status: 'Active' };
+  const [form, setForm] = useState(emptyForm);
+
+  const fetchAll = async () => {
+    setLoading(true);
+    try {
+      const [sRes, dRes] = await Promise.all([
+        fetch('/api/admin/subjects', { credentials: 'include' }),
+        fetch('/api/admin/domains', { credentials: 'include' })
+      ]);
+      const s = await sRes.json();
+      const d = await dRes.json();
+      if (s.success) setSubjects(s.data || []);
+      if (d.success) setDomains(d.data || []);
+    } catch (_e) { toast.error('Failed to load subjects'); }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchAll(); }, []);
+
+  const formDomains = domains.filter(d => d.examId === form.examId);
+  const filtered = subjects.filter(s => {
+    if (filterExamId && s.examId !== filterExamId) return false;
+    if (filterDomainId && s.domainId !== filterDomainId) return false;
+    return true;
+  });
+
+  const examName = (id) => exams?.find(e => e.id === id)?.name || '—';
+  const domainName = (id) => domains.find(d => d.id === id)?.name || '—';
+
+  const openCreate = () => { setEditing(null); setForm(emptyForm); setDialogOpen(true); };
+  const openEdit = (s) => {
+    setEditing(s);
+    setForm({
+      name: s.name || '', description: s.description || '',
+      examId: s.examId || '', domainId: s.domainId || '',
+      status: s.status || 'Active'
+    });
+    setDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!form.examId) { toast.error('Select an exam'); return; }
+    if (!form.domainId) { toast.error('Select a domain'); return; }
+    if (!form.name.trim()) { toast.error('Name is required'); return; }
+    setSaving(true);
+    try {
+      const url = editing ? `/api/admin/subjects/${editing.id}` : '/api/admin/subjects';
+      const method = editing ? 'PUT' : 'POST';
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(form)
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success(editing ? 'Subject updated' : 'Subject created');
+        setDialogOpen(false);
+        fetchAll();
+      } else toast.error(d.error || 'Save failed');
+    } catch (_e) { toast.error('Save failed'); }
+    setSaving(false);
+  };
+
+  const handleDelete = async (s) => {
+    if (!confirm(`Delete subject "${s.name}"? Any practice tests using it will lose their subject mapping.`)) return;
+    const res = await fetch(`/api/admin/subjects/${s.id}`, { method: 'DELETE', credentials: 'include' });
+    const d = await res.json();
+    if (d.success) { toast.success('Subject deleted'); fetchAll(); } else toast.error('Delete failed');
+  };
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Subjects</h2>
+          <p className="text-sm text-gray-500">Subjects are used by Practice Question tests. Create one per (Exam, Domain).</p>
+        </div>
+        <Button onClick={openCreate} className="bg-brand-600 hover:bg-brand-700">
+          <Plus className="w-4 h-4 mr-2" /> New Subject
+        </Button>
+      </div>
+
+      <div className="flex flex-col md:flex-row gap-3 mb-4">
+        <Select value={filterExamId || 'all'} onValueChange={v => { setFilterExamId(v === 'all' ? '' : v); setFilterDomainId(''); }}>
+          <SelectTrigger className="w-full md:w-64"><SelectValue placeholder="Filter by exam" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Exams</SelectItem>
+            {exams?.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={filterDomainId || 'all'} onValueChange={v => setFilterDomainId(v === 'all' ? '' : v)}>
+          <SelectTrigger className="w-full md:w-64"><SelectValue placeholder="Filter by domain" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Domains</SelectItem>
+            {domains.filter(d => !filterExamId || d.examId === filterExamId).map(d =>
+              <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-12 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
+          ) : filtered.length === 0 ? (
+            <div className="p-12 text-center">
+              <BookOpen className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500">No subjects yet. Click &quot;New Subject&quot; to create one.</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Subject</TableHead>
+                  <TableHead>Exam</TableHead>
+                  <TableHead>Domain</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map(s => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">{s.name}</TableCell>
+                    <TableCell>{examName(s.examId)}</TableCell>
+                    <TableCell>{domainName(s.domainId)}</TableCell>
+                    <TableCell>
+                      <Badge className={s.status === 'Active' ? 'bg-green-500' : 'bg-gray-500'}>{s.status || 'Active'}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="sm" onClick={() => openEdit(s)}><Edit className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleDelete(s)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={(o) => { if (!saving) setDialogOpen(o); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader><DialogTitle>{editing ? 'Edit Subject' : 'Create Subject'}</DialogTitle></DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <Label>Exam *</Label>
+              <Select value={form.examId} onValueChange={v => setForm(p => ({ ...p, examId: v, domainId: '' }))}>
+                <SelectTrigger><SelectValue placeholder="Select exam" /></SelectTrigger>
+                <SelectContent>
+                  {exams?.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            {form.examId && (
+              <div>
+                <Label>Domain *</Label>
+                <Select value={form.domainId} onValueChange={v => setForm(p => ({ ...p, domainId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select domain" /></SelectTrigger>
+                  <SelectContent>
+                    {formDomains.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div>
+              <Label>Name *</Label>
+              <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Algebra, Quantitative Aptitude" />
+            </div>
+            <div>
+              <Label>Description</Label>
+              <Textarea rows={3} value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} />
+            </div>
+            <div>
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={v => setForm(p => ({ ...p, status: v }))}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Active">Active</SelectItem>
+                  <SelectItem value="Inactive">Inactive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>
+            <Button className="bg-brand-600 hover:bg-brand-700" onClick={handleSave} disabled={saving}>
+              {saving ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : <><Save className="w-4 h-4 mr-2" /> {editing ? 'Update' : 'Create'}</>}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+

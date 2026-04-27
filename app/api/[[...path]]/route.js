@@ -1098,6 +1098,118 @@ export async function GET(request) {
       });
     }
 
+    // ======= PUBLIC PRACTICE QUESTIONS ROUTES =======
+    if (path === '/subjects') {
+      const examId = searchParams.get('examId');
+      const domainId = searchParams.get('domainId');
+      const subjects = await getCollection('subjects');
+      const mockTests = await getCollection('mock_tests');
+      const questions = await getCollection('questions');
+      const query = { status: { $ne: 'Inactive' } };
+      if (examId) query.examId = examId;
+      if (domainId) query.domainId = domainId;
+      const all = await subjects.find(query).sort({ name: 1 }).toArray();
+      const enriched = await Promise.all(all.map(async (s) => {
+        const tests = await mockTests.find({
+          subjectId: s.id,
+          testType: 'practice_questions',
+          isPublished: true,
+          status: 'Active'
+        }).toArray();
+        let testCount = 0;
+        for (const t of tests) {
+          const qc = await questions.countDocuments({
+            $and: [
+              { $or: [{ mockTestId: t.id }, { test_id: t.id }] },
+              { $or: [{ status: 'Active' }, { status: 'active' }, { status: { $exists: false } }] }
+            ]
+          });
+          if (qc > 0) testCount += 1;
+        }
+        return { ...s, testCount };
+      }));
+      return jsonResponse({ success: true, data: enriched });
+    }
+
+    if (path === '/practice-tests') {
+      const subjectId = searchParams.get('subjectId');
+      if (!subjectId) {
+        return jsonResponse({ success: false, error: 'subjectId is required' }, 400);
+      }
+      const mockTests = await getCollection('mock_tests');
+      const questions = await getCollection('questions');
+      const tests = await mockTests.find({
+        subjectId,
+        testType: 'practice_questions',
+        isPublished: true,
+        status: 'Active'
+      }).sort({ createdAt: -1 }).toArray();
+      const withCount = await Promise.all(tests.map(async (t) => {
+        const qc = await questions.countDocuments({
+          $and: [
+            { $or: [{ mockTestId: t.id }, { test_id: t.id }] },
+            { $or: [{ status: 'Active' }, { status: 'active' }, { status: { $exists: false } }] }
+          ]
+        });
+        return { ...t, questionCount: qc };
+      }));
+      return jsonResponse({ success: true, data: withCount.filter(t => t.questionCount > 0) });
+    }
+
+    if (path.startsWith('/practice-test-questions/')) {
+      const testId = path.split('/practice-test-questions/')[1];
+      const mockTests = await getCollection('mock_tests');
+      const test = await mockTests.findOne({ id: testId });
+      if (!test) return jsonResponse({ success: false, error: 'Test not found' }, 404);
+      if (test.testType && test.testType !== 'practice_questions') {
+        return jsonResponse({ success: false, error: 'This endpoint is for Practice Question tests only' }, 400);
+      }
+      const questions = await getCollection('questions');
+      const testQuestions = await questions.find({
+        $and: [
+          { $or: [{ mockTestId: testId }, { test_id: testId }] },
+          { $or: [{ status: 'Active' }, { status: 'active' }, { status: { $exists: false } }] }
+        ]
+      }).sort({ question_number: 1, questionNumber: 1 }).toArray();
+
+      const out = testQuestions.map((q) => {
+        let options;
+        if (q.options && Array.isArray(q.options)) {
+          options = q.options.map(opt => opt?.title || opt?.text || opt || '');
+        } else {
+          options = [q.option1_title, q.option2_title, q.option3_title, q.option4_title];
+        }
+        let optionImages = [null, null, null, null];
+        if (q.options && Array.isArray(q.options)) {
+          optionImages = q.options.map(opt => opt?.image_url || opt?.imageUrl || null);
+        }
+        const questionText = q.question_text || q.question_title || q.questionText || '';
+        const questionImage = q.question_image_url || q.questionImageUrl || null;
+        let correct = q.correctOption ?? q.correct_answer ?? q.correctAnswer ?? q.correct_option_number ?? '';
+        correct = String(correct).trim();
+        if (/^[1-8]$/.test(correct)) correct = String.fromCharCode(64 + parseInt(correct, 10));
+        if (/^[a-h]$/.test(correct)) correct = correct.toUpperCase();
+        return {
+          id: q.id,
+          questionNumber: q.question_number || q.questionNumber,
+          questionText,
+          question_image_url: questionImage,
+          options,
+          optionImages,
+          correctOption: correct,
+          solution: q.solution || q.solution_text || '',
+          solution_image_url: q.solution_image_url || null,
+          topic: q.topic || q.topic_title || '',
+          marks: q.marks ?? 2
+        };
+      });
+
+      const res = NextResponse.json({ success: true, data: { test, questions: out } });
+      res.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      return res;
+    }
+
+
     // ======= ADMIN ROUTES =======
     if (path.startsWith('/admin')) {
       const user = await getAuthUser(request);
@@ -1148,6 +1260,18 @@ export async function GET(request) {
         const query = examId ? { examId } : {};
         const domains = await domainsCollection.find(query).sort({ createdAt: 1 }).toArray();
         return jsonResponse({ success: true, data: domains });
+      }
+
+      // Admin - Get all subjects (optionally filter by exam/domain)
+      if (path === '/admin/subjects') {
+        const examId = searchParams.get('examId');
+        const domainId = searchParams.get('domainId');
+        const subjects = await getCollection('subjects');
+        const query = {};
+        if (examId) query.examId = examId;
+        if (domainId) query.domainId = domainId;
+        const all = await subjects.find(query).sort({ createdAt: 1 }).toArray();
+        return jsonResponse({ success: true, data: all });
       }
 
       // Admin - Get all blog posts
@@ -3198,6 +3322,7 @@ export async function POST(request) {
           description: body.description || '',
           examId: body.examId || null,
           domainId: body.domainId || null,
+          subjectId: body.subjectId || null,
           testType: body.testType || 'mock_test', // mock_test, practice_questions, previous_year
           duration: parseInt(body.duration) || 60,
           totalQuestions: 0,
@@ -3597,6 +3722,41 @@ export async function POST(request) {
         };
         await domainsCollection.insertOne(domainData);
         return jsonResponse({ success: true, data: domainData });
+      }
+
+      // Create Subject (managed entity for Practice Questions test type)
+      if (path === '/admin/subjects') {
+        const { examId, domainId, name, description } = body;
+        if (!examId || !domainId || !name) {
+          return jsonResponse({ success: false, error: 'examId, domainId and name are required' }, 400);
+        }
+        const subjects = await getCollection('subjects');
+        const subjectData = {
+          id: uuidv4(),
+          examId,
+          domainId,
+          name,
+          description: description || '',
+          status: 'Active',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+        await subjects.insertOne(subjectData);
+        return jsonResponse({ success: true, data: subjectData });
+      }
+
+      // Update Subject
+      if (path.startsWith('/admin/subjects/')) {
+        const subjectId = path.split('/admin/subjects/')[1];
+        const subjects = await getCollection('subjects');
+        const updateData = { updatedAt: new Date() };
+        ['name', 'description', 'status', 'examId', 'domainId'].forEach(k => {
+          if (body[k] !== undefined) updateData[k] = body[k];
+        });
+        const r = await subjects.updateOne({ id: subjectId }, { $set: updateData });
+        if (r.matchedCount === 0) return jsonResponse({ success: false, error: 'Subject not found' }, 404);
+        const updated = await subjects.findOne({ id: subjectId });
+        return jsonResponse({ success: true, data: updated });
       }
 
       // Update Domain
@@ -4032,6 +4192,17 @@ export async function DELETE(request) {
       return jsonResponse({ success: true, message: 'Question deleted' });
     }
 
+    // Delete Subject (also unset subjectId on any test referencing it)
+    if (path.startsWith('/admin/subjects/')) {
+      const subjectId = path.split('/admin/subjects/')[1];
+      const subjects = await getCollection('subjects');
+      const mockTests = await getCollection('mock_tests');
+      await mockTests.updateMany({ subjectId }, { $unset: { subjectId: '' } });
+      await subjects.deleteOne({ id: subjectId });
+      return jsonResponse({ success: true, message: 'Subject deleted' });
+    }
+
+
     // Delete Exam
     if (path.startsWith('/admin/exams/')) {
       const examId = path.split('/admin/exams/')[1];
@@ -4043,8 +4214,7 @@ export async function DELETE(request) {
     // Delete Domain (also reassign tests to General or delete them)
     if (path.startsWith('/admin/domains/')) {
       const domainId = path.split('/admin/domains/')[1];
-      const domainsCollection = await getCollection('domains');
-      const mockTests = await getCollection('mock_tests');
+      const domainsCollection = await getCollection('domains');      const mockTests = await getCollection('mock_tests');
       
       // Move tests to no domain or delete them
       await mockTests.updateMany(

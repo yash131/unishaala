@@ -192,10 +192,10 @@ Get closer to your selection with each attempt.`}</p>
 // Features Section
 function FeaturesSection() {
   const features = [
-    { icon: <FileText className="w-8 h-8" />, title: 'Mock Tests', desc: 'Experience real exam pressure with full-length mock tests.\nAnalyze your performance and improve with detailed solutions and rankings.', color: 'bg-blue-100 text-blue-600' },
-    { icon: <BookOpen className="w-8 h-8" />, title: 'Practice Questions', desc: 'Sharpen your concepts with topic-wise practice questions.\nBuild accuracy and confidence with instant performance insights.', color: 'bg-green-100 text-green-600' },
-    { icon: <Target className="w-8 h-8" />, title: 'Previous Year Questions with Solutions', desc: 'Understand exam patterns with authentic previous year questions.\nPractice what actually matters and boost your chances of success.', color: 'bg-purple-100 text-purple-600' },
-    { icon: <Trophy className="w-8 h-8" />, title: 'Access Premium Notes', desc: 'Concept-focused, exam-oriented notes curated from top educators and toppers.\nSave time and study smart with clear, concise, and high-quality content.', color: 'bg-orange-100 text-orange-600' }
+    { icon: <FileText className="w-8 h-8" />, title: 'Mock Tests', desc: 'Experience real exam pressure with full-length mock tests.\nAnalyze your performance and improve with detailed solutions and rankings.', color: 'bg-blue-100 text-blue-600', href: '/exams' },
+    { icon: <BookOpen className="w-8 h-8" />, title: 'Practice Questions', desc: 'Sharpen your concepts with topic-wise practice questions.\nBuild accuracy and confidence with instant performance insights.', color: 'bg-green-100 text-green-600', href: '/practice' },
+    { icon: <Target className="w-8 h-8" />, title: 'Previous Year Questions with Solutions', desc: 'Understand exam patterns with authentic previous year questions.\nPractice what actually matters and boost your chances of success.', color: 'bg-purple-100 text-purple-600', href: '/exams' },
+    { icon: <Trophy className="w-8 h-8" />, title: 'Access Premium Notes', desc: 'Concept-focused, exam-oriented notes curated from top educators and toppers.\nSave time and study smart with clear, concise, and high-quality content.', color: 'bg-orange-100 text-orange-600', href: '/blogs' }
   ];
 
   return (
@@ -208,15 +208,17 @@ function FeaturesSection() {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {features.map((feature, index) => (
-            <Card key={index} className="card-hover border-none shadow-md">
-              <CardContent className="p-6 text-center">
-                <div className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 ${feature.color}`}>
-                  {feature.icon}
-                </div>
-                <h3 className="font-bold text-gray-900 mb-2">{feature.title}</h3>
-                <p className="text-sm text-gray-600 whitespace-pre-line">{feature.desc}</p>
-              </CardContent>
-            </Card>
+            <Link key={index} href={feature.href} className="block">
+              <Card className="card-hover border-none shadow-md h-full hover:ring-2 hover:ring-brand-200 transition">
+                <CardContent className="p-6 text-center">
+                  <div className={`w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4 ${feature.color}`}>
+                    {feature.icon}
+                  </div>
+                  <h3 className="font-bold text-gray-900 mb-2">{feature.title}</h3>
+                  <p className="text-sm text-gray-600 whitespace-pre-line">{feature.desc}</p>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       </div>
