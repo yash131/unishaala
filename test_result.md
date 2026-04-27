@@ -655,6 +655,24 @@ agent_communication:
 
 
 backend:
+  - task: "Job PDF Upload + Permission Control"
+    implemented: true
+    working: "NA"
+    file: "/app/app/api/admin/jobs/[id]/upload-pdf/route.js, /app/lib/pdfStream.js, /app/app/api/pdfs/[id]/full/route.js, /app/app/api/pdfs/[id]/preview/route.js, /app/app/api/pdfs/[id]/download/route.js, /app/app/api/[[...path]]/route.js (PUT /admin/jobs and DELETE /admin/jobs handlers), /app/app/admin/page.js (JobsTab)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "NEW FEATURE: Mirrors the existing Blog PDF Management for the Jobs collection. (1) New route POST/DELETE /api/admin/jobs/:id/upload-pdf — admin-only, multipart upload, max 25 MB, generates a 1-page preview via pdf-lib (extractFirstPage), stores both full and preview blobs in GridFS bucket 'pdfs', persists pdfFileId/pdfPreviewFileId/pdfFileName/pdfSize/pdfPageCount/pdfPermission/pdfUploadedAt on the job document; DELETE removes both GridFS files and unsets the metadata. (2) /lib/pdfStream.js refactored — added findOwnerForFile that searches blogs first, then jobs, returning {doc, kind}. The legacy findBlogForFile is kept as an alias. (3) /api/pdfs/:id/full, /preview, /download rewritten to use findOwnerForFile so the same routes transparently serve job PDFs. The phoneVerified gate was REMOVED from full and download since site-wide phone verification was disabled in a prior task; full now requires only login, download additionally requires owner.pdfPermission==='view_download'. (4) PUT /api/admin/jobs/:id now accepts and validates pdfPermission ∈ {view, view_download}; invalid values are silently dropped to avoid storing junk. (5) DELETE /api/admin/jobs/:id now cleans up both GridFS files attached to the job before deleting the job document. (6) Admin UI JobsTab updated with the same PDF upload UX as BlogsTab — file input on the dialog (only after the job is saved), upload/replace/remove controls, Permission select (View Only / View + Download) with immediate persistence on existing jobs, and a new 'PDF' column in the jobs table showing a badge (View / View+DL) when a PDF is attached. NEEDS BACKEND TESTING: (a) anonymous POST /api/admin/jobs/:id/upload-pdf → 401; (b) admin upload with a real PDF → 200, response has pdfFileId+pdfPreviewFileId+pdfFileName+pdfPageCount+pdfSize+pdfPermission='view'; (c) admin upload non-PDF → 400; (d) admin upload >25MB → 400; (e) GET /api/pdfs/:pdfPreviewFileId/preview public → 200; (f) GET /api/pdfs/:pdfFileId/full anonymous → 401, with cookie → 200; (g) GET /api/pdfs/:pdfFileId/download with permission='view' → 403 DOWNLOAD_FORBIDDEN, after PUT pdfPermission='view_download' → 200 with attachment Content-Disposition; (h) replacing an existing job PDF removes the old GridFS files (cannot stream them by id afterwards); (i) DELETE /api/admin/jobs/:id/upload-pdf clears all pdf* fields on the job and removes both GridFS files; (j) DELETE /api/admin/jobs/:id removes both GridFS files and the job; (k) Blog PDF flow still works (regression — blog upload + preview + full + download). Use admin@unishaala.com / Shivani@1234."
+
+agent_communication:
+  - agent: "main"
+    message: "JOB PDF UPLOAD shipped (mirror of Blog PDF Management). Same /api/pdfs/:id/(preview|full|download) routes now serve both blogs and jobs via the new findOwnerForFile lookup. Phone-verification gate was already removed in the prior task, so the full/download endpoints now only require auth (download additionally requires pdfPermission==='view_download'). Please backend-test the new task entry above, including a regression check that blog PDFs still work."
+
+
+backend:
   - task: "Auth: remove phone-verification gating, make signup phone optional, auto-login on signup"
     implemented: true
     working: true

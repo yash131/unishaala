@@ -2946,10 +2946,11 @@ function JobsTab() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
   const emptyForm = {
     title: '', organization: '', location: '', category: '',
     vacancies: '', salary: '', qualification: '', description: '',
-    applyLink: '', lastDate: '', status: 'Active'
+    applyLink: '', lastDate: '', status: 'Active', pdfPermission: 'view'
   };
   const [form, setForm] = useState(emptyForm);
 
@@ -2973,7 +2974,8 @@ function JobsTab() {
       salary: j.salary || '', qualification: j.qualification || '',
       description: j.description || '', applyLink: j.applyLink || '',
       lastDate: j.lastDate ? String(j.lastDate).slice(0, 10) : '',
-      status: j.status || 'Active'
+      status: j.status || 'Active',
+      pdfPermission: j.pdfPermission || 'view'
     });
     setDialogOpen(true);
   };
@@ -2983,7 +2985,11 @@ function JobsTab() {
     if (!form.organization.trim()) { toast.error('Organization is required'); return; }
     setSaving(true);
     try {
-      const payload = { ...form, vacancies: form.vacancies === '' ? 0 : parseInt(form.vacancies) };
+      const payload = {
+        ...form,
+        vacancies: form.vacancies === '' ? 0 : parseInt(form.vacancies),
+        pdfPermission: form.pdfPermission || 'view'
+      };
       const url = editing ? `/api/admin/jobs/${editing.id}` : '/api/admin/jobs';
       const method = editing ? 'PUT' : 'POST';
       const res = await fetch(url, {
@@ -2991,8 +2997,16 @@ function JobsTab() {
         credentials: 'include', body: JSON.stringify(payload)
       });
       const d = await res.json();
-      if (d.success) { toast.success(editing ? 'Job updated' : 'Job created'); setDialogOpen(false); fetchJobs(); }
-      else toast.error(d.error || 'Save failed');
+      if (d.success) {
+        toast.success(editing ? 'Job updated' : 'Job created');
+        // Keep dialog open after CREATE so admin can attach a PDF immediately.
+        if (!editing) {
+          setEditing(d.data);
+        } else {
+          setEditing(d.data);
+        }
+        fetchJobs();
+      } else toast.error(d.error || 'Save failed');
     } catch (e) { toast.error('Save failed'); }
     setSaving(false);
   };
@@ -3002,6 +3016,95 @@ function JobsTab() {
     const res = await fetch(`/api/admin/jobs/${j.id}`, { method: 'DELETE', credentials: 'include' });
     const d = await res.json();
     if (d.success) { toast.success('Job deleted'); fetchJobs(); } else toast.error('Delete failed');
+  };
+
+  // ---- PDF Handlers ----
+  const handlePdfUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!editing?.id) {
+      toast.error('Save the job first, then attach a PDF.');
+      e.target.value = '';
+      return;
+    }
+    if (!/pdf/i.test(file.type) && !/\.pdf$/i.test(file.name || '')) {
+      toast.error('Please select a PDF file');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('PDF too large (max 25 MB)');
+      e.target.value = '';
+      return;
+    }
+    setUploadingPdf(true);
+    try {
+      const fd = new FormData();
+      fd.append('pdf', file);
+      fd.append('permission', form.pdfPermission || 'view');
+
+      const res = await fetch(`/api/admin/jobs/${editing.id}/upload-pdf`, {
+        method: 'POST',
+        credentials: 'include',
+        body: fd
+      });
+      const d = await res.json();
+      if (d.success) {
+        setEditing(d.data);
+        setForm((p) => ({ ...p, pdfPermission: d.data.pdfPermission || 'view' }));
+        toast.success('PDF uploaded successfully');
+        fetchJobs();
+      } else {
+        toast.error(d.error || 'PDF upload failed');
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('PDF upload failed');
+    }
+    setUploadingPdf(false);
+    e.target.value = '';
+  };
+
+  const handlePdfRemove = async () => {
+    if (!editing?.id) return;
+    if (!confirm('Remove the attached PDF? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/admin/jobs/${editing.id}/upload-pdf`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      const d = await res.json();
+      if (d.success) {
+        setEditing(d.data);
+        toast.success('PDF removed');
+        fetchJobs();
+      } else {
+        toast.error(d.error || 'Failed to remove PDF');
+      }
+    } catch (e) {
+      toast.error('Failed to remove PDF');
+    }
+  };
+
+  const handlePermissionChange = async (newValue) => {
+    setForm((p) => ({ ...p, pdfPermission: newValue }));
+    // Persist immediately if editing an existing job with a PDF
+    if (editing?.id && editing?.pdfFileId) {
+      try {
+        const res = await fetch(`/api/admin/jobs/${editing.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ pdfPermission: newValue })
+        });
+        const d = await res.json();
+        if (d.success) {
+          setEditing(d.data);
+          toast.success('PDF permission updated');
+          fetchJobs();
+        }
+      } catch (e) { /* ignore */ }
+    }
   };
 
   const filtered = jobs.filter(j => {
@@ -3054,6 +3157,7 @@ function JobsTab() {
                   <TableHead>Organization</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead>Vacancies</TableHead>
+                  <TableHead>PDF</TableHead>
                   <TableHead>Last Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -3066,6 +3170,16 @@ function JobsTab() {
                     <TableCell>{j.organization}</TableCell>
                     <TableCell className="text-sm text-gray-600">{j.location || '—'}</TableCell>
                     <TableCell>{j.vacancies ?? '—'}</TableCell>
+                    <TableCell>
+                      {j.pdfFileId ? (
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <FileDown className="w-3 h-3" />
+                          {j.pdfPermission === 'view_download' ? 'View+DL' : 'View'}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-sm text-gray-600">{j.lastDate ? String(j.lastDate).slice(0, 10) : '—'}</TableCell>
                     <TableCell>
                       <Badge className={j.status === 'Active' ? 'bg-green-500' : 'bg-gray-500'}>{j.status || 'Active'}</Badge>
@@ -3114,6 +3228,124 @@ function JobsTab() {
                 </Select>
               </div>
             </div>
+
+            {/* ===== PDF ATTACHMENT ===== */}
+            <div className="border rounded-lg p-4 bg-gradient-to-br from-slate-50 to-white">
+              <div className="flex items-center justify-between gap-4 mb-3">
+                <div>
+                  <Label className="flex items-center gap-2 text-base">
+                    <FileDown className="w-4 h-4 text-brand-600" />
+                    PDF Attachment
+                  </Label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Optionally attach a PDF (job notification, syllabus, etc.). Logged-in users can view.
+                    Choose whether they can also download it.
+                  </p>
+                </div>
+              </div>
+
+              {!editing?.id ? (
+                <div className="text-sm text-gray-500 bg-amber-50 border border-amber-200 rounded p-3">
+                  Save the job first — then you can attach a PDF from this dialog.
+                </div>
+              ) : editing?.pdfFileId ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3 p-3 bg-white border rounded-lg">
+                    <div className="w-10 h-10 rounded bg-red-100 text-red-600 flex items-center justify-center">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900 truncate">
+                        {editing.pdfFileName || 'document.pdf'}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {editing.pdfPageCount || 0} page{(editing.pdfPageCount || 0) === 1 ? '' : 's'}
+                        {editing.pdfSize ? ` • ${(editing.pdfSize / 1024 / 1024).toFixed(2)} MB` : ''}
+                      </div>
+                    </div>
+                    <a
+                      href={`/api/pdfs/${editing.pdfPreviewFileId}/preview`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-brand-600 hover:underline flex items-center gap-1"
+                    >
+                      <Eye className="w-3.5 h-3.5" /> Preview
+                    </a>
+                    <label className="cursor-pointer">
+                      <span className="inline-flex items-center gap-1 text-xs px-2 py-1 border rounded hover:bg-gray-50">
+                        {uploadingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                        Replace
+                      </span>
+                      <input
+                        type="file"
+                        accept="application/pdf,.pdf"
+                        className="hidden"
+                        onChange={handlePdfUpload}
+                        disabled={uploadingPdf}
+                      />
+                    </label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={handlePdfRemove}
+                      className="text-red-500 hover:text-red-600 hover:bg-red-50"
+                      disabled={uploadingPdf}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <label className="cursor-pointer flex items-center justify-center gap-2 px-4 py-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-brand-400 hover:bg-brand-50/40 transition-colors">
+                  {uploadingPdf ? (
+                    <><Loader2 className="w-5 h-5 animate-spin text-brand-600" /><span className="text-sm text-gray-600">Uploading & generating preview…</span></>
+                  ) : (
+                    <><Upload className="w-5 h-5 text-brand-600" /><span className="text-sm text-gray-700">Click to upload a PDF (max 25 MB)</span></>
+                  )}
+                  <input
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    className="hidden"
+                    onChange={handlePdfUpload}
+                    disabled={uploadingPdf}
+                  />
+                </label>
+              )}
+
+              {/* Permission control */}
+              {editing?.id && (
+                <div className="mt-4 grid md:grid-cols-2 gap-3 items-end">
+                  <div>
+                    <Label className="flex items-center gap-2">
+                      {form.pdfPermission === 'view_download' ? (
+                        <Unlock className="w-4 h-4 text-green-600" />
+                      ) : (
+                        <Lock className="w-4 h-4 text-amber-600" />
+                      )}
+                      Access Permission
+                    </Label>
+                    <Select
+                      value={form.pdfPermission || 'view'}
+                      onValueChange={handlePermissionChange}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="view">View Only (no download)</SelectItem>
+                        <SelectItem value="view_download">View + Download</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-gray-500 pb-2">
+                    Applies whenever a logged-in user opens the job. You can change this at any time.
+                  </p>
+                </div>
+              )}
+            </div>
+            {/* ===== END PDF ATTACHMENT ===== */}
+
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={saving}>Cancel</Button>

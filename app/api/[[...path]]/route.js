@@ -3821,6 +3821,14 @@ export async function PUT(request) {
         const jobs = await getCollection('jobs');
         const updateData = { ...body, updatedAt: new Date() };
         if (body.vacancies !== undefined) updateData.vacancies = parseInt(body.vacancies) || 0;
+        // Validate pdfPermission if provided; otherwise drop to avoid storing junk.
+        if (body.pdfPermission !== undefined) {
+          if (body.pdfPermission === 'view' || body.pdfPermission === 'view_download') {
+            updateData.pdfPermission = body.pdfPermission;
+          } else {
+            delete updateData.pdfPermission;
+          }
+        }
         await jobs.updateOne(
           { id: jobId },
           { $set: updateData }
@@ -4048,10 +4056,22 @@ export async function DELETE(request) {
       return jsonResponse({ success: true, message: 'Domain deleted' });
     }
 
-    // Delete Job
+    // Delete Job (also remove any attached PDF from GridFS)
     if (path.startsWith('/admin/jobs/')) {
       const jobId = path.split('/admin/jobs/')[1];
       const jobs = await getCollection('jobs');
+      const job = await jobs.findOne({ id: jobId });
+      if (job && (job.pdfFileId || job.pdfPreviewFileId)) {
+        try {
+          const { ObjectId } = require('mongodb');
+          const { getPdfBucket } = require('@/lib/db');
+          const bucket = await getPdfBucket('pdfs');
+          for (const fid of [job.pdfFileId, job.pdfPreviewFileId]) {
+            if (!fid) continue;
+            try { await bucket.delete(new ObjectId(fid)); } catch (_e) {}
+          }
+        } catch (_e) {}
+      }
       await jobs.deleteOne({ id: jobId });
       return jsonResponse({ success: true, message: 'Job deleted' });
     }

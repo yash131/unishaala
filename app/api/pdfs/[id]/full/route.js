@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { findBlogForFile, streamGridFSFile, getAuthUser } from '@/lib/pdfStream';
+import { findOwnerForFile, streamGridFSFile, getAuthUser } from '@/lib/pdfStream';
 
 export const dynamic = 'force-dynamic';
 
-// Protected — full PDF. Requires logged-in user AND phoneVerified.
+// Protected — full PDF (blogs and jobs). Requires logged-in user.
 export async function GET(request, { params }) {
   const { id } = params;
   if (!id) return NextResponse.json({ success: false, error: 'Missing id' }, { status: 400 });
@@ -15,21 +15,15 @@ export async function GET(request, { params }) {
       { status: 401 }
     );
   }
-  if (!user.phoneVerified) {
-    return NextResponse.json(
-      { success: false, error: 'Phone verification required', code: 'PHONE_VERIFY_REQUIRED' },
-      { status: 403 }
-    );
-  }
 
-  const blog = await findBlogForFile(id);
-  if (!blog) return NextResponse.json({ success: false, error: 'PDF not found' }, { status: 404 });
+  const found = await findOwnerForFile(id);
+  if (!found) return NextResponse.json({ success: false, error: 'PDF not found' }, { status: 404 });
 
   // Only serve the full file through this route (not preview)
-  if (blog.pdfFileId !== id) {
+  if (found.doc.pdfFileId !== id) {
     return NextResponse.json({ success: false, error: 'Full PDF not available' }, { status: 403 });
   }
 
-  const filename = blog.pdfFileName || 'document.pdf';
+  const filename = found.doc.pdfFileName || 'document.pdf';
   return streamGridFSFile(id, 'inline', filename);
 }
