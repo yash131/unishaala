@@ -93,7 +93,7 @@ export default function NotesPage() {
       {/* Top nav */}
       <nav className="bg-white shadow-sm sticky top-0 z-30 border-b">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
-          <Link href="/"><Logo /></Link>
+          <Logo />
           <Link href="/" className="text-sm text-gray-600 hover:text-brand-600 flex items-center gap-1">
             <ArrowLeft className="w-4 h-4" /> Home
           </Link>

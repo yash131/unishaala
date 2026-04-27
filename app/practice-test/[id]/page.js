@@ -104,7 +104,7 @@ export default function PracticeTestPage() {
       <nav className="bg-white shadow-sm sticky top-0 z-30 border-b">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
-            <Link href="/practice"><Logo /></Link>
+            <Logo />
             <span className="text-gray-300 hidden md:inline">|</span>
             <h1 className="font-bold text-gray-900 truncate hidden md:block">{test.title}</h1>
           </div>
