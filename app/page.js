@@ -213,10 +213,10 @@ Get closer to your selection with each attempt.`}</p>
 // Features Section
 function FeaturesSection() {
   const features = [
-    { icon: <FileText className="w-8 h-8" />, title: 'Mock Tests', desc: 'Experience real exam pressure with full-length mock tests.\nAnalyze your performance and improve with detailed solutions and rankings.', color: 'bg-blue-100 text-blue-600', href: '/exams' },
-    { icon: <BookOpen className="w-8 h-8" />, title: 'Practice Questions', desc: 'Sharpen your concepts with topic-wise practice questions.\nBuild accuracy and confidence with instant performance insights.', color: 'bg-green-100 text-green-600', href: '/practice' },
-    { icon: <Target className="w-8 h-8" />, title: 'Previous Year Questions with Solutions', desc: 'Understand exam patterns with authentic previous year questions.\nPractice what actually matters and boost your chances of success.', color: 'bg-purple-100 text-purple-600', href: '/previous-year' },
-    { icon: <Trophy className="w-8 h-8" />, title: 'Access Premium Notes', desc: 'Concept-focused, exam-oriented notes curated from top educators and toppers.\nSave time and study smart with clear, concise, and high-quality content.', color: 'bg-orange-100 text-orange-600', href: '/notes' }
+    { icon: <FileText className="w-8 h-8" />, title: 'Mock Tests', desc: 'Experience real exam pressure with full-length mock tests.', color: 'bg-blue-100 text-blue-600', href: '/exams' },
+    { icon: <BookOpen className="w-8 h-8" />, title: 'Practice Questions', desc: 'Sharpen your concepts with topic-wise practice questions.', color: 'bg-green-100 text-green-600', href: '/practice' },
+    { icon: <Target className="w-8 h-8" />, title: 'Previous Year Questions with Solutions', desc: 'Understand exam patterns with authentic previous year questions.', color: 'bg-purple-100 text-purple-600', href: '/previous-year' },
+    { icon: <Trophy className="w-8 h-8" />, title: 'Access Premium Notes', desc: 'Concept-focused, exam-oriented notes curated from top educators and toppers.', color: 'bg-orange-100 text-orange-600', href: '/notes' }
   ];
 
   return (
