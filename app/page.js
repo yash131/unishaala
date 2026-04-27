@@ -151,8 +151,10 @@ function PopularExams({ exams }) {
     <section className="py-16 bg-gray-50">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900">Popular Exams</h2>
-          <p className="text-gray-600 mt-2">Choose from 50+ competitive exams</p>
+          <h2 className="text-3xl font-bold text-gray-900">Popular Test Series</h2>
+          <p className="text-gray-600 mt-2 whitespace-pre-line">{`Practice with exam-level questions designed by experts.
+Analyze your performance, identify weak areas, and improve with every test.
+Get closer to your selection with each attempt.`}</p>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-4 gap-6">
