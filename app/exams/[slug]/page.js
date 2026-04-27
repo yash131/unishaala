@@ -443,39 +443,24 @@ export default function ExamDetailPage() {
       <Dialog open={showUnlockModal} onOpenChange={setShowUnlockModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-2xl">Unlock Test</DialogTitle>
-            <DialogDescription>Choose how you want to access this test</DialogDescription>
+            <DialogTitle className="text-2xl">Unlock Access</DialogTitle>
+            <DialogDescription>Choose how you want to access this test. Individual tests are not sold separately.</DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
             {selectedTest && (
               <>
-                {/* Individual Test Purchase */}
-                <div className="border-2 border-brand-500 rounded-lg p-4 bg-brand-50">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-gray-900">This Test Only</h4>
-                    <span className="text-xl font-bold text-brand-600">₹{selectedTest.price || 0}</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mb-3">{selectedTest.title}</p>
-                  <Button 
-                    className="w-full bg-brand-600 hover:bg-brand-700"
-                    onClick={() => handlePayment('test')}
-                  >
-                    Pay ₹{selectedTest.price || 0} for Test
-                  </Button>
-                </div>
-
                 {/* Domain Purchase Option */}
                 {selectedDomain?.price > 0 && !purchasedDomains.has(selectedDomain.id) && (
                   <div className="border-2 border-blue-400 rounded-lg p-4 bg-blue-50">
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <h4 className="font-semibold text-gray-900">Full Domain Access</h4>
-                        <Badge className="bg-blue-200 text-blue-800 text-xs">Recommended</Badge>
+                        <Badge className="bg-blue-200 text-blue-800 text-xs">Popular</Badge>
                       </div>
                       <span className="text-xl font-bold text-blue-600">₹{selectedDomain.price}</span>
                     </div>
-                    <p className="text-sm text-gray-600 mb-3">{selectedDomain.name} - All Tests</p>
-                    <Button 
+                    <p className="text-sm text-gray-600 mb-3">{selectedDomain.name} — unlocks every test in this domain.</p>
+                    <Button
                       className="w-full bg-blue-500 hover:bg-blue-600"
                       onClick={() => handlePayment('domain')}
                     >
@@ -494,8 +479,8 @@ export default function ExamDetailPage() {
                       </div>
                       <span className="text-xl font-bold text-amber-600">₹{exam.price}</span>
                     </div>
-                    <p className="text-sm text-gray-600 mb-3">{exam.name} - All Domains & Tests</p>
-                    <Button 
+                    <p className="text-sm text-gray-600 mb-3">{exam.name} — unlocks all domains & tests of this exam.</p>
+                    <Button
                       className="w-full bg-amber-500 hover:bg-amber-600"
                       onClick={() => handlePayment('exam')}
                     >
@@ -503,6 +488,19 @@ export default function ExamDetailPage() {
                     </Button>
                   </div>
                 )}
+
+                {/* Get Pass Upsell */}
+                <Link href="/get-pass" className="block">
+                  <div className="border-2 border-dashed border-brand-400 rounded-lg p-4 bg-gradient-to-r from-amber-50 via-white to-brand-50 hover:shadow-md transition">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold text-gray-900">Get Pass — All Access</h4>
+                        <p className="text-xs text-gray-600">One pass unlocks every Test Series, Domain and PYQ on Unishaala.</p>
+                      </div>
+                      <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white">View</Badge>
+                    </div>
+                  </div>
+                </Link>
               </>
             )}
           </div>

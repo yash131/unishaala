@@ -60,14 +60,36 @@ export async function POST(request) {
       }
     );
 
-    // Grant exam access
-    if (transaction.examId) {
-      const users = await getCollection('users');
-      await users.updateOne(
-        { id: transaction.userId },
-        { $addToSet: { purchasedExams: transaction.examId } }
-      );
+    // Grant access based on paymentType. Exam purchase unlocks every domain in the exam too.
+    const users = await getCollection('users');
+    const userUpdate = { $set: { updatedAt: new Date() } };
+    const addToSet = {};
+
+    if (transaction.paymentType === 'get_pass') {
+      // All-access pass. Also store the pass expiry (default 1 year from now).
+      const expires = new Date();
+      expires.setFullYear(expires.getFullYear() + 1);
+      userUpdate.$set.hasPass = true;
+      userUpdate.$set.passExpiresAt = expires;
+    } else if (transaction.paymentType === 'exam_purchase' && transaction.examId) {
+      addToSet.purchasedExams = transaction.examId;
+      // Also unlock all domains for this exam (so per-domain checks succeed too)
+      try {
+        const domainsCol = await getCollection('domains');
+        const domainIds = (await domainsCol.find({ examId: transaction.examId }).toArray()).map(d => d.id);
+        if (domainIds.length > 0) {
+          addToSet.purchasedDomains = { $each: domainIds };
+        }
+      } catch (_e) {}
+    } else if (transaction.paymentType === 'domain_purchase' && transaction.domainId) {
+      addToSet.purchasedDomains = transaction.domainId;
     }
+
+    if (Object.keys(addToSet).length > 0) {
+      userUpdate.$addToSet = addToSet;
+    }
+
+    await users.updateOne({ id: transaction.userId }, userUpdate);
 
     return NextResponse.json({
       success: true,

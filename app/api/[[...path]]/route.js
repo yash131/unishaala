@@ -1032,6 +1032,101 @@ export async function GET(request) {
       });
     }
 
+    // Public pricing config (Get Pass price; 0 means "not available")
+    if (path === '/pricing') {
+      const pc = await getCollection('pricing_config');
+      const cfg = await pc.findOne({ id: 'global' }) || { id: 'global', getPassPrice: 0, getPassEnabled: false };
+      return jsonResponse({ success: true, data: { getPassPrice: Number(cfg.getPassPrice) || 0, getPassEnabled: !!cfg.getPassEnabled } });
+    }
+
+    // Current user's analytics (requires login). Used by /dashboard.
+    if (path === '/user/analytics') {
+      const user = await getAuthUser(request);
+      if (!user) return jsonResponse({ success: false, error: 'Please login' }, 401);
+
+      const attempts = await getCollection('test_attempts');
+      const mockTests = await getCollection('mock_tests');
+      const exams = await getCollection('exams');
+      const users = await getCollection('users');
+      const transactions = await getCollection('transactions');
+
+      const dbUser = await users.findOne({ id: user.id }) || {};
+      const myAttempts = await attempts.find({ userId: user.id }).sort({ createdAt: -1 }).toArray();
+
+      // Enrich each attempt with test + exam info and compute rank (rank by score within the same test)
+      const enriched = [];
+      for (const a of myAttempts) {
+        const test = await mockTests.findOne({ id: a.mockTestId });
+        const exam = test?.examId ? await exams.findOne({ id: test.examId }) : null;
+        let rank = null;
+        let totalTakers = null;
+        if (a.status === 'COMPLETED' || a.endTime) {
+          const better = await attempts.countDocuments({
+            mockTestId: a.mockTestId,
+            status: 'COMPLETED',
+            score: { $gt: a.score || 0 },
+          });
+          totalTakers = await attempts.countDocuments({ mockTestId: a.mockTestId, status: 'COMPLETED' });
+          rank = better + 1;
+        }
+        enriched.push({
+          id: a.id,
+          mockTestId: a.mockTestId,
+          testTitle: test?.title || 'Untitled Test',
+          testType: test?.testType || 'mock_test',
+          examId: exam?.id || null,
+          examName: exam?.name || null,
+          startTime: a.startTime,
+          endTime: a.endTime,
+          status: a.status,
+          score: a.score || 0,
+          totalMarks: a.totalMarks || 0,
+          rank,
+          totalTakers,
+        });
+      }
+
+      // Aggregate stats
+      const completed = enriched.filter(e => e.status === 'COMPLETED' || e.endTime);
+      const distinctExams = new Set(enriched.map(e => e.examId).filter(Boolean));
+      const distinctTests = new Set(enriched.map(e => e.mockTestId));
+      const avgPct = completed.length === 0 ? 0 : Math.round(
+        (completed.reduce((s, e) => s + (e.totalMarks > 0 ? (e.score / e.totalMarks) * 100 : 0), 0) / completed.length)
+      );
+      const bestPct = completed.length === 0 ? 0 : Math.round(
+        Math.max(...completed.map(e => e.totalMarks > 0 ? (e.score / e.totalMarks) * 100 : 0))
+      );
+
+      const purchases = await transactions.find({ userId: user.id, status: 'SUCCESS' }).sort({ completedAt: -1 }).toArray();
+
+      return jsonResponse({
+        success: true,
+        data: {
+          summary: {
+            examsAttempted: distinctExams.size,
+            testsAttempted: distinctTests.size,
+            totalAttempts: enriched.length,
+            completedAttempts: completed.length,
+            averagePct: avgPct,
+            bestPct,
+            hasPass: !!dbUser.hasPass,
+            passExpiresAt: dbUser.passExpiresAt || null,
+            purchasedExams: dbUser.purchasedExams || [],
+            purchasedDomains: dbUser.purchasedDomains || [],
+          },
+          history: enriched,
+          purchases: purchases.map(p => ({
+            id: p.id,
+            paymentType: p.paymentType,
+            itemName: p.itemName,
+            amount: p.amount,
+            status: p.status,
+            completedAt: p.completedAt || p.createdAt,
+          })),
+        }
+      });
+    }
+
     // Single Notification by id
     if (path.startsWith('/notifications/')) {
       const notifId = path.split('/notifications/')[1];
@@ -1427,6 +1522,17 @@ export async function GET(request) {
       if (path === '/admin/notifications') {
         const notifs = await getCollection('exam_notifications');
         return jsonResponse({ success: true, data: await notifs.find({}).sort({ createdAt: -1 }).toArray() });
+      }
+
+      // Admin - Get global pricing config
+      if (path === '/admin/pricing') {
+        const pc = await getCollection('pricing_config');
+        const cfg = await pc.findOne({ id: 'global' }) || { id: 'global', getPassPrice: 0, getPassEnabled: false };
+        return jsonResponse({ success: true, data: {
+          getPassPrice: Number(cfg.getPassPrice) || 0,
+          getPassEnabled: !!cfg.getPassEnabled,
+          updatedAt: cfg.updatedAt || null,
+        }});
       }
 
       // Admin - Get all colleges
@@ -3233,6 +3339,169 @@ export async function POST(request) {
     }
 
     // ============================================
+    // Razorpay Payment Gateway Integration (Review Request Endpoints)
+    // ============================================
+
+    // Create Order - Razorpay (as specified in review request)
+    if (path === '/payment/create-order') {
+      const user = await getAuthUser(request);
+      if (!user) {
+        return jsonResponse({ success: false, error: 'Please login to make payment' }, 401);
+      }
+
+      const { paymentType, amount, examId, domainId, mockTestId: testId } = body;
+      
+      console.log('Payment create-order request:', { paymentType, amount, examId, domainId, testId });
+      
+      // Validate paymentType
+      const validPaymentTypes = ['get_pass', 'exam_purchase', 'domain_purchase'];
+      if (paymentType === 'test_purchase') {
+        return jsonResponse({ success: false, error: 'Test purchases are disabled' }, 400);
+      }
+      if (!validPaymentTypes.includes(paymentType)) {
+        return jsonResponse({ success: false, error: 'Invalid payment type' }, 400);
+      }
+      
+      if (!amount || amount <= 0) {
+        return jsonResponse({ success: false, error: 'Invalid amount' }, 400);
+      }
+
+      try {
+        // Initialize Razorpay
+        const Razorpay = require('razorpay');
+        const razorpayInstance = new Razorpay({
+          key_id: process.env.RAZORPAY_KEY_ID,
+          key_secret: process.env.RAZORPAY_KEY_SECRET,
+        });
+
+        // Create Razorpay order
+        const options = {
+          amount: Math.round(amount * 100), // Convert to paise
+          currency: 'INR',
+          receipt: `receipt_${Date.now()}`,
+          notes: {
+            paymentType,
+            userId: user.id,
+            examId: examId || null,
+            domainId: domainId || null,
+            mockTestId: testId || null,
+          }
+        };
+
+        const order = await razorpayInstance.orders.create(options);
+
+        // Save transaction record
+        const transactions = await getCollection('transactions');
+        const transactionData = {
+          id: uuidv4(),
+          userId: user.id,
+          orderId: order.id,
+          amount: amount,
+          paymentType,
+          examId: examId || null,
+          domainId: domainId || null,
+          mockTestId: testId || null,
+          status: 'PENDING',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        await transactions.insertOne(transactionData);
+
+        return jsonResponse({
+          success: true,
+          orderId: order.id,
+          keyId: process.env.RAZORPAY_KEY_ID,
+          amount: order.amount,
+          currency: order.currency,
+          transactionId: transactionData.id,
+        });
+
+      } catch (error) {
+        console.error('Razorpay order creation error:', error);
+        return jsonResponse({ success: false, error: 'Failed to create order' }, 500);
+      }
+    }
+
+    // Verify Payment - Razorpay (as specified in review request)
+    if (path === '/payment/verify') {
+      const user = await getAuthUser(request);
+      if (!user) {
+        return jsonResponse({ success: false, error: 'Please login to verify payment' }, 401);
+      }
+
+      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = body;
+      
+      if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+        return jsonResponse({ success: false, error: 'Missing payment verification data' }, 400);
+      }
+
+      try {
+        // Verify signature
+        const crypto = require('crypto');
+        const body_string = razorpay_order_id + '|' + razorpay_payment_id;
+        const expected_signature = crypto
+          .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+          .update(body_string)
+          .digest('hex');
+
+        if (expected_signature !== razorpay_signature) {
+          return jsonResponse({ success: false, error: 'Invalid payment signature' }, 400);
+        }
+
+        // Update transaction status
+        const transactions = await getCollection('transactions');
+        const transaction = await transactions.findOne({ orderId: razorpay_order_id });
+        
+        if (!transaction) {
+          return jsonResponse({ success: false, error: 'Transaction not found' }, 404);
+        }
+
+        // Update transaction to SUCCESS
+        await transactions.updateOne(
+          { orderId: razorpay_order_id },
+          {
+            $set: {
+              status: 'SUCCESS',
+              paymentId: razorpay_payment_id,
+              signature: razorpay_signature,
+              completedAt: new Date(),
+              updatedAt: new Date(),
+            }
+          }
+        );
+
+        // Update user's purchase records based on payment type
+        const users = await getCollection('users');
+        const updateData = {};
+
+        if (transaction.paymentType === 'get_pass') {
+          updateData.hasPass = true;
+          updateData.passExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000); // 1 year
+        } else if (transaction.paymentType === 'exam_purchase' && transaction.examId) {
+          updateData.$addToSet = { purchasedExams: transaction.examId };
+        } else if (transaction.paymentType === 'domain_purchase' && transaction.domainId) {
+          updateData.$addToSet = { purchasedDomains: transaction.domainId };
+        }
+
+        if (Object.keys(updateData).length > 0) {
+          await users.updateOne({ id: user.id }, { $set: updateData });
+        }
+
+        return jsonResponse({
+          success: true,
+          message: 'Payment verified successfully',
+          transactionId: transaction.id,
+          paymentType: transaction.paymentType,
+        });
+
+      } catch (error) {
+        console.error('Payment verification error:', error);
+        return jsonResponse({ success: false, error: 'Payment verification failed' }, 500);
+      }
+    }
+
+    // ============================================
     // End of Payment Gateway Integration
     // ============================================
 
@@ -3256,32 +3525,44 @@ export async function POST(request) {
         return jsonResponse({ success: false, error: 'Test not available' }, 404);
       }
 
-      // Check if it's a paid test
-      if (!test.isFree && test.price > 0) {
+      // Practice questions are ALWAYS free, regardless of price fields.
+      // Unified gate for other tests: hasPass > exam purchase > domain purchase > isFree.
+      const isPractice = test.testType === 'practice_questions';
+      if (!isPractice && !test.isFree && test.price > 0) {
         const transactions = await getCollection('transactions');
-        
-        // Check for direct test purchase OR exam-level purchase
-        let hasPurchased = await transactions.findOne({
-          userId: user.id,
-          mockTestId,
-          status: 'SUCCESS'
-        });
-        
-        // Also check if user purchased the exam that contains this test
+        const users = await getCollection('users');
+        const dbUser = await users.findOne({ id: user.id });
+
+        const hasPass = !!dbUser?.hasPass && (!dbUser.passExpiresAt || new Date(dbUser.passExpiresAt) > new Date());
+        let hasPurchased = hasPass;
+
         if (!hasPurchased && test.examId) {
+          hasPurchased = (dbUser?.purchasedExams || []).includes(test.examId);
+        }
+        if (!hasPurchased && test.domainId) {
+          hasPurchased = (dbUser?.purchasedDomains || []).includes(test.domainId);
+        }
+        // Fallback: check transactions collection directly (covers users migrated before passthrough flag).
+        if (!hasPurchased) {
           hasPurchased = await transactions.findOne({
             userId: user.id,
-            examId: test.examId,
-            status: 'SUCCESS'
+            status: 'SUCCESS',
+            $or: [
+              { paymentType: 'get_pass' },
+              ...(test.examId ? [{ examId: test.examId, paymentType: 'exam_purchase' }] : []),
+              ...(test.domainId ? [{ domainId: test.domainId, paymentType: 'domain_purchase' }] : []),
+            ],
           });
         }
-        
+
         if (!hasPurchased) {
-          return jsonResponse({ 
-            success: false, 
-            error: 'Please purchase this test to continue',
+          return jsonResponse({
+            success: false,
+            error: 'Please purchase this Test Series or Domain to continue',
             requirePayment: true,
-            price: test.price 
+            price: test.price,
+            examId: test.examId || null,
+            domainId: test.domainId || null,
           }, 402);
         }
       }
@@ -3920,27 +4201,6 @@ export async function POST(request) {
         return jsonResponse({ success: true, data: noteData });
       }
 
-      // Update Domain
-      if (path.startsWith('/admin/domains/')) {
-        const domainId = path.split('/admin/domains/')[1];
-        const domainsCollection = await getCollection('domains');
-        
-        const { name, description, price, status } = body;
-        const updateData = { updatedAt: new Date() };
-        if (name !== undefined) updateData.name = name;
-        if (description !== undefined) updateData.description = description;
-        if (price !== undefined) updateData.price = price;
-        if (status !== undefined) updateData.status = status;
-        
-        await domainsCollection.updateOne(
-          { id: domainId },
-          { $set: updateData }
-        );
-        
-        const updated = await domainsCollection.findOne({ id: domainId });
-        return jsonResponse({ success: true, data: updated });
-      }
-
       // Create Blog Post
       if (path === '/admin/blogs') {
         const { title, description, content, image, publishDate, status } = body;
@@ -4133,7 +4393,8 @@ export async function PUT(request) {
           { id: examId },
           { $set: { ...body, updatedAt: new Date() } }
         );
-        return jsonResponse({ success: true, message: 'Exam updated' });
+        const updated = await exams.findOne({ id: examId });
+        return jsonResponse({ success: true, data: updated });
       }
 
       // Update Job
@@ -4155,6 +4416,27 @@ export async function PUT(request) {
           { $set: updateData }
         );
         const updated = await jobs.findOne({ id: jobId });
+        return jsonResponse({ success: true, data: updated });
+      }
+
+      // Update Domain
+      if (path.startsWith('/admin/domains/')) {
+        const domainId = path.split('/admin/domains/')[1];
+        const domainsCollection = await getCollection('domains');
+        
+        const { name, description, price, status } = body;
+        const updateData = { updatedAt: new Date() };
+        if (name !== undefined) updateData.name = name;
+        if (description !== undefined) updateData.description = description;
+        if (price !== undefined) updateData.price = price;
+        if (status !== undefined) updateData.status = status;
+        
+        await domainsCollection.updateOne(
+          { id: domainId },
+          { $set: updateData }
+        );
+        
+        const updated = await domainsCollection.findOne({ id: domainId });
         return jsonResponse({ success: true, data: updated });
       }
 
@@ -4292,6 +4574,24 @@ export async function PUT(request) {
         if (r.matchedCount === 0) return jsonResponse({ success: false, error: 'Note not found' }, 404);
         const updated = await notesCol.findOne({ id: noteId });
         return jsonResponse({ success: true, data: updated });
+      }
+
+      // Update global pricing config (Get Pass). Upserts singleton {id:'global'}.
+      if (path === '/admin/pricing') {
+        const pc = await getCollection('pricing_config');
+        const updateData = { id: 'global', updatedAt: new Date() };
+        if (body.getPassPrice !== undefined) {
+          const v = parseFloat(body.getPassPrice);
+          updateData.getPassPrice = isNaN(v) ? 0 : Math.max(0, v);
+        }
+        if (body.getPassEnabled !== undefined) updateData.getPassEnabled = !!body.getPassEnabled;
+        await pc.updateOne({ id: 'global' }, { $set: updateData, $setOnInsert: { createdAt: new Date() } }, { upsert: true });
+        const cfg = await pc.findOne({ id: 'global' });
+        return jsonResponse({ success: true, data: {
+          getPassPrice: Number(cfg.getPassPrice) || 0,
+          getPassEnabled: !!cfg.getPassEnabled,
+          updatedAt: cfg.updatedAt || null,
+        }});
       }
     }
 

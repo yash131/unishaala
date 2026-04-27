@@ -18,7 +18,16 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { examId, mockTestId, domainId, amount, paymentType } = body;
+    const { examId, domainId, amount, paymentType } = body;
+
+    // Only exam/domain/get_pass purchases are supported. Individual test purchases are disabled.
+    const ALLOWED = new Set(['exam_purchase', 'domain_purchase', 'get_pass']);
+    if (!ALLOWED.has(paymentType)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid payment type. Only exam, domain or pass purchases are supported.' },
+        { status: 400 }
+      );
+    }
 
     if (!amount || amount <= 0) {
       return NextResponse.json({ success: false, error: 'Invalid amount' }, { status: 400 });
@@ -27,19 +36,17 @@ export async function POST(request) {
     await connectToDatabase();
 
     // Get item details
-    let itemName = 'Test Purchase';
-    if (examId && paymentType === 'exam_purchase') {
+    let itemName = 'Unishaala Purchase';
+    if (paymentType === 'exam_purchase' && examId) {
       const exams = await getCollection('exams');
       const exam = await exams.findOne({ id: examId });
-      if (exam) itemName = `${exam.name} - Full Access`;
-    } else if (domainId && paymentType === 'domain_purchase') {
+      if (exam) itemName = `${exam.name} — Full Access`;
+    } else if (paymentType === 'domain_purchase' && domainId) {
       const domains = await getCollection('domains');
       const domain = await domains.findOne({ id: domainId });
-      if (domain) itemName = `${domain.name} - Domain Access`;
-    } else if (mockTestId) {
-      const mockTests = await getCollection('mock_tests');
-      const test = await mockTests.findOne({ id: mockTestId });
-      if (test) itemName = test.title;
+      if (domain) itemName = `${domain.name} — Domain Access`;
+    } else if (paymentType === 'get_pass') {
+      itemName = 'Unishaala Get Pass — All-Access';
     }
 
     // Create Razorpay order
@@ -67,10 +74,10 @@ export async function POST(request) {
       userName: user.name,
       userEmail: user.email,
       userPhone: user.phone || '',
-      examId: examId || null,
-      domainId: domainId || null,
-      mockTestId: mockTestId || null,
-      paymentType: paymentType || 'test_purchase',
+      examId: paymentType === 'exam_purchase' ? (examId || null) : null,
+      domainId: paymentType === 'domain_purchase' ? (domainId || null) : null,
+      mockTestId: null,
+      paymentType,
       itemName,
       amount: parseFloat(amount),
       currency: 'INR',
