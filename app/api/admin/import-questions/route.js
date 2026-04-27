@@ -474,12 +474,16 @@ export async function POST(request) {
       }
     }
 
-    // Update test question count and publish status
+    // Update test question count and review/publish status
     const totalQuestions = await questions.countDocuments(testMatch);
     const updateData = { totalQuestions, updatedAt: new Date() };
     if (publish) {
-      updateData.isPublished = true;
-      updateData.status = 'Active'; // Required for user-facing visibility
+      // NEW WORKFLOW: clicking "Send to Review" routes the test to the
+      // Reviewer queue. Reviewer must explicitly publish from
+      // /admin/reviewer/test/:id/publish to make it live.
+      updateData.reviewStatus = 'PENDING_REVIEW';
+      updateData.sentToReviewAt = new Date();
+      updateData.isPublished = false;
     }
     await mockTests.updateOne(
       { id: testId },
@@ -487,7 +491,8 @@ export async function POST(request) {
     );
 
     result.success = true;
-    result.published = publish;
+    result.published = false;
+    result.sentToReview = !!publish;
     return NextResponse.json(result);
 
   } catch (error) {

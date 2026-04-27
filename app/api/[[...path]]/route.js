@@ -1441,7 +1441,122 @@ export async function GET(request) {
         return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
       }
 
-      // Admin Dashboard Stats
+      // ===== REVIEWER ROUTES (SUPER_ADMIN / ADMIN only) =====
+      if (path.startsWith('/admin/reviewer')) {
+        if (!['SUPER_ADMIN', 'ADMIN'].includes(user.role)) {
+          return jsonResponse({ success: false, error: 'Reviewer access requires admin role' }, 403);
+        }
+
+        // List of tests in PENDING_REVIEW (or filterable)
+        if (path === '/admin/reviewer/queue') {
+          const status = searchParams.get('status') || 'PENDING_REVIEW';
+          const mockTests = await getCollection('mock_tests');
+          const exams = await getCollection('exams');
+          const domains = await getCollection('domains');
+          const subjects = await getCollection('subjects');
+          const tests = await mockTests.find({ reviewStatus: status }).sort({ sentToReviewAt: -1, updatedAt: -1 }).toArray();
+          // Enrich
+          const examIds = [...new Set(tests.map(t => t.examId).filter(Boolean))];
+          const domainIds = [...new Set(tests.map(t => t.domainId).filter(Boolean))];
+          const subjectIds = [...new Set(tests.map(t => t.subjectId).filter(Boolean))];
+          const examMap = new Map((examIds.length ? await exams.find({ id: { $in: examIds } }).toArray() : []).map(e => [e.id, e]));
+          const domainMap = new Map((domainIds.length ? await domains.find({ id: { $in: domainIds } }).toArray() : []).map(d => [d.id, d]));
+          const subjectMap = new Map((subjectIds.length ? await subjects.find({ id: { $in: subjectIds } }).toArray() : []).map(s => [s.id, s]));
+          return jsonResponse({
+            success: true,
+            data: tests.map(t => ({
+              id: t.id,
+              title: t.title,
+              description: t.description || '',
+              testType: t.testType || 'mock_test',
+              examId: t.examId,
+              examName: examMap.get(t.examId)?.name || null,
+              domainId: t.domainId,
+              domainName: domainMap.get(t.domainId)?.name || null,
+              subjectId: t.subjectId,
+              subjectName: subjectMap.get(t.subjectId)?.name || null,
+              duration: t.duration || 60,
+              totalQuestions: t.totalQuestions || 0,
+              totalMarks: t.totalMarks || 0,
+              reviewStatus: t.reviewStatus,
+              isPublished: !!t.isPublished,
+              sentToReviewAt: t.sentToReviewAt,
+              rejectionReason: t.rejectionReason || null,
+              rejectedAt: t.rejectedAt || null,
+              updatedAt: t.updatedAt,
+            }))
+          });
+        }
+
+        // Full test + questions for review preview (with correct answers visible)
+        if (path.startsWith('/admin/reviewer/test/')) {
+          const testId = path.split('/admin/reviewer/test/')[1];
+          if (!testId) return jsonResponse({ success: false, error: 'testId required' }, 400);
+          const mockTests = await getCollection('mock_tests');
+          const questions = await getCollection('questions');
+          const exams = await getCollection('exams');
+          const domains = await getCollection('domains');
+          const subjects = await getCollection('subjects');
+          const test = await mockTests.findOne({ id: testId });
+          if (!test) return jsonResponse({ success: false, error: 'Test not found' }, 404);
+          const exam = test.examId ? await exams.findOne({ id: test.examId }) : null;
+          const domain = test.domainId ? await domains.findOne({ id: test.domainId }) : null;
+          const subject = test.subjectId ? await subjects.findOne({ id: test.subjectId }) : null;
+          const qs = await questions.find({ mockTestId: testId }).sort({ questionNumber: 1, question_number: 1, createdAt: 1 }).toArray();
+          // Normalize question shape (legacy + new)
+          const normalized = qs.map((q, idx) => ({
+            id: q.id,
+            questionNumber: q.questionNumber || q.question_number || (idx + 1),
+            question_title: q.question_title || q.question_text || '',
+            question_image_url: q.question_image_url || null,
+            topic_title: q.topic_title || '',
+            description: q.description || '',
+            solution_text: q.solution_text || '',
+            solution_image_url: q.solution_image_url || null,
+            tip: q.tip || '',
+            duration: q.duration || 60,
+            marks: q.marks || 2,
+            negativeMarks: q.negativeMarks || 0.66,
+            correct_option_number: q.correct_option_number,
+            options: q.options && Array.isArray(q.options) && q.options.length > 0
+              ? q.options
+              : [
+                  { number: 1, title: q.option1_title || '', image_url: null },
+                  { number: 2, title: q.option2_title || '', image_url: null },
+                  { number: 3, title: q.option3_title || '', image_url: null },
+                  { number: 4, title: q.option4_title || '', image_url: null },
+                ],
+            status: q.status || 'Active',
+          }));
+          return jsonResponse({
+            success: true,
+            data: {
+              test: {
+                id: test.id,
+                title: test.title,
+                description: test.description || '',
+                testType: test.testType || 'mock_test',
+                duration: test.duration || 60,
+                totalQuestions: test.totalQuestions || normalized.length,
+                totalMarks: test.totalMarks || normalized.length * 2,
+                examId: test.examId,
+                examName: exam?.name || null,
+                domainId: test.domainId,
+                domainName: domain?.name || null,
+                subjectId: test.subjectId,
+                subjectName: subject?.name || null,
+                reviewStatus: test.reviewStatus || null,
+                isPublished: !!test.isPublished,
+                sentToReviewAt: test.sentToReviewAt || null,
+                rejectionReason: test.rejectionReason || null,
+              },
+              questions: normalized,
+            }
+          });
+        }
+      }
+
+
       if (path === '/admin/stats') {
         const users = await getCollection('users');
         const exams = await getCollection('exams');
@@ -3764,6 +3879,67 @@ export async function POST(request) {
         return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
       }
 
+      // ===== REVIEWER ACTIONS (SUPER_ADMIN / ADMIN only) =====
+      if (path.startsWith('/admin/reviewer')) {
+        if (!['SUPER_ADMIN', 'ADMIN'].includes(user.role)) {
+          return jsonResponse({ success: false, error: 'Reviewer access requires admin role' }, 403);
+        }
+        const mockTests = await getCollection('mock_tests');
+
+        // Approve & publish a reviewed test
+        if (path.match(/^\/admin\/reviewer\/test\/[^/]+\/publish$/)) {
+          const testId = path.split('/')[4];
+          const test = await mockTests.findOne({ id: testId });
+          if (!test) return jsonResponse({ success: false, error: 'Test not found' }, 404);
+          if (test.reviewStatus !== 'PENDING_REVIEW') {
+            return jsonResponse({ success: false, error: `Test is not pending review (status: ${test.reviewStatus || 'NONE'})` }, 400);
+          }
+          await mockTests.updateOne(
+            { id: testId },
+            {
+              $set: {
+                isPublished: true,
+                status: 'Active',
+                reviewStatus: 'PUBLISHED',
+                publishedAt: new Date(),
+                publishedBy: user.id,
+                updatedAt: new Date(),
+              },
+              $unset: { rejectionReason: '', rejectedAt: '', rejectedBy: '' },
+            }
+          );
+          return jsonResponse({ success: true, message: 'Test approved and published.' });
+        }
+
+        // Reject a reviewed test
+        if (path.match(/^\/admin\/reviewer\/test\/[^/]+\/reject$/)) {
+          const testId = path.split('/')[4];
+          const reason = (body?.reason || '').toString().trim();
+          if (!reason) {
+            return jsonResponse({ success: false, error: 'A rejection reason is required' }, 400);
+          }
+          const test = await mockTests.findOne({ id: testId });
+          if (!test) return jsonResponse({ success: false, error: 'Test not found' }, 404);
+          if (test.reviewStatus !== 'PENDING_REVIEW') {
+            return jsonResponse({ success: false, error: `Test is not pending review (status: ${test.reviewStatus || 'NONE'})` }, 400);
+          }
+          await mockTests.updateOne(
+            { id: testId },
+            {
+              $set: {
+                isPublished: false,
+                reviewStatus: 'REJECTED',
+                rejectionReason: reason,
+                rejectedAt: new Date(),
+                rejectedBy: user.id,
+                updatedAt: new Date(),
+              },
+            }
+          );
+          return jsonResponse({ success: true, message: 'Test rejected and returned to draft.' });
+        }
+      }
+
       // Create Mock Test
       if (path === '/admin/mock-tests') {
         const mockTests = await getCollection('mock_tests');
@@ -3890,16 +4066,24 @@ export async function POST(request) {
 
         // Update mock test question count and marks
         const totalQuestions = await questions.countDocuments({ mockTestId });
+        const updateSet = {
+          totalQuestions,
+          totalMarks: totalQuestions * 2,
+          updatedAt: new Date()
+        };
+        // NEW WORKFLOW: 'publish: true' from CSV preview now sends test to the
+        // Reviewer queue instead of going live. Reviewer must approve via
+        // /admin/reviewer/test/:id/publish to actually publish.
+        if (publish === true) {
+          updateSet.reviewStatus = 'PENDING_REVIEW';
+          updateSet.sentToReviewAt = new Date();
+          updateSet.sentToReviewBy = user.id;
+          // Explicitly keep isPublished:false until reviewer approves.
+          updateSet.isPublished = false;
+        }
         await mockTests.updateOne(
           { id: mockTestId },
-          { 
-            $set: { 
-              totalQuestions,
-              totalMarks: totalQuestions * 2,
-              isPublished: publish === true,
-              updatedAt: new Date()
-            } 
-          }
+          { $set: updateSet }
         );
 
         return jsonResponse({
@@ -3910,7 +4094,9 @@ export async function POST(request) {
             duplicates,
             failed,
             errors: errors.slice(0, 20),
-            testPublished: publish === true
+            sentToReview: publish === true,
+            // Legacy field kept for backward-compat with older clients
+            testPublished: false
           }
         });
       }

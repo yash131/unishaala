@@ -10,9 +10,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   LayoutDashboard,
   FileText,
@@ -66,7 +67,12 @@ import {
   FileDown,
   Lock,
   Unlock,
-  ScrollText
+  ScrollText,
+  ShieldCheck,
+  ThumbsUp,
+  ThumbsDown,
+  ClipboardCheck,
+  FileText as FileTextIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -78,7 +84,8 @@ const TEST_TYPES = [
 ];
 
 // Sidebar
-function AdminSidebar({ activeTab, setActiveTab }) {
+function AdminSidebar({ activeTab, setActiveTab, userRole }) {
+  const isAdminRole = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN';
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> },
     { id: 'exams', label: 'Test Series', icon: <GraduationCap className="w-5 h-5" /> },
@@ -86,6 +93,7 @@ function AdminSidebar({ activeTab, setActiveTab }) {
     { id: 'subjects', label: 'Subjects', icon: <BookOpen className="w-5 h-5" /> },
     { id: 'tests', label: 'Tests', icon: <ClipboardList className="w-5 h-5" /> },
     { id: 'questions', label: 'Questions', icon: <BookOpen className="w-5 h-5" /> },
+    ...(isAdminRole ? [{ id: 'reviewer', label: 'Reviewer', icon: <ShieldCheck className="w-5 h-5" /> }] : []),
     { id: 'blogs', label: 'Blogs', icon: <FileText className="w-5 h-5" /> },
     { id: 'notes', label: 'Notes', icon: <FileDown className="w-5 h-5" /> },
     { id: 'notifications', label: 'Exam Notifications', icon: <Bell className="w-5 h-5" /> },
@@ -860,6 +868,12 @@ function TestsTab({ mockTests, exams, onRefresh }) {
                   <Button variant="ghost" size="sm" onClick={() => togglePublish(test)} title={test.isPublished ? 'Click to Unpublish' : 'Click to Publish'}>
                     {test.isPublished ? <Eye className="w-4 h-4 text-green-600" /> : <EyeOff className="w-4 h-4 text-gray-400" />}
                   </Button>
+                  {test.reviewStatus === 'PENDING_REVIEW' && (
+                    <Badge className="bg-amber-500 ml-1 text-[10px] px-1.5 py-0">In Review</Badge>
+                  )}
+                  {test.reviewStatus === 'REJECTED' && (
+                    <Badge className="bg-red-500 ml-1 text-[10px] px-1.5 py-0">Rejected</Badge>
+                  )}
                 </TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="sm" onClick={() => { setEditingTest(test); setFormData({ title: test.title, description: test.description || '', duration: test.duration, isFree: test.isFree ?? true, price: test.price || 0, status: test.status, examId: test.examId || '', domainId: test.domainId || '', subjectId: test.subjectId || '', testType: test.testType || 'mock_test' }); setShowAddDialog(true); }}>
@@ -1399,7 +1413,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
           if (result.replaced > 0) parts.push(`${result.replaced} replaced`);
           if (result.invalid_image_urls?.length > 0) parts.push(`${result.invalid_image_urls.length} invalid URLs`);
           if (result.missing_images?.length > 0) parts.push(`${result.missing_images.length} missing images`);
-          toast.success(parts.join(', ') + (publish ? ' — Test Published!' : ''));
+          toast.success(parts.join(', ') + (publish ? ' — Sent to Reviewer' : ''));
           setShowPreview(false);
           setPreviewData([]);
           setZipFile(null);
@@ -1429,7 +1443,7 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
         if (result.success) {
           toast.success(
             `Saved: ${result.data.inserted} inserted, ${result.data.duplicates} duplicates skipped, ${result.data.failed} failed` +
-            (publish ? ' - Test Published!' : '')
+            (publish ? ' — Sent to Reviewer' : '')
           );
           setShowPreview(false);
           setPreviewData([]);
@@ -1753,11 +1767,8 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
                 <Button variant="outline" onClick={cancelPreview} disabled={saving}>
                   <X className="w-4 h-4 mr-2" /> Cancel
                 </Button>
-                <Button variant="outline" onClick={() => saveQuestions(false)} disabled={saving} className="border-blue-500 text-blue-600">
-                  <Save className="w-4 h-4 mr-2" /> {saving ? 'Saving...' : 'Save Draft'}
-                </Button>
                 <Button onClick={() => saveQuestions(true)} disabled={saving} className="bg-green-600 hover:bg-green-700">
-                  <Send className="w-4 h-4 mr-2" /> {saving ? 'Publishing...' : 'Publish'}
+                  <Send className="w-4 h-4 mr-2" /> {saving ? 'Sending...' : 'Send to Review'}
                 </Button>
               </div>
             </CardTitle>
@@ -4554,7 +4565,7 @@ export default function AdminPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} userRole={user.role} />
       <div className="ml-64">
         <header className="bg-white shadow-sm sticky top-0 z-30">
           <div className="flex items-center justify-between px-8 py-4">
@@ -4573,6 +4584,7 @@ export default function AdminPage() {
           {activeTab === 'subjects' && <SubjectsTab exams={data.exams} />}
           {activeTab === 'tests' && <TestsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'questions' && <QuestionsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
+          {activeTab === 'reviewer' && <ReviewerTab userRole={user.role} />}
           {activeTab === 'blogs' && <BlogsTab />}
           {activeTab === 'notes' && <NotesTab exams={data.exams} />}
           {activeTab === 'notifications' && <NotificationsTab exams={data.exams} />}
@@ -5654,3 +5666,461 @@ function PricingTab({ exams }) {
     </div>
   );
 }
+
+// ===== Reviewer Tab =====
+function ReviewerTab({ userRole }) {
+  const [filter, setFilter] = useState('PENDING_REVIEW');
+  const [tests, setTests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [openTestId, setOpenTestId] = useState(null);
+
+  const isAdminRole = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN';
+
+  const fetchQueue = async (status = filter) => {
+    setLoading(true);
+    try {
+      const r = await fetch(`/api/admin/reviewer/queue?status=${encodeURIComponent(status)}`, { credentials: 'include' });
+      const d = await r.json();
+      if (d.success) setTests(d.data || []);
+      else toast.error(d.error || 'Failed to load reviewer queue');
+    } catch (_e) {
+      toast.error('Failed to load reviewer queue');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchQueue(filter); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filter]);
+
+  if (!isAdminRole) {
+    return (
+      <Card>
+        <CardContent className="p-12 text-center">
+          <ShieldCheck className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+          <p className="text-gray-600">Reviewer access requires Super Admin or Admin role.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-4">
+        <h2 className="text-2xl font-bold flex items-center gap-2">
+          <ShieldCheck className="w-6 h-6 text-brand-600" /> Reviewer Queue
+        </h2>
+        <span className="text-sm text-gray-500">{tests.length} test{tests.length === 1 ? '' : 's'}</span>
+        <div className="ml-auto">
+          <Select value={filter} onValueChange={setFilter}>
+            <SelectTrigger className="w-56">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="PENDING_REVIEW">Pending Review</SelectItem>
+              <SelectItem value="REJECTED">Rejected</SelectItem>
+              <SelectItem value="PUBLISHED">Recently Published</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="p-12 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-brand-600" /></div>
+          ) : tests.length === 0 ? (
+            <div className="p-12 text-center">
+              <ClipboardCheck className="w-12 h-12 mx-auto text-gray-300 mb-2" />
+              <p className="text-gray-600">
+                {filter === 'PENDING_REVIEW' && 'No tests waiting for review.'}
+                {filter === 'REJECTED' && 'No rejected tests.'}
+                {filter === 'PUBLISHED' && 'No published tests yet.'}
+              </p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Title</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Exam / Domain / Subject</TableHead>
+                  <TableHead>Questions</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Sent on</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tests.map(t => (
+                  <TableRow key={t.id}>
+                    <TableCell className="font-medium max-w-xs">
+                      <div className="truncate" title={t.title}>{t.title}</div>
+                      {t.rejectionReason && (
+                        <div className="text-xs text-red-600 mt-0.5 truncate" title={t.rejectionReason}>
+                          Reason: {t.rejectionReason}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="outline">
+                        {t.testType === 'practice_questions' ? 'Practice' : t.testType === 'previous_year' ? 'PYQ' : 'Mock'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      <div className="text-gray-700">{t.examName || '—'}</div>
+                      <div className="text-xs text-gray-500">
+                        {[t.domainName, t.subjectName].filter(Boolean).join(' · ') || '—'}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <span className="font-semibold">{t.totalQuestions}</span>
+                    </TableCell>
+                    <TableCell>
+                      {t.reviewStatus === 'PENDING_REVIEW' && <Badge className="bg-amber-500">Pending Review</Badge>}
+                      {t.reviewStatus === 'PUBLISHED' && <Badge className="bg-green-600">Published</Badge>}
+                      {t.reviewStatus === 'REJECTED' && <Badge className="bg-red-500">Rejected</Badge>}
+                    </TableCell>
+                    <TableCell className="text-sm text-gray-500">
+                      {t.sentToReviewAt ? new Date(t.sentToReviewAt).toLocaleString() : '—'}
+                    </TableCell>
+                    <TableCell>
+                      <Button size="sm" onClick={() => setOpenTestId(t.id)}>
+                        <Eye className="w-4 h-4 mr-1" /> Review
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {openTestId && (
+        <ReviewerPreviewDialog
+          testId={openTestId}
+          onClose={() => setOpenTestId(null)}
+          onActionDone={() => { setOpenTestId(null); fetchQueue(filter); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ReviewerPreviewDialog({ testId, onClose, onActionDone }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState('test'); // 'test' | 'list'
+  const [currentIdx, setCurrentIdx] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [showReject, setShowReject] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/admin/reviewer/test/${testId}`, { credentials: 'include' });
+        const d = await r.json();
+        if (d.success) {
+          setData(d.data);
+          setCurrentIdx(0);
+        } else {
+          toast.error(d.error || 'Failed to load test');
+          onClose();
+        }
+      } catch (_e) {
+        toast.error('Failed to load test');
+        onClose();
+      }
+      setLoading(false);
+    })();
+  }, [testId, onClose]);
+
+  const isPending = data?.test?.reviewStatus === 'PENDING_REVIEW';
+
+  const publish = async () => {
+    if (!confirm('Approve and publish this test? It will become visible to users.')) return;
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/admin/reviewer/test/${testId}/publish`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      const d = await r.json();
+      if (d.success) { toast.success('Test approved & published'); onActionDone(); }
+      else toast.error(d.error || 'Failed to publish');
+    } catch (_e) { toast.error('Failed to publish'); }
+    setBusy(false);
+  };
+
+  const reject = async () => {
+    if (!rejectReason.trim()) { toast.error('Please enter a reason'); return; }
+    setBusy(true);
+    try {
+      const r = await fetch(`/api/admin/reviewer/test/${testId}/reject`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: rejectReason.trim() })
+      });
+      const d = await r.json();
+      if (d.success) { toast.success('Test rejected'); onActionDone(); }
+      else toast.error(d.error || 'Failed to reject');
+    } catch (_e) { toast.error('Failed to reject'); }
+    setBusy(false);
+    setShowReject(false);
+  };
+
+  return (
+    <Dialog open={!!testId} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent className="max-w-6xl max-h-[92vh] overflow-hidden flex flex-col">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between gap-2 pr-6">
+            <span className="flex items-center gap-2">
+              <ClipboardCheck className="w-5 h-5 text-brand-600" />
+              Review: {data?.test?.title || '...'}
+            </span>
+            {data?.test?.reviewStatus && (
+              <Badge className={
+                data.test.reviewStatus === 'PENDING_REVIEW' ? 'bg-amber-500' :
+                data.test.reviewStatus === 'PUBLISHED' ? 'bg-green-600' :
+                'bg-red-500'
+              }>
+                {data.test.reviewStatus.replace('_', ' ')}
+              </Badge>
+            )}
+          </DialogTitle>
+          {data?.test && (
+            <DialogDescription className="text-xs">
+              {[data.test.examName, data.test.domainName, data.test.subjectName].filter(Boolean).join(' · ')}
+              {' · '}
+              {data.test.totalQuestions} questions · {data.test.duration} min · {data.test.totalMarks} marks
+            </DialogDescription>
+          )}
+        </DialogHeader>
+
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
+        ) : data ? (
+          <>
+            <Tabs value={view} onValueChange={setView} className="flex-1 flex flex-col overflow-hidden">
+              <TabsList className="grid w-full max-w-md grid-cols-2 self-start mx-1">
+                <TabsTrigger value="test"><Eye className="w-4 h-4 mr-1" /> Test View</TabsTrigger>
+                <TabsTrigger value="list"><FileTextIcon className="w-4 h-4 mr-1" /> List View</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="test" className="flex-1 overflow-hidden mt-3">
+                <ReviewerTestView
+                  questions={data.questions}
+                  currentIdx={currentIdx}
+                  setCurrentIdx={setCurrentIdx}
+                />
+              </TabsContent>
+
+              <TabsContent value="list" className="flex-1 overflow-y-auto mt-3 pr-2">
+                <ReviewerListView questions={data.questions} />
+              </TabsContent>
+            </Tabs>
+
+            <DialogFooter className="border-t pt-3 mt-2 flex-shrink-0">
+              <div className="flex w-full items-center gap-2">
+                <Button variant="outline" onClick={onClose} disabled={busy}>Close</Button>
+                {isPending && (
+                  <>
+                    <Button
+                      variant="outline"
+                      className="border-red-500 text-red-600 hover:bg-red-50 ml-auto"
+                      onClick={() => setShowReject(true)}
+                      disabled={busy}
+                    >
+                      <ThumbsDown className="w-4 h-4 mr-1" /> Reject
+                    </Button>
+                    <Button
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={publish}
+                      disabled={busy}
+                    >
+                      <ThumbsUp className="w-4 h-4 mr-1" /> {busy ? 'Publishing...' : 'Approve & Publish'}
+                    </Button>
+                  </>
+                )}
+                {!isPending && (
+                  <span className="ml-auto text-sm text-gray-500">
+                    {data.test.reviewStatus === 'PUBLISHED' && 'This test is already live.'}
+                    {data.test.reviewStatus === 'REJECTED' && 'This test was rejected. Reason: ' + (data.test.rejectionReason || '—')}
+                  </span>
+                )}
+              </div>
+            </DialogFooter>
+          </>
+        ) : null}
+      </DialogContent>
+
+      {/* Reject reason sub-dialog */}
+      <Dialog open={showReject} onOpenChange={setShowReject}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reject Test</DialogTitle>
+            <DialogDescription>This sends the test back to draft state. Provide a reason for the admin.</DialogDescription>
+          </DialogHeader>
+          <Textarea
+            placeholder="Reason for rejection (required)"
+            value={rejectReason}
+            onChange={e => setRejectReason(e.target.value)}
+            rows={4}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowReject(false)} disabled={busy}>Cancel</Button>
+            <Button className="bg-red-600 hover:bg-red-700" onClick={reject} disabled={busy || !rejectReason.trim()}>
+              {busy ? 'Rejecting...' : 'Confirm Reject'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </Dialog>
+  );
+}
+
+function ReviewerTestView({ questions, currentIdx, setCurrentIdx }) {
+  if (!questions || questions.length === 0) {
+    return <div className="p-12 text-center text-gray-500">No questions in this test.</div>;
+  }
+  const q = questions[currentIdx];
+  const correctNum = Number(q.correct_option_number);
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-[1fr,260px] gap-4 h-full overflow-hidden">
+      {/* Question Display */}
+      <div className="overflow-y-auto pr-3">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-gray-700">
+            Question {currentIdx + 1} <span className="text-gray-400 font-normal">/ {questions.length}</span>
+          </h3>
+          {q.topic_title && <Badge variant="outline">{q.topic_title}</Badge>}
+        </div>
+        <Card>
+          <CardContent className="p-5 space-y-4">
+            <div className="prose prose-sm max-w-none">
+              <div className="text-base font-medium text-gray-900 whitespace-pre-wrap">{q.question_title}</div>
+              {q.question_image_url && (
+                <img src={q.question_image_url} alt="Question" className="mt-3 max-h-72 rounded border" />
+              )}
+            </div>
+            <div className="space-y-2 mt-4">
+              {q.options.map((opt) => {
+                const isCorrect = Number(opt.number) === correctNum;
+                return (
+                  <div
+                    key={opt.number}
+                    className={`flex items-start gap-3 p-3 rounded-lg border ${isCorrect ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}
+                  >
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0 ${isCorrect ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-600'}`}>
+                      {String.fromCharCode(64 + Number(opt.number))}
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm text-gray-800 whitespace-pre-wrap">{opt.title}</div>
+                      {opt.image_url && <img src={opt.image_url} alt={`Option ${opt.number}`} className="mt-2 max-h-40 rounded border" />}
+                    </div>
+                    {isCorrect && <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />}
+                  </div>
+                );
+              })}
+            </div>
+            {(q.solution_text || q.solution_image_url || q.tip) && (
+              <div className="border-t pt-3 mt-3">
+                <div className="text-xs font-semibold text-gray-500 uppercase mb-1">Solution</div>
+                {q.solution_text && <div className="text-sm text-gray-800 whitespace-pre-wrap">{q.solution_text}</div>}
+                {q.solution_image_url && <img src={q.solution_image_url} alt="Solution" className="mt-2 max-h-60 rounded border" />}
+                {q.tip && <div className="text-xs text-blue-700 mt-2"><b>Tip:</b> {q.tip}</div>}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="flex justify-between mt-4">
+          <Button
+            variant="outline"
+            disabled={currentIdx === 0}
+            onClick={() => setCurrentIdx(Math.max(0, currentIdx - 1))}
+          >
+            <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+          </Button>
+          <Button
+            variant="outline"
+            disabled={currentIdx === questions.length - 1}
+            onClick={() => setCurrentIdx(Math.min(questions.length - 1, currentIdx + 1))}
+          >
+            Next <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Question Palette */}
+      <div className="border-l pl-4 overflow-y-auto">
+        <div className="text-xs font-semibold text-gray-500 uppercase mb-2">Question Palette</div>
+        <div className="grid grid-cols-5 gap-2">
+          {questions.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentIdx(idx)}
+              className={`w-9 h-9 rounded text-xs font-semibold border ${
+                idx === currentIdx
+                  ? 'bg-brand-600 text-white border-brand-600'
+                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              {idx + 1}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReviewerListView({ questions }) {
+  if (!questions || questions.length === 0) {
+    return <div className="p-12 text-center text-gray-500">No questions in this test.</div>;
+  }
+  return (
+    <div className="space-y-4">
+      {questions.map((q, idx) => {
+        const correctNum = Number(q.correct_option_number);
+        return (
+          <Card key={q.id || idx}>
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <h4 className="font-semibold text-gray-900">
+                  Q{idx + 1}.&nbsp;
+                  <span className="font-normal whitespace-pre-wrap">{q.question_title}</span>
+                </h4>
+                {q.topic_title && <Badge variant="outline" className="flex-shrink-0">{q.topic_title}</Badge>}
+              </div>
+              {q.question_image_url && <img src={q.question_image_url} alt="Q" className="max-h-56 rounded border" />}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {q.options.map((opt) => {
+                  const isCorrect = Number(opt.number) === correctNum;
+                  return (
+                    <div key={opt.number} className={`p-2 rounded border text-sm ${isCorrect ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}>
+                      <span className={`font-semibold mr-2 ${isCorrect ? 'text-green-700' : 'text-gray-500'}`}>
+                        {String.fromCharCode(64 + Number(opt.number))}.
+                      </span>
+                      <span className="whitespace-pre-wrap">{opt.title}</span>
+                      {opt.image_url && <img src={opt.image_url} alt="" className="mt-1 max-h-32 rounded" />}
+                    </div>
+                  );
+                })}
+              </div>
+              {q.solution_text && (
+                <div className="text-xs text-gray-600 bg-blue-50 p-2 rounded">
+                  <b>Solution:</b> {q.solution_text}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
