@@ -65,7 +65,8 @@ import {
   ExternalLink,
   FileDown,
   Lock,
-  Unlock
+  Unlock,
+  ScrollText
 } from 'lucide-react';
 import { toast } from 'sonner';
 
