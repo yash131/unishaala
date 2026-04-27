@@ -192,10 +192,10 @@ Get closer to your selection with each attempt.`}</p>
 // Features Section
 function FeaturesSection() {
   const features = [
-    { icon: <FileText className="w-8 h-8" />, title: 'Mock Tests', desc: '10,000+ practice tests with detailed analytics', color: 'bg-blue-100 text-blue-600' },
-    { icon: <BookOpen className="w-8 h-8" />, title: 'Question Bank', desc: 'Topic-wise questions with explanations', color: 'bg-green-100 text-green-600' },
-    { icon: <Target className="w-8 h-8" />, title: 'Previous Papers', desc: '10+ years of solved papers', color: 'bg-purple-100 text-purple-600' },
-    { icon: <Trophy className="w-8 h-8" />, title: 'Topper Notes', desc: 'Handwritten notes from top rankers', color: 'bg-orange-100 text-orange-600' }
+    { icon: <FileText className="w-8 h-8" />, title: 'Mock Tests', desc: 'Experience real exam pressure with full-length mock tests.\nAnalyze your performance and improve with detailed solutions and rankings.', color: 'bg-blue-100 text-blue-600' },
+    { icon: <BookOpen className="w-8 h-8" />, title: 'Practice Questions', desc: 'Sharpen your concepts with topic-wise practice questions.\nBuild accuracy and confidence with instant performance insights.', color: 'bg-green-100 text-green-600' },
+    { icon: <Target className="w-8 h-8" />, title: 'Previous Year Questions with Solutions', desc: 'Understand exam patterns with authentic previous year questions.\nPractice what actually matters and boost your chances of success.', color: 'bg-purple-100 text-purple-600' },
+    { icon: <Trophy className="w-8 h-8" />, title: 'Access Premium Notes', desc: 'Concept-focused, exam-oriented notes curated from top educators and toppers.\nSave time and study smart with clear, concise, and high-quality content.', color: 'bg-orange-100 text-orange-600' }
   ];
 
   return (
@@ -214,7 +214,7 @@ function FeaturesSection() {
                   {feature.icon}
                 </div>
                 <h3 className="font-bold text-gray-900 mb-2">{feature.title}</h3>
-                <p className="text-sm text-gray-600">{feature.desc}</p>
+                <p className="text-sm text-gray-600 whitespace-pre-line">{feature.desc}</p>
               </CardContent>
             </Card>
           ))}
