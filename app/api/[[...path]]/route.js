@@ -4441,11 +4441,12 @@ export async function PUT(request) {
         const domainId = path.split('/admin/domains/')[1];
         const domainsCollection = await getCollection('domains');
         
-        const { name, description, price, status } = body;
+        const { name, description, price, pyqPrice, status } = body;
         const updateData = { updatedAt: new Date() };
         if (name !== undefined) updateData.name = name;
         if (description !== undefined) updateData.description = description;
         if (price !== undefined) updateData.price = price;
+        if (pyqPrice !== undefined) updateData.pyqPrice = pyqPrice;
         if (status !== undefined) updateData.status = status;
         
         await domainsCollection.updateOne(
