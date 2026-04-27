@@ -201,7 +201,7 @@ function FeaturesSection() {
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-gray-900">Why Choose Unishaala?</h2>
-          <p className="text-gray-600 mt-2">Everything you need to crack your dream exam</p>
+          <p className="text-gray-600 mt-2">Curated content from top educators and successful candidates who understand exactly what it takes to crack government exams.</p>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
