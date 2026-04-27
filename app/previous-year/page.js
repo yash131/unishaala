@@ -213,6 +213,49 @@ export default function PreviousYearPage() {
     }
   };
 
+  const handleBuyDomainFromCard = async (dom) => {
+    if (!me?.id) { router.push('/login?next=/previous-year'); return; }
+    const price = Number(dom?.pyqPrice || 0);
+    if (!price) { toast.error('Price not set yet.'); return; }
+    try {
+      const res = await fetch('/api/payment/create-order', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ paymentType: 'domain_pyq_purchase', domainId: dom.id, amount: price })
+      });
+      const d = await res.json();
+      if (!d.success) { toast.error(d.error || 'Failed to create order'); return; }
+      await ensureRzp();
+      const { orderId, keyId, name, description, prefill, amount, currency } = d.data;
+      const rzp = new window.Razorpay({
+        key: keyId, amount, currency, name, description,
+        order_id: orderId, prefill,
+        theme: { color: '#7c3aed' },
+        handler: async function (response) {
+          try {
+            const v = await fetch('/api/payment/verify', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(response)
+            });
+            const vd = await v.json();
+            if (vd.success) {
+              toast.success(`Unlocked PYQs for ${dom.name}`);
+              await loadAccess();
+            } else {
+              window.location.href = `/payment/failed?reason=${encodeURIComponent(vd.error || 'Verification failed')}`;
+            }
+          } catch (err) {
+            window.location.href = `/payment/failed?reason=${encodeURIComponent(err.message)}`;
+          }
+        },
+      });
+      rzp.on('payment.failed', (resp) => toast.error(resp.error?.description || 'Payment failed'));
+      rzp.open();
+    } catch (err) {
+      toast.error('Could not start payment');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-purple-50/30 via-white to-white">
       <nav className="bg-white shadow-sm sticky top-0 z-30 border-b">
@@ -296,6 +339,7 @@ export default function PreviousYearPage() {
                   examUnlocked={examUnlocked}
                   hasActivePass={hasActivePass}
                   onPick={pickDomain}
+                  onBuy={handleBuyDomainFromCard}
                 />
               </>
             )}
@@ -457,7 +501,7 @@ function ExamPicker({ exams, purchasedPyqExams, hasActivePass, onPick, onBuy }) 
   );
 }
 
-function DomainPicker({ domains, purchasedPyqDomains, examUnlocked, hasActivePass, onPick }) {
+function DomainPicker({ domains, purchasedPyqDomains, examUnlocked, hasActivePass, onPick, onBuy }) {
   if (!domains || domains.length === 0) {
     return <EmptyState icon={<Layers className="w-7 h-7" />} title="No domains for this exam" hint="Pick another exam or check back later." />;
   }
@@ -467,19 +511,42 @@ function DomainPicker({ domains, purchasedPyqDomains, examUnlocked, hasActivePas
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {domains.map(d => {
           const unlocked = examUnlocked || hasActivePass || purchasedPyqDomains.has(d.id);
+          const price = Number(d.pyqPrice || 0);
           return (
-            <Card key={d.id} className="hover:ring-2 hover:ring-purple-300 cursor-pointer transition" onClick={() => onPick(d)}>
-              <CardContent className="p-5 flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center"><Layers className="w-6 h-6" /></div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900 truncate">{d.name}</h3>
-                  {unlocked ? (
-                    <Badge className="bg-green-500 text-xs mt-1"><CheckCircle className="w-3 h-3 mr-1" /> Unlocked</Badge>
-                  ) : Number(d.pyqPrice) > 0 ? (
-                    <Badge className="bg-blue-600 text-xs mt-1">₹{d.pyqPrice}</Badge>
-                  ) : null}
+            <Card key={d.id} className="hover:shadow-lg transition border-2 hover:border-purple-300">
+              <CardContent className="p-5">
+                <div className="flex items-start gap-3 mb-3 cursor-pointer" onClick={() => onPick(d)}>
+                  <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0"><Layers className="w-6 h-6" /></div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-gray-900 truncate">{d.name}</h3>
+                    {d.description && <p className="text-xs text-gray-500 truncate mt-0.5">{d.description}</p>}
+                  </div>
                 </div>
-                <ArrowRight className="w-4 h-4 text-gray-400" />
+
+                {/* Price + Access row */}
+                <div className="flex items-center justify-between mb-3 mt-3 pt-3 border-t border-gray-100">
+                  {unlocked ? (
+                    <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Unlocked</Badge>
+                  ) : price > 0 ? (
+                    <div className="flex flex-col">
+                      <span className="text-xs text-gray-500">Domain PYQ Access</span>
+                      <span className="text-2xl font-bold text-gray-900">₹{price.toLocaleString('en-IN')}</span>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-gray-500">Price not set</span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1" onClick={() => onPick(d)}>
+                    <ArrowRight className="w-4 h-4 mr-1" /> Browse
+                  </Button>
+                  {!unlocked && price > 0 && (
+                    <Button size="sm" className="flex-1 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white" onClick={() => onBuy(d)}>
+                      <ShieldCheck className="w-4 h-4 mr-1" /> Purchase
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           );
