@@ -318,7 +318,6 @@ function JobNotifications({ jobs }) {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h2 className="text-3xl font-bold text-gray-900">Latest Job Notifications</h2>
-            <p className="text-gray-600 mt-2">Government & Private sector opportunities</p>
           </div>
           <Link href="/jobs">
             <Button variant="outline" className="hidden md:flex">
