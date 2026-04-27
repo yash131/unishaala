@@ -5903,13 +5903,13 @@ function ReviewerPreviewDialog({ testId, onClose, onActionDone }) {
           <div className="flex-1 flex items-center justify-center"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>
         ) : data ? (
           <>
-            <Tabs value={view} onValueChange={setView} className="flex-1 flex flex-col overflow-hidden">
-              <TabsList className="grid w-full max-w-md grid-cols-2 self-start mx-1">
+            <Tabs value={view} onValueChange={setView} className="flex-1 flex flex-col overflow-hidden min-h-0">
+              <TabsList className="grid w-full max-w-md grid-cols-2 self-start mx-1 flex-shrink-0">
                 <TabsTrigger value="test"><Eye className="w-4 h-4 mr-1" /> Test View</TabsTrigger>
                 <TabsTrigger value="list"><FileTextIcon className="w-4 h-4 mr-1" /> List View</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="test" className="flex-1 overflow-hidden mt-3">
+              <TabsContent value="test" className="flex-1 overflow-hidden mt-3 min-h-0 data-[state=inactive]:hidden">
                 <ReviewerTestView
                   questions={data.questions}
                   currentIdx={currentIdx}
@@ -5917,7 +5917,7 @@ function ReviewerPreviewDialog({ testId, onClose, onActionDone }) {
                 />
               </TabsContent>
 
-              <TabsContent value="list" className="flex-1 overflow-y-auto mt-3 pr-2">
+              <TabsContent value="list" className="flex-1 overflow-y-auto mt-3 pr-2 min-h-0 data-[state=inactive]:hidden">
                 <ReviewerListView questions={data.questions} />
               </TabsContent>
             </Tabs>
@@ -5989,9 +5989,9 @@ function ReviewerTestView({ questions, currentIdx, setCurrentIdx }) {
   const correctNum = Number(q.correct_option_number);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-[1fr,260px] gap-4 h-full overflow-hidden">
+    <div className="grid grid-cols-1 md:grid-cols-[1fr,260px] gap-4 h-full overflow-hidden min-h-0">
       {/* Question Display */}
-      <div className="overflow-y-auto pr-3">
+      <div className="overflow-y-auto pr-3 min-h-0 max-h-full">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-semibold text-gray-700">
             Question {currentIdx + 1} <span className="text-gray-400 font-normal">/ {questions.length}</span>
