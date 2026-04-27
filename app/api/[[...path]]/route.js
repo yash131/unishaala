@@ -1051,17 +1051,38 @@ export async function GET(request) {
       const attempts = await getCollection('test_attempts');
       const mockTests = await getCollection('mock_tests');
       const exams = await getCollection('exams');
+      const domains = await getCollection('domains');
+      const subjects = await getCollection('subjects');
       const users = await getCollection('users');
       const transactions = await getCollection('transactions');
 
       const dbUser = await users.findOne({ id: user.id }) || {};
       const myAttempts = await attempts.find({ userId: user.id }).sort({ createdAt: -1 }).toArray();
 
+      // Pre-load referenced tests/exams/domains/subjects in batches to reduce DB roundtrips
+      const testIds = [...new Set(myAttempts.map(a => a.mockTestId).filter(Boolean))];
+      const allTests = testIds.length ? await mockTests.find({ id: { $in: testIds } }).toArray() : [];
+      const testMap = new Map(allTests.map(t => [t.id, t]));
+
+      const examIds = [...new Set(allTests.map(t => t.examId).filter(Boolean))];
+      const allExams = examIds.length ? await exams.find({ id: { $in: examIds } }).toArray() : [];
+      const examMap = new Map(allExams.map(e => [e.id, e]));
+
+      const domainIds = [...new Set(allTests.map(t => t.domainId).filter(Boolean))];
+      const allDomains = domainIds.length ? await domains.find({ id: { $in: domainIds } }).toArray() : [];
+      const domainMap = new Map(allDomains.map(d => [d.id, d]));
+
+      const subjectIds = [...new Set(allTests.map(t => t.subjectId).filter(Boolean))];
+      const allSubjects = subjectIds.length ? await subjects.find({ id: { $in: subjectIds } }).toArray() : [];
+      const subjectMap = new Map(allSubjects.map(s => [s.id, s]));
+
       // Enrich each attempt with test + exam info and compute rank (rank by score within the same test)
       const enriched = [];
       for (const a of myAttempts) {
-        const test = await mockTests.findOne({ id: a.mockTestId });
-        const exam = test?.examId ? await exams.findOne({ id: test.examId }) : null;
+        const test = testMap.get(a.mockTestId);
+        const exam = test?.examId ? examMap.get(test.examId) : null;
+        const domain = test?.domainId ? domainMap.get(test.domainId) : null;
+        const subject = test?.subjectId ? subjectMap.get(test.subjectId) : null;
         let rank = null;
         let totalTakers = null;
         if (a.status === 'COMPLETED' || a.endTime) {
@@ -1073,6 +1094,11 @@ export async function GET(request) {
           totalTakers = await attempts.countDocuments({ mockTestId: a.mockTestId, status: 'COMPLETED' });
           rank = better + 1;
         }
+        // Time taken in minutes (if completed)
+        let timeTakenMin = null;
+        if (a.startTime && a.endTime) {
+          timeTakenMin = Math.max(0, Math.round((new Date(a.endTime).getTime() - new Date(a.startTime).getTime()) / 60000));
+        }
         enriched.push({
           id: a.id,
           mockTestId: a.mockTestId,
@@ -1080,11 +1106,19 @@ export async function GET(request) {
           testType: test?.testType || 'mock_test',
           examId: exam?.id || null,
           examName: exam?.name || null,
+          domainId: domain?.id || null,
+          domainName: domain?.name || null,
+          subjectId: subject?.id || null,
+          subjectName: subject?.name || null,
           startTime: a.startTime,
           endTime: a.endTime,
           status: a.status,
           score: a.score || 0,
           totalMarks: a.totalMarks || 0,
+          correct: a.correct ?? null,
+          incorrect: a.incorrect ?? null,
+          unanswered: a.unanswered ?? null,
+          timeTakenMin,
           rank,
           totalTakers,
         });
@@ -1100,6 +1134,16 @@ export async function GET(request) {
       const bestPct = completed.length === 0 ? 0 : Math.round(
         Math.max(...completed.map(e => e.totalMarks > 0 ? (e.score / e.totalMarks) * 100 : 0))
       );
+      // Total questions answered correctly/incorrectly across all completed attempts
+      const totals = completed.reduce((acc, e) => {
+        acc.correct += e.correct || 0;
+        acc.incorrect += e.incorrect || 0;
+        acc.unanswered += e.unanswered || 0;
+        acc.timeMin += e.timeTakenMin || 0;
+        return acc;
+      }, { correct: 0, incorrect: 0, unanswered: 0, timeMin: 0 });
+      const totalAnswered = totals.correct + totals.incorrect;
+      const accuracy = totalAnswered === 0 ? 0 : Math.round((totals.correct / totalAnswered) * 100);
 
       const purchases = await transactions.find({ userId: user.id, status: 'SUCCESS' }).sort({ completedAt: -1 }).toArray();
 
@@ -1113,10 +1157,17 @@ export async function GET(request) {
             completedAttempts: completed.length,
             averagePct: avgPct,
             bestPct,
+            accuracy,
+            totalCorrect: totals.correct,
+            totalIncorrect: totals.incorrect,
+            totalUnanswered: totals.unanswered,
+            totalTimeMin: totals.timeMin,
             hasPass: !!dbUser.hasPass,
             passExpiresAt: dbUser.passExpiresAt || null,
             purchasedExams: dbUser.purchasedExams || [],
             purchasedDomains: dbUser.purchasedDomains || [],
+            purchasedPyqExams: dbUser.purchasedPyqExams || [],
+            purchasedPyqDomains: dbUser.purchasedPyqDomains || [],
           },
           history: enriched,
           purchases: purchases.map(p => ({
