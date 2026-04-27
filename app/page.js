@@ -172,7 +172,7 @@ function PopularExams({ exams }) {
     <section className="py-16 bg-gray-50">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900">Popular Test Series</h2>
+          <h2 className="text-3xl font-bold text-gray-900">Popular Exams</h2>
           <p className="text-gray-600 mt-2 whitespace-pre-line">{`Practice with exam-level questions designed by experts.
 Analyze your performance, identify weak areas, and improve with every test.
 Get closer to your selection with each attempt.`}</p>
@@ -429,7 +429,7 @@ function Footer() {
               <Logo size="default" showText={false} />
             </div>
             <p className="text-gray-600 text-sm mb-4">
-              Your trusted partner for competitive test series preparation. Join millions of students achieving their dreams.
+              Your trusted partner for competitive exam preparation. Join millions of students achieving their dreams.
             </p>
             <div className="flex gap-4">
               <a href="#" className="w-10 h-10 bg-brand-100 rounded-full flex items-center justify-center text-brand-600 hover:bg-brand-200">
@@ -450,7 +450,7 @@ function Footer() {
           <div>
             <h4 className="font-bold text-gray-900 mb-4">Quick Links</h4>
             <ul className="space-y-2 text-sm text-gray-600">
-              <li><Link href="/exams" className="hover:text-brand-600">Test Series</Link></li>
+              <li><Link href="/exams" className="hover:text-brand-600">Exams</Link></li>
               <li><Link href="/blogs" className="hover:text-brand-600">Blogs</Link></li>
               <li><Link href="/jobs" className="hover:text-brand-600">Jobs</Link></li>
               <li><Link href="/rank-predictor" className="hover:text-brand-600">Rank Predictor</Link></li>
@@ -459,7 +459,7 @@ function Footer() {
           </div>
 
           <div>
-            <h4 className="font-bold text-gray-900 mb-4">Popular Test Series</h4>
+            <h4 className="font-bold text-gray-900 mb-4">Popular Exams</h4>
             <ul className="space-y-2 text-sm text-gray-600">
               <li><Link href="/exams/gate" className="hover:text-brand-600">GATE</Link></li>
               <li><Link href="/exams/cat" className="hover:text-brand-600">CAT</Link></li>
@@ -477,7 +477,13 @@ function Footer() {
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="w-4 h-4 text-brand-600" />
-                +91 1234567890
+                <a href="tel:+919829132906" className="hover:text-brand-600">+91 98291 32906</a>
+              </li>
+              <li className="flex items-center gap-2">
+                <svg viewBox="0 0 24 24" className="w-4 h-4 text-green-600 fill-current" aria-hidden="true">
+                  <path d="M.057 24l1.687-6.163a11.867 11.867 0 0 1-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.817 11.817 0 0 1 8.413 3.488 11.824 11.824 0 0 1 3.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 0 1-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 0 0 1.51 5.26L4.45 19.34l3.5-1.16zm5.391-1.548c-.298 0-3.119-.058-5.717-2.633-2.875-2.85-2.654-6.243-2.59-6.696.063-.453.85-2.633 2.062-2.776.226-.027.45-.04.67-.04.27 0 .487.034.696.518.234.555.794 1.92.864 2.06.07.14.117.303.023.484-.094.182-.14.292-.281.45-.14.158-.296.353-.422.474-.14.135-.286.282-.123.554.164.273.728 1.2 1.564 1.946 1.073.96 1.978 1.255 2.252 1.395.273.14.432.117.59-.07.158-.187.682-.795.864-1.068.182-.273.364-.227.61-.137.247.09 1.572.741 1.84.875.27.135.45.202.516.314.067.114.067.66-.156 1.298-.225.638-1.31 1.243-1.838 1.32-.473.07-1.083.099-1.621-.103z"/>
+                </svg>
+                <a href="https://wa.me/919829132906" target="_blank" rel="noopener noreferrer" className="hover:text-green-600">WhatsApp 9829132906</a>
               </li>
               <li className="flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-brand-600" />
