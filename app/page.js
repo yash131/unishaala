@@ -523,11 +523,11 @@ export default function HomePage() {
       <MainNavbar />
       <AccessGateBanner />
       <HeroSection />
-      <ExamNotifications notifications={data.notifications} />
+      <JobNotifications jobs={data.jobs} />
       <PopularExams exams={data.exams} />
       <FeaturesSection />
       <BlogMarquee blogs={data.blogs} />
-      <JobNotifications jobs={data.jobs} />
+      <ExamNotifications notifications={data.notifications} />
       <TestimonialsSection testimonials={data.testimonials} />
       <Footer />
     </div>
