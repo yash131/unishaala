@@ -512,6 +512,60 @@ export async function GET(request) {
       return jsonResponse({ success: true, data: safeUser });
     }
 
+    // Public: Creative Control settings (hero banner image + badge text)
+    if (path === '/creative-control') {
+      const settings = await getCollection('site_settings');
+      const doc = await settings.findOne({ id: 'hero' });
+      const data = {
+        heroBannerImageUrl: doc?.heroBannerImageUrl || 'https://customer-assets.emergentagent.com/job_7acc3893-d2c4-4511-8e86-2a2521e5fe9d/artifacts/harwama0_banner_%20finsl.png',
+        heroBannerAlt: doc?.heroBannerAlt || 'Unishaala Banner',
+        heroBadgeTitle: doc?.heroBadgeTitle || '95% Success Rate',
+        heroBadgeSubtitle: doc?.heroBadgeSubtitle || 'In Top Exams',
+        heroBadgeColor: doc?.heroBadgeColor || 'green',
+        updatedAt: doc?.updatedAt || null,
+      };
+      const res = NextResponse.json({ success: true, data });
+      res.headers.set('Cache-Control', 'no-store');
+      return res;
+    }
+
+    // Public: stream currently uploaded banner image (GridFS 'banners' bucket)
+    if (path === '/creative-control/banner-image') {
+      const settings = await getCollection('site_settings');
+      const doc = await settings.findOne({ id: 'hero' });
+      if (!doc?.heroBannerFileId) {
+        return jsonResponse({ success: false, error: 'No uploaded banner' }, 404);
+      }
+      try {
+        const { ObjectId } = await import('mongodb');
+        const { getPdfBucket } = await import('@/lib/db');
+        const bucket = await getPdfBucket('banners');
+        const objId = new ObjectId(doc.heroBannerFileId);
+        const files = await bucket.find({ _id: objId }).toArray();
+        if (files.length === 0) return jsonResponse({ success: false, error: 'Banner missing' }, 404);
+        const fileDoc = files[0];
+        const nodeStream = bucket.openDownloadStream(objId);
+        const webStream = new ReadableStream({
+          start(controller) {
+            nodeStream.on('data', (c) => controller.enqueue(new Uint8Array(c)));
+            nodeStream.on('end', () => controller.close());
+            nodeStream.on('error', (err) => controller.error(err));
+          },
+          cancel() { nodeStream.destroy(); },
+        });
+        return new Response(webStream, {
+          status: 200,
+          headers: {
+            'Content-Type': fileDoc.metadata?.contentType || 'image/jpeg',
+            'Content-Length': String(fileDoc.length || ''),
+            'Cache-Control': 'public, max-age=300',
+          }
+        });
+      } catch (e) {
+        return jsonResponse({ success: false, error: 'Failed to load banner' }, 500);
+      }
+    }
+
     // Home page data
     if (path === '/home' || path === '/') {
       await seedDatabase();
@@ -1745,6 +1799,21 @@ export async function GET(request) {
           getPassEnabled: !!cfg.getPassEnabled,
           getPassDurationDays: Number(cfg.getPassDurationDays) || 365,
           updatedAt: cfg.updatedAt || null,
+        }});
+      }
+
+      // Admin - Get Creative Control settings (hero banner)
+      if (path === '/admin/creative-control') {
+        const settings = await getCollection('site_settings');
+        const doc = await settings.findOne({ id: 'hero' });
+        return jsonResponse({ success: true, data: {
+          heroBannerImageUrl: doc?.heroBannerImageUrl || '',
+          heroBannerAlt: doc?.heroBannerAlt || 'Unishaala Banner',
+          heroBadgeTitle: doc?.heroBadgeTitle || '95% Success Rate',
+          heroBadgeSubtitle: doc?.heroBadgeSubtitle || 'In Top Exams',
+          heroBadgeColor: doc?.heroBadgeColor || 'green',
+          heroBannerFileId: doc?.heroBannerFileId || null,
+          updatedAt: doc?.updatedAt || null,
         }});
       }
 
@@ -5035,6 +5104,33 @@ export async function PUT(request) {
           getPassEnabled: !!cfg.getPassEnabled,
           getPassDurationDays: Number(cfg.getPassDurationDays) || 365,
           updatedAt: cfg.updatedAt || null,
+        }});
+      }
+
+      // Update Creative Control settings (hero banner text/color/alt and optional external image URL).
+      // File uploads go through a separate multipart endpoint.
+      if (path === '/admin/creative-control') {
+        const settings = await getCollection('site_settings');
+        const allowedColors = ['green', 'blue', 'amber', 'brand', 'purple', 'red'];
+        const update = { id: 'hero', updatedAt: new Date() };
+        if (typeof body.heroBadgeTitle === 'string') update.heroBadgeTitle = body.heroBadgeTitle.trim().slice(0, 120);
+        if (typeof body.heroBadgeSubtitle === 'string') update.heroBadgeSubtitle = body.heroBadgeSubtitle.trim().slice(0, 120);
+        if (typeof body.heroBannerAlt === 'string') update.heroBannerAlt = body.heroBannerAlt.trim().slice(0, 200);
+        if (typeof body.heroBadgeColor === 'string' && allowedColors.includes(body.heroBadgeColor)) {
+          update.heroBadgeColor = body.heroBadgeColor;
+        }
+        // Optional: allow admin to set an external URL directly instead of uploading
+        if (typeof body.heroBannerImageUrl === 'string') update.heroBannerImageUrl = body.heroBannerImageUrl.trim();
+        await settings.updateOne({ id: 'hero' }, { $set: update, $setOnInsert: { createdAt: new Date() } }, { upsert: true });
+        const doc = await settings.findOne({ id: 'hero' });
+        return jsonResponse({ success: true, data: {
+          heroBannerImageUrl: doc?.heroBannerImageUrl || '',
+          heroBannerAlt: doc?.heroBannerAlt || 'Unishaala Banner',
+          heroBadgeTitle: doc?.heroBadgeTitle || '95% Success Rate',
+          heroBadgeSubtitle: doc?.heroBadgeSubtitle || 'In Top Exams',
+          heroBadgeColor: doc?.heroBadgeColor || 'green',
+          heroBannerFileId: doc?.heroBannerFileId || null,
+          updatedAt: doc?.updatedAt || null,
         }});
       }
     }

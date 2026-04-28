@@ -72,6 +72,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   ClipboardCheck,
+  Sparkles,
   FileText as FileTextIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -98,6 +99,7 @@ function AdminSidebar({ activeTab, setActiveTab, userRole }) {
     { id: 'notes', label: 'Notes', icon: <FileDown className="w-5 h-5" /> },
     { id: 'notifications', label: 'Exam Notifications', icon: <Bell className="w-5 h-5" /> },
     { id: 'pricing', label: 'Pricing', icon: <IndianRupee className="w-5 h-5" /> },
+    { id: 'creative', label: 'Creative Control', icon: <Sparkles className="w-5 h-5" /> },
     { id: 'answer-keys', label: 'Answer Keys', icon: <ClipboardList className="w-5 h-5" /> },
     { id: 'transactions', label: 'Transactions', icon: <CreditCard className="w-5 h-5" /> },
     { id: 'jobs', label: 'Jobs', icon: <Briefcase className="w-5 h-5" /> },
@@ -4585,6 +4587,7 @@ export default function AdminPage() {
           {activeTab === 'tests' && <TestsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'questions' && <QuestionsTab mockTests={data.mockTests} exams={data.exams} onRefresh={fetchData} />}
           {activeTab === 'reviewer' && <ReviewerTab userRole={user.role} />}
+          {activeTab === 'creative' && <CreativeControlTab />}
           {activeTab === 'blogs' && <BlogsTab />}
           {activeTab === 'notes' && <NotesTab exams={data.exams} />}
           {activeTab === 'notifications' && <NotificationsTab exams={data.exams} />}
@@ -6120,6 +6123,216 @@ function ReviewerListView({ questions }) {
           </Card>
         );
       })}
+    </div>
+  );
+}
+
+
+// ===== Creative Control Tab =====
+const CREATIVE_COLORS = [
+  { id: 'green', label: 'Green', cls: 'bg-green-100 text-green-600' },
+  { id: 'blue', label: 'Blue', cls: 'bg-blue-100 text-blue-600' },
+  { id: 'amber', label: 'Amber', cls: 'bg-amber-100 text-amber-600' },
+  { id: 'brand', label: 'Brand', cls: 'bg-brand-100 text-brand-600' },
+  { id: 'purple', label: 'Purple', cls: 'bg-purple-100 text-purple-600' },
+  { id: 'red', label: 'Red', cls: 'bg-red-100 text-red-600' },
+];
+
+function CreativeControlTab() {
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState(Date.now());
+  const fileRef = useRef(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const r = await fetch('/api/admin/creative-control', { credentials: 'include' });
+      const d = await r.json();
+      if (d.success) setSettings(d.data);
+      else toast.error(d.error || 'Failed to load settings');
+    } catch (_e) { toast.error('Failed to load'); }
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const r = await fetch('/api/admin/creative-control', {
+        method: 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          heroBadgeTitle: settings.heroBadgeTitle,
+          heroBadgeSubtitle: settings.heroBadgeSubtitle,
+          heroBannerAlt: settings.heroBannerAlt,
+          heroBadgeColor: settings.heroBadgeColor,
+          heroBannerImageUrl: settings.heroBannerImageUrl,
+        }),
+      });
+      const d = await r.json();
+      if (d.success) {
+        toast.success('Saved. Changes will reflect on the home page.');
+        setSettings(d.data);
+        setPreview(Date.now());
+      } else {
+        toast.error(d.error || 'Save failed');
+      }
+    } catch (_e) { toast.error('Save failed'); }
+    setSaving(false);
+  };
+
+  const uploadBanner = async (file) => {
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { toast.error('Image too large (max 8 MB)'); return; }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('image', file);
+      const r = await fetch('/api/admin/creative-control/banner-image', {
+        method: 'POST', credentials: 'include', body: fd,
+      });
+      const d = await r.json();
+      if (d.success) {
+        toast.success('Banner image updated');
+        await load();
+        setPreview(Date.now());
+      } else {
+        toast.error(d.error || 'Upload failed');
+      }
+    } catch (_e) { toast.error('Upload failed'); }
+    setUploading(false);
+  };
+
+  if (loading || !settings) {
+    return <Card><CardContent className="p-12 text-center"><Loader2 className="w-8 h-8 animate-spin mx-auto text-brand-600" /></CardContent></Card>;
+  }
+
+  const colorDef = CREATIVE_COLORS.find(c => c.id === settings.heroBadgeColor) || CREATIVE_COLORS[0];
+  const previewSrc = settings.heroBannerImageUrl
+    ? (settings.heroBannerImageUrl.startsWith('/api/') ? `${settings.heroBannerImageUrl.split('?')[0]}?v=${preview}` : settings.heroBannerImageUrl)
+    : 'https://customer-assets.emergentagent.com/job_7acc3893-d2c4-4511-8e86-2a2521e5fe9d/artifacts/harwama0_banner_%20finsl.png';
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center gap-3">
+        <Sparkles className="w-6 h-6 text-brand-600" />
+        <div>
+          <h2 className="text-2xl font-bold">Creative Control</h2>
+          <p className="text-sm text-gray-500">Manage the home page hero banner image and badge.</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Editor */}
+        <Card>
+          <CardContent className="p-6 space-y-5">
+            <h3 className="font-semibold text-lg">Banner Image</h3>
+            <div>
+              <div className="relative rounded-xl overflow-hidden border bg-gray-50">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={previewSrc} alt="banner preview" className="w-full object-cover max-h-72" />
+                {uploading && (
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                    <Loader2 className="w-8 h-8 animate-spin text-white" />
+                  </div>
+                )}
+              </div>
+              <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; uploadBanner(f); e.target.value = ''; }} />
+              <div className="flex gap-2 mt-3">
+                <Button onClick={() => fileRef.current?.click()} disabled={uploading}>
+                  <Upload className="w-4 h-4 mr-1" /> {settings.heroBannerFileId ? 'Replace Image' : 'Upload Image'}
+                </Button>
+                <Button variant="outline" onClick={() => setPreview(Date.now())} title="Refresh preview">
+                  Refresh
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500 mt-2">JPG/PNG/WEBP/GIF, up to 8 MB. Uploaded image automatically replaces the existing one.</p>
+            </div>
+            <div>
+              <Label>Image alt text</Label>
+              <Input value={settings.heroBannerAlt || ''} onChange={e => setSettings({ ...settings, heroBannerAlt: e.target.value })} placeholder="Describe the banner (accessibility)" />
+            </div>
+            <div>
+              <Label>Or use an external image URL (optional)</Label>
+              <Input value={settings.heroBannerImageUrl || ''} onChange={e => setSettings({ ...settings, heroBannerImageUrl: e.target.value })} placeholder="https://..." />
+              <p className="text-xs text-gray-500 mt-1">If set, this URL overrides any uploaded image. Leave blank to use the uploaded image.</p>
+            </div>
+
+            <hr />
+
+            <h3 className="font-semibold text-lg">Badge Text</h3>
+            <div>
+              <Label>Title (e.g., "95% Success Rate")</Label>
+              <Input value={settings.heroBadgeTitle || ''} onChange={e => setSettings({ ...settings, heroBadgeTitle: e.target.value })} maxLength={120} />
+            </div>
+            <div>
+              <Label>Subtitle (e.g., "In Top Exams")</Label>
+              <Input value={settings.heroBadgeSubtitle || ''} onChange={e => setSettings({ ...settings, heroBadgeSubtitle: e.target.value })} maxLength={120} />
+            </div>
+            <div>
+              <Label>Accent colour</Label>
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mt-1">
+                {CREATIVE_COLORS.map(c => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => setSettings({ ...settings, heroBadgeColor: c.id })}
+                    className={`px-2 py-1.5 rounded border text-xs font-medium flex items-center gap-2 ${settings.heroBadgeColor === c.id ? 'border-brand-500 ring-2 ring-brand-200' : 'border-gray-300'}`}
+                  >
+                    <span className={`w-4 h-4 rounded-full ${c.cls.split(' ')[0]}`}></span>
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex justify-end">
+              <Button onClick={save} disabled={saving}>
+                {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                Save Changes
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Live Preview */}
+        <Card>
+          <CardContent className="p-6">
+            <h3 className="font-semibold text-lg mb-4 flex items-center gap-2"><Eye className="w-5 h-5 text-brand-600" /> Live Preview</h3>
+            <div className="bg-gradient-to-b from-brand-50 to-white rounded-xl p-6">
+              <div className="relative">
+                <div className="bg-brand-100 rounded-3xl p-3 overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={previewSrc} alt={settings.heroBannerAlt || ''} className="rounded-2xl shadow-xl w-full object-cover" />
+                </div>
+                <div className="absolute -bottom-4 -left-4 bg-white rounded-xl shadow-lg p-4">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${colorDef.cls.split(' ')[0]}`}>
+                      <Trophy className={`w-6 h-6 ${colorDef.cls.split(' ')[1]}`} />
+                    </div>
+                    <div>
+                      <p className="font-semibold">{settings.heroBadgeTitle || '—'}</p>
+                      <p className="text-sm text-gray-500">{settings.heroBadgeSubtitle || '—'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 mt-6">This is how the hero section will appear on the home page.</p>
+            </div>
+            <div className="mt-4">
+              <Link href="/" target="_blank">
+                <Button variant="outline" className="w-full">
+                  Open home page in new tab
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

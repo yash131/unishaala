@@ -37,7 +37,22 @@ import {
 } from 'lucide-react';
 
 // Hero Section
-function HeroSection() {
+const BADGE_COLOR_MAP = {
+  green: { bg: 'bg-green-100', text: 'text-green-600' },
+  blue: { bg: 'bg-blue-100', text: 'text-blue-600' },
+  amber: { bg: 'bg-amber-100', text: 'text-amber-600' },
+  brand: { bg: 'bg-brand-100', text: 'text-brand-600' },
+  purple: { bg: 'bg-purple-100', text: 'text-purple-600' },
+  red: { bg: 'bg-red-100', text: 'text-red-600' },
+};
+
+function HeroSection({ creative }) {
+  const bannerSrc = creative?.heroBannerImageUrl || 'https://customer-assets.emergentagent.com/job_7acc3893-d2c4-4511-8e86-2a2521e5fe9d/artifacts/harwama0_banner_%20finsl.png';
+  const bannerAlt = creative?.heroBannerAlt || 'UPPSC Full Length Test - Unishaala';
+  const badgeTitle = creative?.heroBadgeTitle || '95% Success Rate';
+  const badgeSubtitle = creative?.heroBadgeSubtitle || 'In Top Exams';
+  const badgeColor = BADGE_COLOR_MAP[creative?.heroBadgeColor || 'green'] || BADGE_COLOR_MAP.green;
+
   return (
     <section className="pt-20 bg-gradient-to-b from-brand-50 to-white">
       <div className="container mx-auto px-4 py-16">
@@ -79,20 +94,21 @@ function HeroSection() {
           </div>
           <div className="relative">
             <div className="bg-brand-100 rounded-3xl p-4 overflow-hidden">
-              <img 
-                src="https://customer-assets.emergentagent.com/job_7acc3893-d2c4-4511-8e86-2a2521e5fe9d/artifacts/harwama0_banner_%20finsl.png" 
-                alt="UPPSC Full Length Test - Unishaala" 
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={bannerSrc}
+                alt={bannerAlt}
                 className="rounded-2xl shadow-xl w-full object-cover"
               />
             </div>
             <div className="absolute -bottom-4 -left-4 bg-white rounded-xl shadow-lg p-4">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                  <Trophy className="w-6 h-6 text-green-600" />
+                <div className={`w-12 h-12 ${badgeColor.bg} rounded-full flex items-center justify-center`}>
+                  <Trophy className={`w-6 h-6 ${badgeColor.text}`} />
                 </div>
                 <div>
-                  <p className="font-semibold">95% Success Rate</p>
-                  <p className="text-sm text-gray-500">In Top Exams</p>
+                  <p className="font-semibold">{badgeTitle}</p>
+                  <p className="text-sm text-gray-500">{badgeSubtitle}</p>
                 </div>
               </div>
             </div>
@@ -514,16 +530,24 @@ export default function HomePage() {
     colleges: [],
     blogs: []
   });
+  const [creative, setCreative] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const response = await fetch('/api/home');
-        const result = await response.json();
+        const [hr, cr] = await Promise.all([
+          fetch('/api/home'),
+          fetch('/api/creative-control'),
+        ]);
+        const result = await hr.json();
         if (result.success) {
           setData(result.data);
         }
+        try {
+          const cj = await cr.json();
+          if (cj.success) setCreative(cj.data);
+        } catch (_e) {}
       } catch (error) {
         console.error('Error fetching home data:', error);
       } finally {
@@ -548,7 +572,7 @@ export default function HomePage() {
     <div className="min-h-screen">
       <MainNavbar />
       <AccessGateBanner />
-      <HeroSection />
+      <HeroSection creative={creative} />
       <JobNotifications jobs={data.jobs} />
       <PopularExams exams={data.exams} />
       <FeaturesSection />
