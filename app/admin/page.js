@@ -73,6 +73,7 @@ import {
   ThumbsDown,
   ClipboardCheck,
   Sparkles,
+  Trophy,
   FileText as FileTextIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
