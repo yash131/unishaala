@@ -1054,6 +1054,12 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
   const [selectedQuestions, setSelectedQuestions] = useState([]);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // PYQ PDF Attachment State
+  const [currentTestData, setCurrentTestData] = useState(null);
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const [pdfPermission, setPdfPermission] = useState('view');
+  const pdfInputRef = useRef(null);
+
   // Fetch domains on mount
   useEffect(() => {
     fetchDomains();
@@ -1154,6 +1160,94 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
       console.error(e);
     }
     setLoading(false);
+  };
+
+  // Fetch full test details (incl. PDF metadata) when a test is selected
+  const refreshTestData = async () => {
+    if (!selectedTestId) { setCurrentTestData(null); return; }
+    try {
+      const res = await fetch('/api/admin/mock-tests', { credentials: 'include' });
+      const data = await res.json();
+      if (data.success) {
+        const t = (data.data || []).find(x => x.id === selectedTestId);
+        setCurrentTestData(t || null);
+        if (t?.pdfPermission) setPdfPermission(t.pdfPermission);
+        else setPdfPermission('view');
+      }
+    } catch (e) { console.error('Failed to fetch test details', e); }
+  };
+
+  useEffect(() => { refreshTestData(); /* eslint-disable-next-line */ }, [selectedTestId]);
+
+  const handlePdfUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!/\.pdf$/i.test(file.name)) { toast.error('Please choose a .pdf file'); return; }
+    if (file.size > 25 * 1024 * 1024) { toast.error('PDF too large (max 25 MB)'); return; }
+
+    setPdfUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('pdf', file);
+      fd.append('permission', pdfPermission);
+      const res = await fetch(`/api/admin/mock-tests/${selectedTestId}/upload-pdf`, {
+        method: 'POST',
+        credentials: 'include',
+        body: fd,
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(currentTestData?.pdfFileId ? 'PDF replaced' : 'PDF uploaded');
+        setCurrentTestData(data.data);
+        if (data.data?.pdfPermission) setPdfPermission(data.data.pdfPermission);
+        onRefresh && onRefresh();
+      } else {
+        toast.error(data.error || 'Upload failed');
+      }
+    } catch (err) {
+      toast.error('Upload failed');
+    } finally {
+      setPdfUploading(false);
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
+    }
+  };
+
+  const handlePdfDelete = async () => {
+    if (!confirm('Remove the attached PDF for this PYQ test?')) return;
+    try {
+      const res = await fetch(`/api/admin/mock-tests/${selectedTestId}/upload-pdf`, {
+        method: 'DELETE', credentials: 'include',
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('PDF removed');
+        setCurrentTestData(data.data);
+        setPdfPermission('view');
+        onRefresh && onRefresh();
+      } else {
+        toast.error(data.error || 'Failed to remove');
+      }
+    } catch (err) { toast.error('Failed to remove'); }
+  };
+
+  const handlePermissionChange = async (val) => {
+    setPdfPermission(val);
+    if (!currentTestData?.pdfFileId) return; // only persist if a PDF is attached
+    try {
+      const res = await fetch(`/api/admin/mock-tests/${selectedTestId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ pdfPermission: val }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('PDF access updated');
+        await refreshTestData();
+      } else {
+        toast.error(data.error || 'Failed to update');
+      }
+    } catch (err) { toast.error('Failed to update'); }
   };
 
   const selectedExam = exams.find(e => e.id === selectedExamId);
@@ -1663,6 +1757,122 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
                 <ClipboardList className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                 <p className="text-gray-500 mb-4">No {selectedTypeInfo?.label || 'tests'} found for {selectedExam?.name}</p>
                 <p className="text-sm text-gray-400">Create a test first in the "Tests" tab</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* PYQ PDF Attachment (only for previous_year test type) */}
+      {selectedTestId && selectedTestType === 'previous_year' && (
+        <Card className="mb-6 border-purple-200">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileTextIcon className="w-5 h-5 text-purple-600" /> PYQ PDF Attachment
+              <Badge variant="outline" className="text-xs ml-1 border-purple-300 text-purple-700">Optional</Badge>
+            </CardTitle>
+            <p className="text-sm text-gray-500">
+              Attach the original question paper PDF. When attached, users see a split button: <b>Download/View PDF</b> + <b>Start Test</b>. PDFs are stored in MongoDB GridFS.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {currentTestData?.pdfFileId ? (
+              <div className="p-4 bg-purple-50/50 border border-purple-200 rounded-lg">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 rounded-lg bg-purple-600 text-white flex items-center justify-center flex-shrink-0">
+                      <FileTextIcon className="w-5 h-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium text-gray-900 truncate" title={currentTestData.pdfFileName}>
+                        {currentTestData.pdfFileName || 'PDF attached'}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {currentTestData.pdfPageCount || 0} pages · {((currentTestData.pdfSize || 0) / 1024 / 1024).toFixed(2)} MB · uploaded {currentTestData.pdfUploadedAt ? new Date(currentTestData.pdfUploadedAt).toLocaleString() : '-'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={`/api/pdfs/${currentTestData.pdfPreviewFileId}/preview`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-purple-700 hover:underline inline-flex items-center gap-1"
+                    >
+                      <Eye className="w-4 h-4" /> Preview
+                    </a>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs text-gray-700">PDF Access</Label>
+                    <Select value={pdfPermission} onValueChange={handlePermissionChange}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="view">View Only (no download)</SelectItem>
+                        <SelectItem value="view_download">Download Allowed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <Input
+                      ref={pdfInputRef}
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      onChange={handlePdfUpload}
+                      disabled={pdfUploading}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      onClick={handlePdfDelete}
+                      disabled={pdfUploading}
+                      className="flex-shrink-0"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" /> Remove
+                    </Button>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Pick a new PDF in the file box above to <b>replace</b> the current one (max 25 MB).</p>
+              </div>
+            ) : (
+              <div className="p-4 border-2 border-dashed border-purple-300 rounded-lg bg-purple-50/40">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
+                  <div>
+                    <Label className="text-sm text-gray-700">Choose a PDF (max 25 MB)</Label>
+                    <Input
+                      ref={pdfInputRef}
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      onChange={handlePdfUpload}
+                      disabled={pdfUploading}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-sm text-gray-700">PDF Access</Label>
+                    <Select value={pdfPermission} onValueChange={setPdfPermission}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="view">View Only (no download)</SelectItem>
+                        <SelectItem value="view_download">Download Allowed</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                {pdfUploading && (
+                  <p className="text-xs text-purple-700 mt-2 flex items-center gap-1">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading & generating preview…
+                  </p>
+                )}
+                <p className="text-xs text-gray-500 mt-2">No PDF attached. The user-side PYQ test card will show a normal Start Test button.</p>
               </div>
             )}
           </CardContent>

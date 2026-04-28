@@ -4874,9 +4874,18 @@ export async function PUT(request) {
       if (path.startsWith('/admin/mock-tests/')) {
         const testId = path.split('/admin/mock-tests/')[1];
         const mockTests = await getCollection('mock_tests');
+        const updateData = { ...body, updatedAt: new Date() };
+        // Validate pdfPermission if provided; otherwise drop to avoid storing junk.
+        if (body.pdfPermission !== undefined) {
+          if (body.pdfPermission === 'view' || body.pdfPermission === 'view_download') {
+            updateData.pdfPermission = body.pdfPermission;
+          } else {
+            delete updateData.pdfPermission;
+          }
+        }
         await mockTests.updateOne(
           { id: testId },
-          { $set: { ...body, updatedAt: new Date() } }
+          { $set: updateData }
         );
         return jsonResponse({ success: true, message: 'Mock test updated' });
       }
@@ -5153,12 +5162,29 @@ export async function DELETE(request) {
       return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
     }
 
-    // Delete Mock Test (also delete its questions)
+    // Delete Mock Test (also delete its questions and any attached PDF)
     if (path.startsWith('/admin/mock-tests/')) {
       const testId = path.split('/admin/mock-tests/')[1];
       const mockTests = await getCollection('mock_tests');
       const questions = await getCollection('questions');
-      
+      const test = await mockTests.findOne({ id: testId });
+
+      // Clean up any GridFS PDF files associated with this test
+      if (test && (test.pdfFileId || test.pdfPreviewFileId)) {
+        try {
+          const { ObjectId } = require('mongodb');
+          const { getPdfBucket } = require('@/lib/db');
+          const bucket = await getPdfBucket('pdfs');
+          for (const fid of [test.pdfFileId, test.pdfPreviewFileId]) {
+            if (fid) {
+              try { await bucket.delete(new ObjectId(fid)); } catch (_) {}
+            }
+          }
+        } catch (e) {
+          console.error('PDF cleanup error on mock test delete:', e);
+        }
+      }
+
       await mockTests.deleteOne({ id: testId });
       await questions.deleteMany({ mockTestId: testId });
       

@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/dialog';
 import {
   GraduationCap, ArrowLeft, ArrowRight, Loader2, Layers,
-  Target, FileText, Clock, ChevronRight, CheckCircle, BookOpen, Lock, Crown, ShieldCheck
+  Target, FileText, Clock, ChevronRight, CheckCircle, BookOpen, Lock, Crown, ShieldCheck,
+  Download, Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -146,6 +147,36 @@ export default function PreviousYearPage() {
       router.push(`/practice-test/${t.id}`);
     } else {
       setUnlockOpen(true);
+    }
+  };
+
+  const handlePdfAction = async (t) => {
+    if (!t?.pdfFileId) return;
+    if (t.pdfPermission === 'view_download') {
+      // Trigger download via blob save
+      try {
+        const res = await fetch(`/api/pdfs/${t.pdfFileId}/download`, { credentials: 'include' });
+        if (!res.ok) {
+          if (res.status === 401) { router.push('/login?next=/previous-year'); return; }
+          const j = await res.json().catch(() => ({}));
+          toast.error(j.error || 'Could not download PDF');
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = t.pdfFileName || `${t.title || 'pyq'}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        toast.error('Failed to download PDF');
+      }
+    } else {
+      // View only — open full PDF in new tab (auth required by API)
+      window.open(`/api/pdfs/${t.pdfFileId}/full`, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -355,7 +386,7 @@ export default function PreviousYearPage() {
                     onBuy={() => handlePayment('domain')}
                   />
                 )}
-                <TestList tests={tests} domain={selectedDomain} unlocked={domainUnlocked || hasActivePass} onStart={handleStartTest} />
+                <TestList tests={tests} domain={selectedDomain} unlocked={domainUnlocked || hasActivePass} onStart={handleStartTest} onPdf={handlePdfAction} />
               </>
             )}
           </>
@@ -556,7 +587,7 @@ function DomainPicker({ domains, purchasedPyqDomains, examUnlocked, hasActivePas
   );
 }
 
-function TestList({ tests, domain, unlocked, onStart }) {
+function TestList({ tests, domain, unlocked, onStart, onPdf }) {
   if (!tests || tests.length === 0) {
     return <EmptyState icon={<FileText className="w-7 h-7" />} title="No tests available" hint={`No published previous-year tests under ${domain?.name || 'this domain'} yet.`} />;
   }
@@ -567,6 +598,8 @@ function TestList({ tests, domain, unlocked, onStart }) {
         {tests.map(t => {
           const free = t.isFree;
           const canStart = free || unlocked;
+          const hasPdf = !!t.pdfFileId;
+          const canDownload = t.pdfPermission === 'view_download';
           return (
             <Card key={t.id} className="hover:shadow-lg transition">
               <CardContent className="p-5">
@@ -581,12 +614,38 @@ function TestList({ tests, domain, unlocked, onStart }) {
                       <span className="flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> {t.questionCount || 0} questions</span>
                       {t.duration ? <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {t.duration} min</span> : null}
                       {free ? <Badge className="bg-green-500">Free</Badge> : unlocked ? <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" /> Unlocked</Badge> : <Badge className="bg-gray-500"><Lock className="w-3 h-3 mr-1" /> Locked</Badge>}
+                      {hasPdf && (
+                        <Badge variant="outline" className="border-purple-300 text-purple-700">
+                          {canDownload ? (<><Download className="w-3 h-3 mr-1" /> PDF · Download</>) : (<><Eye className="w-3 h-3 mr-1" /> PDF · View</>)}
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 </div>
-                <Button onClick={() => onStart(t)} className={`w-full mt-4 ${canStart ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-500 hover:bg-gray-600'}`}>
-                  {canStart ? <><BookOpen className="w-4 h-4 mr-2" /> Start with Solutions</> : <><Lock className="w-4 h-4 mr-2" /> Unlock to start</>}
-                </Button>
+                {hasPdf ? (
+                  <div className="mt-4 flex items-stretch rounded-md overflow-hidden shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => onPdf(t)}
+                      className="flex-1 inline-flex items-center justify-center gap-2 bg-white border border-purple-300 text-purple-700 hover:bg-purple-50 px-4 py-2.5 text-sm font-medium transition"
+                      title={canDownload ? 'Download original question paper PDF' : 'View original question paper PDF'}
+                    >
+                      {canDownload ? <Download className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      <span>{canDownload ? 'Download PDF' : 'View PDF'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onStart(t)}
+                      className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white transition ${canStart ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-500 hover:bg-gray-600'}`}
+                    >
+                      {canStart ? <><BookOpen className="w-4 h-4" /> Start Test</> : <><Lock className="w-4 h-4" /> Unlock to start</>}
+                    </button>
+                  </div>
+                ) : (
+                  <Button onClick={() => onStart(t)} className={`w-full mt-4 ${canStart ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-500 hover:bg-gray-600'}`}>
+                    {canStart ? <><BookOpen className="w-4 h-4 mr-2" /> Start with Solutions</> : <><Lock className="w-4 h-4 mr-2" /> Unlock to start</>}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           );

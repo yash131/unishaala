@@ -1,49 +1,42 @@
-<analysis>**original_problem_statement**: 
-The user requested UI/UX and thematic enhancements, specifically changing the site's dominant color to a specific pink () and applying a specific logo green () to designated sections. Additional homepage updates included changing Test Series text to Exam, simplifying the Access Restricted pop-up, and replacing the College Finder section with a marquee-style Blog section. 
-On the backend, the user introduced a new CSV format for uploading exam questions using direct Bunny.net image URLs instead of a ZIP file. The system needed to process these image URLs, handle re-uploads cleanly without caching/duplicate issues, and route URL-based CSV uploads correctly from the admin dashboard.
+<analysis>### Handover Summary
+
+**original_problem_statement**: 
+The user requested the addition of multiple major features and an overhaul of the platform:
+1. **User Dashboard:** A dashboard with complete analytics (exams attempted, history, scores, ranks, performance) categorized by Mock Tests, Practice, and PYQs.
+2. **Reviewer Workflow:** An admin workflow where CSV question uploads don't auto-publish. Instead, they go to a Reviewer panel where admins can preview the test and manually publish or reject it.
+3. **Manage Account (Profile) Page:** A fully functional profile page covering Profile/Security (password, 2FA, avatar, session logout), Purchases, Learning Activity, Notifications/Preferences, Payments, and Support/Account deletion.
+4. **Creative Control Admin Panel:** An admin module to customize the homepage banner image and text dynamically.
+5. Previous pending features: Get Pass unified purchasing, Exam notifications, Premium Notes, etc. (mostly completed).
 
 **PRODUCT REQUIREMENTS**:
-1. Global Theme Update: Set  as the primary brand color and  as an accent background for specific components (About page stats/CTA).
-2. Homepage UI: Marquee-style auto-scrolling Blog cards, copy text updates.
-3. CSV Question Import: Support HTTP(S) image URLs directly in the CSV columns (, , option images).
-4. Idempotent Uploads: Replace existing questions mode to prevent duplicates when re-uploading the same CSV.
-5. Strict Caching Control: Ensure tests dynamically fetch updated images without caching stale assets.
+- Ensure all charts/visualizations on the dashboard use full visual representation (bar, line, pie).
+- Ensure existing live tests are left untouched by the new Reviewer workflow.
+- Ensure avatar uploads use GridFS and store  in the user document.
 
-**User's preferred language**: English (INSTRUCT next agent to respond in English only)
+**User's preferred language**: INSTRUCT next agent to respond in English only
 
 **what currently exists?** 
-A Next.js full-stack platform with MongoDB. It features user auth, Edge middleware for gated access, PDF management inside blogs, Rank Predictor, and an Admin dashboard. The site now utilizes a custom  pink brand palette and a robust URL-based CSV question importer that isolates data and prevents duplication via a replace existing upload mode.
+A monolithic Next.js full-stack platform with MongoDB. It features user auth, Razorpay payment systems, GridFS (for PDFs and user Avatars), and a highly centralized Admin panel. Recently added features include a detailed User Dashboard (), a comprehensive Manage Account page (), an Admin Reviewer queue for validating imported tests, and a Creative Control module for homepage customization.
 
 **Last working item**:
-    - **Last item agent was working**: Fixing a routing bug in the frontend Admin panel () that sent CSVs without ZIP files to the legacy  endpoint, causing image URLs to be ignored (specifically for the user's IMMI Test). 
-    - **Status**: USER VERIFICATION PENDING
-    - **Agent Testing Done**: Y
-    - **Which testing method agent to use?**: manual testing by python -c / mongodb queries
-    - **User Testing Done**: N
+    - Last item agent was working: Fixing a UI crash in the Admin panel where clicking the Creative Control tab threw a  because the Lucide React icon was not imported. 
+    - Status: USER VERIFICATION PENDING
+    - Agent Testing Done: Y
+    - Which testing method agent to use? manual bash check / screenshot tool
+    - User Testing Done: N
 
 **All Pending/In progress Issue list**:
-  - **Issue 1: Verify Rank Predictor NAT Mapping Fix (IGNORED TWICE)**
-     - **Attempted fixes**: Previous agent applied a fix to split HTML by question blocks to isolate properties, but it was never verified.
-     - **Next debug checklist**: Check  (predict-rank endpoint). Verify output for Question ID  and  to ensure 16.27 and 327.36 map accurately. Run a test script or cURL.
-     - **Why fix this issue and what will be achieved with the fix?**: Ensures accurate score calculation for NAT questions in Rank Predictor.
-     - **Status**: TESTING PENDING
-     - **Is recurring issue?**: Y (Persistently ignored by agents)
-     - **Should Test frontend/backend/both after fix?**: Backend
-     - **Blocked on other issue**: None
-     - **Priority**: P0
-
-  - **Issue 2: Accidental Deletion of Legacy Questions**
-     - **Attempted fixes**: N/A
-     - **Next debug checklist**: Assess if the user needs help recovering manually-added questions (where  was ), which were deleted by the agent's deduplication script. If unrecoverable, implement a Clear all questions button per test in the admin panel to allow safe manual resets in the future.
-     - **Why fix this issue and what will be achieved with the fix?**: Gives admins safe tools to manage test states after the destructive script ran.
-     - **Status**: NOT STARTED
-     - **Is recurring issue?**: N
-     - **Should Test frontend/backend/both after fix?**: Frontend/Backend
-     - **Blocked on other issue**: None
-     - **Priority**: P1
+  - **Issue 1: Verify Rank Predictor NAT Mapping Fix (IGNORED FIVE TIMES)**
+     - Attempted fixes: Earlier forks applied a fix to split HTML by question blocks for NAT mapping, but it was never verified.
+     - Next debug checklist: Check  (predict-rank endpoint). Verify output for Question ID  and  to ensure accurate mapping.
+     - Why fix this issue and what will be achieved with the fix?: Ensures accurate score calculation for NAT questions.
+     - Status: TESTING PENDING
+     - Is recurring issue?: Y
+     - Should Test frontend/backend/both after fix?: Backend
+     - Priority: P0
 
 **In progress Task List**:
-None currently active.
+None
 
 **Upcoming and Future Tasks**
     - P1: Add Clear submissions admin button per Answer Key.
@@ -53,94 +46,103 @@ None currently active.
     - P2: Email notification to admin on new contact form submission.
 
 **Completed work in this session**
-  - Updated Tailwind config and applied  (pink) as the primary brand color globally (DONE)
-  - Applied Unishaala logo green () to About page Stats and CTA section backgrounds (DONE)
-  - Replaced Test Series with Exam text on Homepage hero and updated subtitle (DONE)
-  - Simplified Access Gate Banner pop-up text (DONE)
-  - Implemented marquee-style auto-scrolling Blog cards on Homepage, replacing College Finder (DONE)
-  - Built direct URL-based CSV image import feature for Bunny.net compatibility in  (DONE)
-  - Fixed CSV duplication issues by introducing Replace existing questions mode and row-index mapping (DONE)
-  - Fixed image caching cross-pollution between mock tests by adding  headers and resetting state in  (DONE)
-  - Fixed Admin CSV upload routing bug so image-column CSVs correctly map to the new image-aware endpoint even without a ZIP (DONE)
+- Built User Dashboard Analytics () with Recharts visual charts and tabs for Mock, Practice, PYQ (DONE)
+- Built Admin Reviewer Workflow (Pending Review queue for CSV uploads, Test/List preview, Publish/Reject logic) (DONE)
+- Fixed Reviewer Test View scrolling bug ( fix) (DONE)
+- Updated homepage copy, updated phone number, added WhatsApp logo link (DONE)
+- Built complete Manage Account page () with Avatar upload (GridFS), password changes, logout from all devices via , and preferences (DONE)
+- Built Creative Control Admin panel to dynamically customize homepage banner text, badge, and image (DONE)
+- Fixed  icon import crash in the Admin panel for the Creative Control tab (DONE)
 
 **Earlier issues found/mentioned but not fixed**
-  - Issue 1: Verify Rank Predictor NAT Mapping (Carried over from 2 forks ago, still unverified).
+   - Issue 1: Verify Rank Predictor NAT Mapping
+   - Debug checklist: Manually invoke predict-rank logic with specific NAT Question IDs to ensure the parser correctly attributes points.
+   - Why to solve this issue and what will be achieved with this?: It's a dangling critical bug from early forks that affects user scoring correctness.
+   - Should Test frontend/backend/both after fix: Backend
+   - Is recurring issue? Y
 
 **Known issue recurrence from previous fork**
   - Issue recurrence in previous fork: Rank Predictor Mapping Verification ignored.
-  - Recurrence count: 2
+  - Recurrence count: 5
   - Status: TESTING PENDING
+  Note: Do not ignore this again. It has been carried over 5 times. Prioritize executing the test for this backend logic.
 
 **Code Architecture**
-- Monolithic API routing via 
-- Custom JWT auth checking Edge Middleware 
-- Server-side caching strictly disabled () on Mock Test questions to prevent CDN URL reuse issues.
+- Monolithic API routing via  (~5300 lines).
+- Highly centralized admin panel () (~6100 lines).
+- Edge Middleware  handles JWT auth checking. NextJS App Router frontend.
 
 **Key Technical Concepts**
-- Next.js App Router
-- Tailwind CSS custom color palettes ( overriding )
-- MongoDB  lookups (using both  and  for legacy backward compatibility)
-- Bunny.net CDN integration via CSV URL parsing
+- Next.js App Router (React 18)
+- MongoDB native driver ()
+- GridFS (Chunked streaming for Notes, Jobs, and now Avatars)
+- Recharts (Used for Dashboard analytics)
+- JSON Web Tokens (Now includes  for global session invalidation)
 
 **key DB schema**
   - : 
+  - : 
+  - : Contains 
+  -  /  via GridFS: Used for Avatars and notes.
 
 **changes in tech stack**
-  - Moved away from strictly requiring ZIP files for question images; system now natively supports direct CDN URL arrays parsed directly from the CSV.
+  - None
 
-**All files of reference**
-  -  & : Custom  palette added.
-  - : Heavily updated for Marquee blogs and text changes.
-  - : UI updated with Replace Mode toggle and URL-mode detection.
-  - : Handles URL scraping, validation, and idempotent replace operations.
-  - : Upload routing logic patched.
-  - : Cache-busting logic implemented.
+**All files of reference** 
+  -  (Updated with Reviewer, Manage Account, and Creative Control logic)
+  -  (Added ReviewerTab and CreativeControlTab)
+  -  (Created for User Analytics)
+  -  (Created for Manage Account functionality)
+  -  (Created for GridFS Avatar multipart uploads)
+  -  (Created for GridFS Banner uploads)
+  -  (Updated to fetch dynamic Creative Control settings)
+  -  (Updated to handle  for global logouts)
 
-**Areas that need refactoring**:
-  -  and  remain excessively large (4000+ lines). 
+**Areas that need refactoring**: 
+  -  and  are massive. Always use  and precise string matching.
 
 **key api endpoints**
-  - : Heavily modified to handle URL-based images and Replace existing logic.
-  - : Added  headers.
+  - 
+  - 
+  - 
+  - 
+  - 
 
-**Critical Info for New Agent**
-  - **Data Loss Warning**: The previous agent accidentally deleted ~212 legacy questions that had  while running a manual script. Always back up or triple-check MongoDB shell scripts before executing bulk deletes. 
-  - **Question IDs**: The system now matches mock test questions using  to bridge legacy code and new imports. Ensure you retain this pattern for backward compatibility.
-  - **Color Theming**: Use  and  classes instead of  or  directly, as the Tailwind config has been precisely calibrated to the user's reference hex .
+**Critical Info for New Agent** 
+  - **Reviewer Workflow**: Creating a test via CSV no longer auto-publishes. It sets  and . It must be approved in the ReviewerTab to go live.
+  - **Global Logouts**: Auth logic now includes a  in the JWT and the DB. Updating  in DB instantly invalidates all existing JWTs for that user.
+  - **Creative Control**: Fetches singleton document from  collection.
 
-**documents and test reports created in this job**
-  -  (Updated with CSV Import URL-based backend testing results)
+**documents and test reports created in this job** 
+  -  (Updated with Dashboard, Reviewer workflow, and Manage Account test results)
 
 **Last 10 User Messages and any pending HUMAN messages** 
- 1. **[PENDING]** User needs to verify if the IMMI Test CSV upload fix successfully loads images. User may ask for further tasks. 
- 2. **[RESOLVED]** User reported IMMI test CSV upload is not fetching images.
- 3. **[RESOLVED]** User reported the system incorrectly reused/cached images from previous uploads.
- 4. **[RESOLVED]** User reported uploaded images were missing in the exam viewer.
- 5. **[RESOLVED]** User requested to support a new CSV format with direct Bunny.net URLs in image columns instead of ZIP files.
- 6. **[RESOLVED]** User requested to update hero subtitle text.
- 7. **[RESOLVED]** User requested to replace the College Finder with a marquee-style Blog section.
- 8. **[RESOLVED]** User requested a minimal Login to get full access pop-up.
- 9. **[RESOLVED]** User requested to apply logo green color exclusively to About page Stats/CTA.
- 10. **[RESOLVED]** User asked to apply logo green color exclusively to the College finder section.
+ - [RESOLVED] Fix the error that occurs when clicking the “Creative Control” panel ( icon bug).
+ - [RESOLVED] Create a new section called “Creative Control”... update home page banner image and text.
+ - [RESOLVED] Fix the issue where clicking “Manage Account” does not open any page... Create a full Manage Account page.
+ - [RESOLVED] change popular exam with popular testseries on homepage.
+ - [RESOLVED] remove that badge from home screen.
+ - [RESOLVED] replace the text ‘Test Series’ with ‘Exam’, update phone number, add WhatsApp logo.
+ - [RESOLVED] Add a scroll feature in the Reviewer Test view so users can view all questions/options properly.
+ - [RESOLVED] Create a new section called ‘Reviewer’ for admin CSV uploads.
+ - [RESOLVED] Build the full Dashboard with visual charts and tabs.
 
 **Project Health Check:**
-  - Broken: Legacy manually-created questions () were permanently deleted via a bad script.
-  - Mocked: Twilio OTP.
+  - Broken: Rank Predictor NAT mapping logic (Untested regression carried over for multiple forks).
+  - Mocked: Phone OTP login flow remains bypassed/mocked to always verify.
 
-**3rd Party Integrations**
-  - Twilio (Phone OTP) — requires User API Key
-  - Razorpay (Payments) — requires User API Key
-  - Bunny.net (CDN) — images served dynamically via URLs (No API key required natively, just valid URLs)
+**3rd Party Integrations** 
+  - Razorpay (Payments) — requires User API Key (Present in )
+  - Twilio (Phone OTP) — requires User API Key (CURRENTLY BYPASSED)
 
 **Testing status**
-  - Testing agent used after significant changes: YES (backend testing agent used for CSV import).
+  - Testing agent used after significant changes: YES (Tested Dashboard Analytics, Reviewer Workflow, and Manage Account).
   - Troubleshoot agent used after agent stuck in loop: NO
-  - Test files created: None preserved.
-  - Known regressions: None code-wise, but data was lost (legacy questions).
+  - Test files created: None
+  - Known regressions: Rank Predictor NAT Mapping (Unverified).
 
 **Credentials to test flow:**
   - Admin Login:  / 
 
 **What agent forgot to execute**
-  - Issue 1: **Verify Rank Predictor NAT Mapping Fix** (The previous fork's P0 issue was ignored *again*).
-  - Add a Clear all questions button (Agent suggested it to fix their DB mistake but didn't implement it).</analysis>
+  - The agent did not test the Rank Predictor NAT Mapping (Issue 1), despite it being flagged from previous forks. Prioritize this immediately.</analysis>
