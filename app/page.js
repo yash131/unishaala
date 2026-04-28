@@ -172,7 +172,7 @@ function PopularExams({ exams }) {
     <section className="py-16 bg-gray-50">
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-gray-900">Popular Exams</h2>
+          <h2 className="text-3xl font-bold text-gray-900">Popular Test Series</h2>
           <p className="text-gray-600 mt-2 whitespace-pre-line">{`Practice with exam-level questions designed by experts.
 Analyze your performance, identify weak areas, and improve with every test.
 Get closer to your selection with each attempt.`}</p>
@@ -459,7 +459,7 @@ function Footer() {
           </div>
 
           <div>
-            <h4 className="font-bold text-gray-900 mb-4">Popular Exams</h4>
+            <h4 className="font-bold text-gray-900 mb-4">Popular Test Series</h4>
             <ul className="space-y-2 text-sm text-gray-600">
               <li><Link href="/exams/gate" className="hover:text-brand-600">GATE</Link></li>
               <li><Link href="/exams/cat" className="hover:text-brand-600">CAT</Link></li>
@@ -474,10 +474,6 @@ function Footer() {
               <li className="flex items-center gap-2">
                 <Mail className="w-4 h-4 text-brand-600" />
                 support@unishaala.com
-              </li>
-              <li className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-brand-600" />
-                <a href="tel:+919829132906" className="hover:text-brand-600">+91 98291 32906</a>
               </li>
               <li className="flex items-center gap-2">
                 <svg viewBox="0 0 24 24" className="w-4 h-4 text-green-600 fill-current" aria-hidden="true">
