@@ -116,9 +116,7 @@ export function MainNavbar() {
                     className="flex items-center gap-2 rounded-full p-1 pr-3 hover:bg-gray-50 border border-transparent hover:border-gray-200 transition"
                     aria-label="Profile menu"
                   >
-                    <span className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center font-bold shadow">
-                      {initial}
-                    </span>
+                    <Avatar user={user} initial={initial} />
                     {user.hasPass && <Crown className="w-4 h-4 text-amber-500" title="Active Pass" />}
                   </button>
                 </DropdownMenuTrigger>
@@ -220,5 +218,29 @@ export function MainNavbar() {
         )}
       </div>
     </nav>
+  );
+}
+
+
+function Avatar({ user, initial }) {
+  const [failed, setFailed] = useState(false);
+  // Only attempt to load the image if we have a user id AND either we were told
+  // an avatar exists OR we haven't already failed a previous load.
+  const tryImage = !!user?.id && !failed;
+  const src = tryImage ? `/api/user/${user.id}/avatar` : null;
+  return (
+    <span className="w-9 h-9 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 text-white flex items-center justify-center font-bold shadow overflow-hidden">
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt=""
+          className="w-full h-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span>{initial}</span>
+      )}
+    </span>
   );
 }

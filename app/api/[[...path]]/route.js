@@ -1197,9 +1197,51 @@ export async function GET(request) {
       if (!user) {
         return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
       }
-      const { password, ...userData } = user;
+      const { password, otp, otpExpiry, tokenVersion, ...userData } = user;
+      // Normalize some fields the Manage Account page expects
+      userData.notificationPrefs = userData.notificationPrefs || { emailEnabled: true, examReminders: true, productUpdates: true };
+      userData.hasPass = !!userData.hasPass;
       return jsonResponse({ success: true, data: userData });
     }
+
+    // Public avatar stream — GET /api/user/:userId/avatar
+    if (path.match(/^\/user\/[^/]+\/avatar$/)) {
+      const userId = path.split('/')[2];
+      const users = await getCollection('users');
+      const dbUser = await users.findOne({ id: userId });
+      if (!dbUser || !dbUser.avatarFileId) {
+        return jsonResponse({ success: false, error: 'Avatar not found' }, 404);
+      }
+      try {
+        const { ObjectId } = await import('mongodb');
+        const { getPdfBucket } = await import('@/lib/db');
+        const bucket = await getPdfBucket('avatars');
+        const objId = new ObjectId(dbUser.avatarFileId);
+        const files = await bucket.find({ _id: objId }).toArray();
+        if (files.length === 0) return jsonResponse({ success: false, error: 'Avatar not found' }, 404);
+        const fileDoc = files[0];
+        const nodeStream = bucket.openDownloadStream(objId);
+        const webStream = new ReadableStream({
+          start(controller) {
+            nodeStream.on('data', (c) => controller.enqueue(new Uint8Array(c)));
+            nodeStream.on('end', () => controller.close());
+            nodeStream.on('error', (err) => controller.error(err));
+          },
+          cancel() { nodeStream.destroy(); },
+        });
+        return new Response(webStream, {
+          status: 200,
+          headers: {
+            'Content-Type': fileDoc.metadata?.contentType || 'image/jpeg',
+            'Content-Length': String(fileDoc.length || ''),
+            'Cache-Control': 'public, max-age=86400',
+          }
+        });
+      } catch (e) {
+        return jsonResponse({ success: false, error: 'Failed to load avatar' }, 500);
+      }
+    }
+
 
     // Get user's purchased tests/exams
     if (path === '/user/purchases') {
@@ -2003,7 +2045,8 @@ export async function POST(request) {
         userId: newUser.id,
         email: newUser.email,
         role: newUser.role,
-        phoneVerified: true
+        phoneVerified: true,
+        tokenVersion: newUser.tokenVersion || 0
       });
       const response = jsonResponse({
         success: true,
@@ -2053,7 +2096,7 @@ export async function POST(request) {
         { $set: { isVerified: true, otp: null, otpExpiry: null } }
       );
 
-      const token = createToken({ userId: user.id, email: user.email, role: user.role, phoneVerified: user.phoneVerified === true });
+      const token = createToken({ userId: user.id, email: user.email, role: user.role, phoneVerified: user.phoneVerified === true, tokenVersion: user.tokenVersion || 0 });
       
       const response = jsonResponse({
         success: true,
@@ -2092,7 +2135,7 @@ export async function POST(request) {
         return jsonResponse({ success: false, error: 'Invalid credentials' }, 401);
       }
 
-      const token = createToken({ userId: user.id, email: user.email, role: user.role, phoneVerified: user.phoneVerified === true });
+      const token = createToken({ userId: user.id, email: user.email, role: user.role, phoneVerified: user.phoneVerified === true, tokenVersion: user.tokenVersion || 0 });
       
       const response = jsonResponse({
         success: true,
@@ -2125,6 +2168,133 @@ export async function POST(request) {
       response.cookies.delete('auth_token');
       return response;
     }
+
+    // ===== USER ACCOUNT ENDPOINTS =====
+
+    // Change password
+    if (path === '/user/change-password') {
+      const user = await getAuthUser(request);
+      if (!user) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+      const { oldPassword, newPassword } = body;
+      if (!oldPassword || !newPassword) {
+        return jsonResponse({ success: false, error: 'Both old and new password are required' }, 400);
+      }
+      if (String(newPassword).length < 6) {
+        return jsonResponse({ success: false, error: 'New password must be at least 6 characters' }, 400);
+      }
+      const users = await getCollection('users');
+      const dbUser = await users.findOne({ id: user.id });
+      if (!dbUser) return jsonResponse({ success: false, error: 'User not found' }, 404);
+      if (!dbUser.password) {
+        return jsonResponse({ success: false, error: 'Password change not available for social-login accounts. Use "Forgot password" instead.' }, 400);
+      }
+      const ok = await verifyPassword(oldPassword, dbUser.password);
+      if (!ok) return jsonResponse({ success: false, error: 'Old password is incorrect' }, 400);
+      const newHash = await hashPassword(newPassword);
+      // Also bump tokenVersion so other sessions are invalidated on password change
+      const newTv = (dbUser.tokenVersion || 0) + 1;
+      await users.updateOne({ id: user.id }, { $set: { password: newHash, tokenVersion: newTv, updatedAt: new Date() } });
+      // Re-issue cookie for the current device so the user stays logged in here
+      const newToken = createToken({ userId: dbUser.id, email: dbUser.email, role: dbUser.role, phoneVerified: dbUser.phoneVerified === true, tokenVersion: newTv });
+      const response = jsonResponse({ success: true, message: 'Password changed successfully. Other devices have been signed out.' });
+      response.cookies.set('auth_token', newToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60,
+      });
+      return response;
+    }
+
+    // Logout from all devices (including current)
+    if (path === '/user/logout-all-devices') {
+      const user = await getAuthUser(request);
+      if (!user) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+      const users = await getCollection('users');
+      await users.updateOne({ id: user.id }, { $inc: { tokenVersion: 1 }, $set: { updatedAt: new Date() } });
+      const response = jsonResponse({ success: true, message: 'Signed out from all devices' });
+      response.cookies.delete('auth_token');
+      return response;
+    }
+
+    // Update notification preferences
+    if (path === '/user/notification-prefs') {
+      const user = await getAuthUser(request);
+      if (!user) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+      const prefs = {
+        emailEnabled: body.emailEnabled !== false,
+        examReminders: body.examReminders !== false,
+        productUpdates: body.productUpdates !== false,
+      };
+      const users = await getCollection('users');
+      await users.updateOne({ id: user.id }, { $set: { notificationPrefs: prefs, updatedAt: new Date() } });
+      return jsonResponse({ success: true, message: 'Notification preferences saved', data: prefs });
+    }
+
+    // Report an issue / support ticket
+    if (path === '/user/support-ticket') {
+      const user = await getAuthUser(request);
+      if (!user) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+      const { subject, message, category } = body;
+      if (!subject || !message) {
+        return jsonResponse({ success: false, error: 'Subject and message are required' }, 400);
+      }
+      const tickets = await getCollection('support_tickets');
+      const ticket = {
+        id: uuidv4(),
+        userId: user.id,
+        userName: user.name,
+        userEmail: user.email,
+        subject: String(subject).slice(0, 200),
+        message: String(message).slice(0, 4000),
+        category: category || 'general',
+        status: 'OPEN',
+        createdAt: new Date(),
+      };
+      await tickets.insertOne(ticket);
+      return jsonResponse({ success: true, message: 'Support ticket created. Our team will reach out to you soon.', data: { id: ticket.id } });
+    }
+
+    // Delete account
+    if (path === '/user/delete-account') {
+      const user = await getAuthUser(request);
+      if (!user) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+      if (['SUPER_ADMIN', 'ADMIN', 'CONTENT_MANAGER'].includes(user.role)) {
+        return jsonResponse({ success: false, error: 'Admin accounts cannot be self-deleted from here' }, 403);
+      }
+      const { password, confirm } = body;
+      if (confirm !== 'DELETE') {
+        return jsonResponse({ success: false, error: "Please type 'DELETE' to confirm" }, 400);
+      }
+      const users = await getCollection('users');
+      const dbUser = await users.findOne({ id: user.id });
+      if (!dbUser) return jsonResponse({ success: false, error: 'User not found' }, 404);
+      // If user has a password, require password confirmation
+      if (dbUser.password) {
+        if (!password) return jsonResponse({ success: false, error: 'Password is required' }, 400);
+        const ok = await verifyPassword(password, dbUser.password);
+        if (!ok) return jsonResponse({ success: false, error: 'Incorrect password' }, 400);
+      }
+      // Delete avatar from GridFS if any
+      try {
+        if (dbUser.avatarFileId) {
+          const { ObjectId } = await import('mongodb');
+          const bucket = await (await import('@/lib/db')).getPdfBucket('avatars');
+          try { await bucket.delete(new ObjectId(dbUser.avatarFileId)); } catch (_e) {}
+        }
+      } catch (_e) {}
+      // Anonymize attempts & transactions instead of hard-deleting (preserve leaderboards)
+      const attempts = await getCollection('test_attempts');
+      const transactions = await getCollection('transactions');
+      await attempts.updateMany({ userId: user.id }, { $set: { userId: `deleted:${user.id}`, userDeleted: true } });
+      await transactions.updateMany({ userId: user.id }, { $set: { userId: `deleted:${user.id}`, userDeleted: true } });
+      await users.deleteOne({ id: user.id });
+      const response = jsonResponse({ success: true, message: 'Account deleted' });
+      response.cookies.delete('auth_token');
+      return response;
+    }
+
 
     // Send Phone OTP via Twilio
     if (path === '/auth/send-otp') {
@@ -2232,7 +2402,8 @@ export async function POST(request) {
           userId: updated.id,
           email: updated.email,
           role: updated.role,
-          phoneVerified: true
+          phoneVerified: true,
+          tokenVersion: updated.tokenVersion || 0
         });
         const response = jsonResponse({
           success: true,
@@ -2315,7 +2486,7 @@ export async function POST(request) {
         }
 
         // Create our own token
-        const token = createToken({ userId: user.id, email: user.email, role: user.role, phoneVerified: user.phoneVerified === true });
+        const token = createToken({ userId: user.id, email: user.email, role: user.role, phoneVerified: user.phoneVerified === true, tokenVersion: user.tokenVersion || 0 });
         
         const response = jsonResponse({
           success: true,
@@ -4597,18 +4768,31 @@ export async function PUT(request) {
     const body = await request.json();
     const user = await getAuthUser(request);
 
-    // Update Profile
+    // Update Profile (name, email, phone; avatar and password are on dedicated endpoints)
     if (path === '/profile') {
       if (!user) {
         return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
       }
-      const { name, phone } = body;
+      const { name, phone, email } = body;
       const users = await getCollection('users');
-      await users.updateOne(
-        { id: user.id },
-        { $set: { name, phone, updatedAt: new Date() } }
-      );
-      return jsonResponse({ success: true, message: 'Profile updated' });
+      const update = { updatedAt: new Date() };
+      if (typeof name === 'string' && name.trim()) update.name = name.trim().slice(0, 100);
+      if (typeof phone === 'string') update.phone = phone.trim().slice(0, 20);
+      if (typeof email === 'string' && email.trim()) {
+        const newEmail = email.trim().toLowerCase();
+        // If email changed, ensure it's unique
+        if (newEmail !== (user.email || '').toLowerCase()) {
+          const exists = await users.findOne({ email: newEmail, id: { $ne: user.id } });
+          if (exists) {
+            return jsonResponse({ success: false, error: 'Email is already in use' }, 400);
+          }
+          update.email = newEmail;
+        }
+      }
+      await users.updateOne({ id: user.id }, { $set: update });
+      const updated = await users.findOne({ id: user.id });
+      const { password, otp, otpExpiry, ...safe } = updated || {};
+      return jsonResponse({ success: true, message: 'Profile updated', data: safe });
     }
 
     // Admin routes
