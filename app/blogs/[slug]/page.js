@@ -98,37 +98,37 @@ export default function BlogDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50/40">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand-50/40 overflow-x-hidden">
       <MainNavbar />
 
       <article className="pt-20">
         {/* Hero */}
         <div className="relative">
           {blog.image ? (
-            <div className="relative h-64 md:h-96 overflow-hidden">
+            <div className="relative h-48 sm:h-64 md:h-96 overflow-hidden">
               <img src={blog.image} alt={blog.title} className="w-full h-full object-cover" />
               <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"></div>
             </div>
           ) : (
-            <div className="h-40 bg-gradient-to-r from-brand-100 via-white to-brand-100"></div>
+            <div className="h-32 sm:h-40 bg-gradient-to-r from-brand-100 via-white to-brand-100"></div>
           )}
         </div>
 
-        <div className="container mx-auto px-4 -mt-24 md:-mt-32 relative z-10 pb-16">
+        <div className="container mx-auto px-3 sm:px-4 -mt-16 sm:-mt-24 md:-mt-32 relative z-10 pb-16">
           <div className="max-w-3xl mx-auto">
             <Link href="/blogs" className="inline-flex items-center text-white mb-4 hover:text-brand-200 transition-colors drop-shadow">
               <ArrowLeft className="w-4 h-4 mr-2" /> All Articles
             </Link>
 
-            <Card className="border-0 shadow-2xl bg-white/90 backdrop-blur">
-              <CardContent className="p-6 md:p-10">
+            <Card className="border-0 shadow-2xl bg-white/90 backdrop-blur overflow-hidden">
+              <CardContent className="p-4 sm:p-6 md:p-10">
                 <Badge className="bg-brand-100 text-brand-700 mb-4">Blog</Badge>
-                <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 leading-tight">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-4 leading-tight break-words">
                   {blog.title}
                 </h1>
 
                 {blog.description && (
-                  <p className="text-lg text-gray-600 mb-6 leading-relaxed">{blog.description}</p>
+                  <p className="text-base sm:text-lg text-gray-600 mb-6 leading-relaxed break-words">{blog.description}</p>
                 )}
 
                 <div className="flex flex-wrap items-center justify-between gap-4 pb-6 mb-6 border-b">
@@ -195,23 +195,52 @@ export default function BlogDetailPage() {
       </article>
 
       <style jsx global>{`
+        .blog-content {
+          /* Make sure user-pasted content cannot blow out the layout */
+          max-width: 100%;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+        .blog-content * { max-width: 100%; }
         .blog-content h1, .blog-content h2, .blog-content h3, .blog-content h4 {
           font-weight: 700;
           color: #111827;
           margin-top: 1.5em;
           margin-bottom: 0.6em;
           line-height: 1.3;
+          word-break: break-word;
+          overflow-wrap: anywhere;
         }
-        .blog-content h1 { font-size: 2em; }
-        .blog-content h2 { font-size: 1.5em; }
-        .blog-content h3 { font-size: 1.25em; }
-        .blog-content p { margin-bottom: 1em; color: #374151; line-height: 1.75; font-size: 1.05rem; }
-        .blog-content a { color: #0d9488; text-decoration: underline; }
+        .blog-content h1 { font-size: 1.6em; }
+        .blog-content h2 { font-size: 1.35em; }
+        .blog-content h3 { font-size: 1.18em; }
+        @media (min-width: 640px) {
+          .blog-content h1 { font-size: 2em; }
+          .blog-content h2 { font-size: 1.5em; }
+          .blog-content h3 { font-size: 1.25em; }
+        }
+        .blog-content p {
+          margin-bottom: 1em;
+          color: #374151;
+          line-height: 1.75;
+          font-size: 1rem;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
+        @media (min-width: 640px) {
+          .blog-content p { font-size: 1.05rem; }
+        }
+        .blog-content a {
+          color: #0d9488;
+          text-decoration: underline;
+          overflow-wrap: anywhere;
+          word-break: break-word;
+        }
         .blog-content a:hover { color: #0f766e; }
-        .blog-content ul, .blog-content ol { margin: 1em 0; padding-left: 1.5em; }
+        .blog-content ul, .blog-content ol { margin: 1em 0; padding-left: 1.25em; }
         .blog-content ul { list-style: disc; }
         .blog-content ol { list-style: decimal; }
-        .blog-content li { margin-bottom: 0.4em; color: #374151; line-height: 1.75; }
+        .blog-content li { margin-bottom: 0.4em; color: #374151; line-height: 1.75; overflow-wrap: anywhere; word-break: break-word; }
         .blog-content blockquote {
           border-left: 4px solid #14b8a6;
           padding: 0.5em 1em;
@@ -220,14 +249,76 @@ export default function BlogDetailPage() {
           background: #f0fdfa;
           border-radius: 0 0.5rem 0.5rem 0;
           font-style: italic;
+          overflow-wrap: anywhere;
         }
-        .blog-content img { max-width: 100%; border-radius: 0.75rem; margin: 1.25em 0; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-        .blog-content code { background: #f3f4f6; padding: 0.15em 0.35em; border-radius: 0.25em; font-size: 0.95em; color: #be185d; }
-        .blog-content pre { background: #0f172a; color: #e2e8f0; padding: 1em; border-radius: 0.5em; overflow-x: auto; margin: 1em 0; }
-        .blog-content pre code { background: transparent; color: inherit; padding: 0; }
+        .blog-content img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 0.75rem;
+          margin: 1.25em 0;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+          display: block;
+        }
+        .blog-content figure { max-width: 100%; margin: 1.25em 0; }
+        .blog-content figure img { margin: 0; }
+        .blog-content figure figcaption { font-size: 0.85em; color: #6b7280; text-align: center; margin-top: 0.5em; }
+        .blog-content code {
+          background: #f3f4f6;
+          padding: 0.15em 0.35em;
+          border-radius: 0.25em;
+          font-size: 0.9em;
+          color: #be185d;
+          word-break: break-word;
+          overflow-wrap: anywhere;
+        }
+        .blog-content pre {
+          background: #0f172a;
+          color: #e2e8f0;
+          padding: 1em;
+          border-radius: 0.5em;
+          overflow-x: auto;
+          margin: 1em 0;
+          max-width: 100%;
+          -webkit-overflow-scrolling: touch;
+        }
+        .blog-content pre code { background: transparent; color: inherit; padding: 0; white-space: pre; word-break: normal; overflow-wrap: normal; }
         .blog-content strong { font-weight: 700; color: #111827; }
         .blog-content em { font-style: italic; }
         .blog-content u { text-decoration: underline; }
+        /* Tables — wrap so they scroll horizontally on small screens instead of breaking layout */
+        .blog-content table {
+          display: block;
+          width: 100%;
+          max-width: 100%;
+          overflow-x: auto;
+          border-collapse: collapse;
+          margin: 1em 0;
+          -webkit-overflow-scrolling: touch;
+        }
+        .blog-content thead, .blog-content tbody, .blog-content tr { width: 100%; }
+        .blog-content th, .blog-content td {
+          border: 1px solid #e5e7eb;
+          padding: 0.5em 0.75em;
+          text-align: left;
+          vertical-align: top;
+          word-break: break-word;
+          overflow-wrap: anywhere;
+        }
+        .blog-content th { background: #f9fafb; font-weight: 600; color: #111827; }
+        /* Embedded media — keep responsive */
+        .blog-content iframe,
+        .blog-content video,
+        .blog-content embed,
+        .blog-content object {
+          max-width: 100%;
+          width: 100%;
+          height: auto;
+          aspect-ratio: 16 / 9;
+          border-radius: 0.5rem;
+          display: block;
+          margin: 1em 0;
+        }
+        .blog-content hr { border: 0; border-top: 1px solid #e5e7eb; margin: 1.5em 0; }
       `}</style>
     </div>
   );
