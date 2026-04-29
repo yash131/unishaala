@@ -232,7 +232,16 @@ export default function JobDetailPage() {
                     <span className="font-medium">Varies by category</span>
                   </div>
                 </div>
-                <Button className="w-full bg-brand-500 hover:bg-brand-600 text-lg py-6">
+                <Button
+                  className="w-full bg-brand-500 hover:bg-brand-600 text-lg py-6"
+                  disabled={!job.applyLink}
+                  onClick={() => {
+                    if (!job.applyLink) return;
+                    let url = String(job.applyLink).trim();
+                    if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+                    window.open(url, '_blank', 'noopener,noreferrer');
+                  }}
+                >
                   Know More <ExternalLink className="w-4 h-4 ml-2" />
                 </Button>
                 <p className="text-xs text-gray-500 mt-3 text-center">
