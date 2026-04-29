@@ -221,7 +221,7 @@ export default function JobDetailPage() {
           <div className="space-y-6">
             <Card className="sticky top-24">
               <CardContent className="p-6">
-                <h3 className="font-bold text-gray-900 mb-4">Apply Now</h3>
+                <h3 className="font-bold text-gray-900 mb-4">Know More</h3>
                 <div className="space-y-3 mb-6">
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-500">Application Deadline</span>
@@ -233,7 +233,7 @@ export default function JobDetailPage() {
                   </div>
                 </div>
                 <Button className="w-full bg-brand-500 hover:bg-brand-600 text-lg py-6">
-                  Apply Online <ExternalLink className="w-4 h-4 ml-2" />
+                  Know More <ExternalLink className="w-4 h-4 ml-2" />
                 </Button>
                 <p className="text-xs text-gray-500 mt-3 text-center">
                   You will be redirected to official website
