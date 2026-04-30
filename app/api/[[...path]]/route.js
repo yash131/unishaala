@@ -4571,21 +4571,6 @@ export async function POST(request) {
         return jsonResponse({ success: true, data: notifData });
       }
 
-      // Update Exam Notification
-      if (path.startsWith('/admin/notifications/')) {
-        const notifId = path.split('/admin/notifications/')[1];
-        const notifs = await getCollection('exam_notifications');
-        const updateData = { updatedAt: new Date() };
-        ['title', 'examName', 'description', 'date', 'link'].forEach(k => {
-          if (body[k] !== undefined) updateData[k] = body[k];
-        });
-        if (body.isNew !== undefined) updateData.isNew = !!body.isNew;
-        const r = await notifs.updateOne({ id: notifId }, { $set: updateData });
-        if (r.matchedCount === 0) return jsonResponse({ success: false, error: 'Notification not found' }, 404);
-        const updated = await notifs.findOne({ id: notifId });
-        return jsonResponse({ success: true, data: updated });
-      }
-
       // Create College
       if (path === '/admin/colleges') {
         const { name, location } = body;
@@ -4888,6 +4873,21 @@ export async function PUT(request) {
           { $set: updateData }
         );
         return jsonResponse({ success: true, message: 'Mock test updated' });
+      }
+
+      // Update Exam Notification
+      if (path.startsWith('/admin/notifications/')) {
+        const notifId = path.split('/admin/notifications/')[1];
+        const notifs = await getCollection('exam_notifications');
+        const updateData = { updatedAt: new Date() };
+        ['title', 'examName', 'description', 'date', 'link'].forEach(k => {
+          if (body[k] !== undefined) updateData[k] = body[k];
+        });
+        if (body.isNew !== undefined) updateData.isNew = !!body.isNew;
+        const r = await notifs.updateOne({ id: notifId }, { $set: updateData });
+        if (r.matchedCount === 0) return jsonResponse({ success: false, error: 'Notification not found' }, 404);
+        const updated = await notifs.findOne({ id: notifId });
+        return jsonResponse({ success: true, data: updated });
       }
 
       // Update Question

@@ -10,6 +10,34 @@ import { Logo } from '@/components/Logo';
 import { ArrowLeft, Loader2, Bell, Clock, ExternalLink, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
 
+// Auto-link plain URLs in user-entered descriptions while keeping line breaks.
+function linkifyDescription(text = '') {
+  if (!text) return null;
+  // Split on URL pattern; keep the matched URL parts so we can render them as <a>.
+  const urlRegex = /((?:https?:\/\/|www\.)[^\s<]+)/gi;
+  const parts = String(text).split(urlRegex);
+  return parts.map((part, idx) => {
+    if (!part) return null;
+    if (urlRegex.test(part)) {
+      // Reset regex lastIndex for safety in repeated tests
+      urlRegex.lastIndex = 0;
+      const href = part.startsWith('http') ? part : `https://${part}`;
+      return (
+        <a
+          key={idx}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-brand-600 underline hover:text-brand-700 break-words"
+        >
+          {part}
+        </a>
+      );
+    }
+    return <span key={idx}>{part}</span>;
+  });
+}
+
 export default function NotificationDetailsPage() {
   const params = useParams();
   const id = params?.id;
@@ -71,7 +99,9 @@ export default function NotificationDetailsPage() {
               )}
               <div className="mt-6 border-t pt-6">
                 {notif.description ? (
-                  <p className="text-gray-700 whitespace-pre-line leading-relaxed">{notif.description}</p>
+                  <p className="text-gray-700 whitespace-pre-line leading-relaxed break-words">
+                    {linkifyDescription(notif.description)}
+                  </p>
                 ) : (
                   <p className="text-gray-500 italic">No additional details provided.</p>
                 )}

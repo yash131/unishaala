@@ -4742,6 +4742,16 @@ export default function AdminPage() {
         const res = await fetch('/api/admin/exams', { credentials: 'include' });
         const d = await res.json();
         if (d.success) setData(p => ({ ...p, exams: d.data }));
+      } else if (activeTab === 'notifications') {
+        // Need exams for the Exam dropdown in the notification dialog
+        const [examsRes, notifsRes] = await Promise.all([
+          fetch('/api/admin/exams', { credentials: 'include' }),
+          fetch('/api/admin/notifications', { credentials: 'include' })
+        ]);
+        const examsData = await examsRes.json();
+        const notifsData = await notifsRes.json();
+        if (examsData.success) setData(p => ({ ...p, exams: examsData.data }));
+        if (notifsData.success) setData(p => ({ ...p, notifications: notifsData.data }));
       } else {
         const endpoints = { jobs: '/api/admin/jobs', colleges: '/api/admin/colleges', users: '/api/admin/users', testimonials: '/api/admin/testimonials', contacts: '/api/admin/contacts' };
         const endpoint = endpoints[activeTab];
