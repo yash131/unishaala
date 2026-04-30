@@ -1312,16 +1312,14 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
   const csvHeaders = ['test_title', 'topic_title', 'question_title', 'duration', 'description', 'solution_text', 'tip', 'status', 'option1_title', 'option2_title', 'option3_title', 'option4_title', 'correct_option_number'];
 
   const downloadSampleCSV = () => {
-    const sample = [
-      csvHeaders.join('\t'),
-      `${selectedTest?.title || 'Test Name'}\tData Structures\tWhat is the time complexity of binary search?\t2\tDescription here\tO(log n) because it divides space in half\tRemember divide and conquer\tActive\tO(n)\tO(log n)\tO(n²)\tO(1)\t2`
-    ].join('\n');
-    
-    const blob = new Blob([sample], { type: 'text/tab-separated-values' });
+    // Serve the exact pre-uploaded sample CSV (kept under /public/samples/)
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'questions_sample.csv';
+    a.href = '/samples/previous_year_paper_questions_sample.csv';
+    a.download = 'previous_year_paper_questions_sample.csv';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   };
 
   const exportCSV = () => {
