@@ -512,6 +512,177 @@ export async function GET(request) {
       return jsonResponse({ success: true, data: safeUser });
     }
 
+    // ================== Google OAuth (native, server-side redirect flow) ==================
+    // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+    // Step 1 — start the OAuth dance. Browser hits /api/auth/google/start?next=...
+    if (path === '/auth/google/start') {
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        return jsonResponse({ success: false, error: 'Google OAuth not configured' }, 500);
+      }
+      const reqUrl = new URL(request.url);
+      const next = searchParams.get('next') || '/';
+      // Use the live origin so the redirect URI matches what's registered in Google Cloud Console.
+      const origin = reqUrl.origin;
+      const redirectUri = `${origin}/api/auth/google/callback`;
+
+      // Tamper-proof CSRF state — random + signed copy of `next` baked in.
+      const stateRaw = `${uuidv4()}.${Buffer.from(next).toString('base64url')}`;
+
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: redirectUri,
+        response_type: 'code',
+        scope: 'openid email profile',
+        access_type: 'online',
+        include_granted_scopes: 'true',
+        prompt: 'select_account',
+        state: stateRaw,
+      });
+
+      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+      const res = NextResponse.redirect(authUrl, 302);
+      // Short-lived state cookie used to prevent CSRF on the callback.
+      res.cookies.set('gauth_state', stateRaw, {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 10 * 60, // 10 minutes
+      });
+      return res;
+    }
+
+    // Step 2 — Google redirects the browser back to /api/auth/google/callback?code=...&state=...
+    if (path === '/auth/google/callback') {
+      const code = searchParams.get('code');
+      const state = searchParams.get('state');
+      const error = searchParams.get('error');
+      const reqUrl = new URL(request.url);
+      const origin = reqUrl.origin;
+      const failRedirect = (msg) => NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(msg)}`, 302);
+
+      if (error) return failRedirect(error);
+      if (!code || !state) return failRedirect('Missing code/state');
+
+      // Verify state against our HttpOnly cookie (CSRF protection)
+      const stateCookie = request.cookies.get('gauth_state')?.value;
+      if (!stateCookie || stateCookie !== state) {
+        return failRedirect('Invalid OAuth state');
+      }
+
+      // Decode the original `next` we baked into state
+      let nextPath = '/';
+      try {
+        const encoded = state.split('.')[1];
+        if (encoded) nextPath = Buffer.from(encoded, 'base64url').toString() || '/';
+      } catch (_e) { nextPath = '/'; }
+      // Only allow same-origin redirects
+      if (!nextPath.startsWith('/') || nextPath.startsWith('//')) nextPath = '/';
+
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+      if (!clientId || !clientSecret) return failRedirect('Google OAuth not configured');
+
+      const redirectUri = `${origin}/api/auth/google/callback`;
+
+      try {
+        // Exchange authorization code for tokens
+        const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            code,
+            client_id: clientId,
+            client_secret: clientSecret,
+            redirect_uri: redirectUri,
+            grant_type: 'authorization_code',
+          }).toString(),
+        });
+        if (!tokenRes.ok) {
+          const txt = await tokenRes.text();
+          console.error('Google token exchange failed:', tokenRes.status, txt);
+          return failRedirect('Google token exchange failed');
+        }
+        const tokenData = await tokenRes.json();
+        const accessToken = tokenData.access_token;
+        if (!accessToken) return failRedirect('Missing Google access token');
+
+        // Fetch userinfo
+        const uiRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+        if (!uiRes.ok) return failRedirect('Failed to fetch Google profile');
+        const profile = await uiRes.json();
+        // profile = { sub, email, email_verified, name, given_name, family_name, picture, locale }
+
+        if (!profile.email) return failRedirect('Google account has no email');
+
+        const users = await getCollection('users');
+        const emailLower = String(profile.email).toLowerCase();
+
+        // Idempotent upsert — match by googleId first, then by email (existing email/password users get linked)
+        let user = await users.findOne({ googleId: profile.sub });
+        if (!user) user = await users.findOne({ email: emailLower });
+
+        if (!user) {
+          user = {
+            id: uuidv4(),
+            name: profile.name || emailLower.split('@')[0],
+            email: emailLower,
+            phone: '',
+            password: '',
+            role: 'USER',
+            isVerified: true,
+            phoneVerified: false,
+            picture: profile.picture || '',
+            googleId: profile.sub,
+            authProvider: 'google',
+            tokenVersion: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          await users.insertOne(user);
+        } else {
+          // Link/refresh — keep existing role / phoneVerified / tokenVersion
+          const updateSet = {
+            name: profile.name || user.name,
+            picture: profile.picture || user.picture || '',
+            googleId: profile.sub,
+            isVerified: true,
+            updatedAt: new Date(),
+          };
+          // Only set authProvider to 'google' if user has no password (i.e., truly Google-only)
+          if (!user.password) updateSet.authProvider = 'google';
+          await users.updateOne({ id: user.id }, { $set: updateSet });
+          user = await users.findOne({ id: user.id });
+        }
+
+        const token = createToken({
+          userId: user.id,
+          email: user.email,
+          role: user.role,
+          phoneVerified: user.phoneVerified === true,
+          tokenVersion: user.tokenVersion || 0,
+        });
+
+        const res = NextResponse.redirect(`${origin}${nextPath}`, 302);
+        res.cookies.set('auth_token', token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: 'lax',
+          path: '/',
+          maxAge: 7 * 24 * 60 * 60,
+        });
+        // Clean up state cookie
+        res.cookies.set('gauth_state', '', { path: '/', maxAge: 0 });
+        return res;
+      } catch (e) {
+        console.error('Google OAuth callback error:', e);
+        return failRedirect('Google sign-in failed');
+      }
+    }
+
     // Public: Creative Control settings (hero banner image + badge text)
     if (path === '/creative-control') {
       const settings = await getCollection('site_settings');

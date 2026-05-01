@@ -79,8 +79,10 @@ export default function SignupPage() {
   const handleGoogleSignup = () => {
     setGoogleLoading(true);
     // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
-    const redirectUrl = window.location.origin + '/auth/callback';
-    window.location.href = `https://auth.emergentagent.com/?redirect=${encodeURIComponent(redirectUrl)}`;
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get('next') || '/';
+    // Full-page redirect — no popup. Server handles consent + token exchange + cookie.
+    window.location.href = `/api/auth/google/start?next=${encodeURIComponent(next)}`;
   };
 
   return (
