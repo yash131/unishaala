@@ -514,16 +514,28 @@ export async function GET(request) {
 
     // ================== Google OAuth (native, server-side redirect flow) ==================
     // REMINDER: DO NOT HARDCODE THE URL, OR ADD ANY FALLBACKS OR REDIRECT URLS, THIS BREAKS THE AUTH
+    // Helper: resolve the PUBLIC origin (what the browser actually used) — required so redirect_uri
+    // matches the URI registered in Google Cloud Console. We must NOT use request.url's origin
+    // because behind the k8s ingress that resolves to the upstream "http://0.0.0.0:3000".
+    const getPublicOrigin = () => {
+      const xfHost = request.headers.get('x-forwarded-host');
+      const host = xfHost || request.headers.get('host');
+      const proto = request.headers.get('x-forwarded-proto') || (host && host.includes('localhost') ? 'http' : 'https');
+      if (host && !host.startsWith('0.0.0.0') && !host.startsWith('127.0.0.1')) {
+        return `${proto}://${host}`;
+      }
+      // Final fallback for purely-internal calls
+      return process.env.NEXT_PUBLIC_BASE_URL || new URL(request.url).origin;
+    };
+
     // Step 1 — start the OAuth dance. Browser hits /api/auth/google/start?next=...
     if (path === '/auth/google/start') {
       const clientId = process.env.GOOGLE_CLIENT_ID;
       if (!clientId) {
         return jsonResponse({ success: false, error: 'Google OAuth not configured' }, 500);
       }
-      const reqUrl = new URL(request.url);
       const next = searchParams.get('next') || '/';
-      // Use the live origin so the redirect URI matches what's registered in Google Cloud Console.
-      const origin = reqUrl.origin;
+      const origin = getPublicOrigin();
       const redirectUri = `${origin}/api/auth/google/callback`;
 
       // Tamper-proof CSRF state — random + signed copy of `next` baked in.
@@ -558,8 +570,7 @@ export async function GET(request) {
       const code = searchParams.get('code');
       const state = searchParams.get('state');
       const error = searchParams.get('error');
-      const reqUrl = new URL(request.url);
-      const origin = reqUrl.origin;
+      const origin = getPublicOrigin();
       const failRedirect = (msg) => NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(msg)}`, 302);
 
       if (error) return failRedirect(error);
