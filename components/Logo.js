@@ -7,10 +7,10 @@ const LOGO_URL = 'https://customer-assets.emergentagent.com/job_unishaala-web/ar
 
 export function Logo({ size = 'default', showText = true, className = '' }) {
   const sizes = {
-    small: { img: 32, text: 'text-lg' },
-    default: { img: 40, text: 'text-xl' },
-    large: { img: 48, text: 'text-2xl' },
-    xlarge: { img: 64, text: 'text-3xl' }
+    small: { img: 40, text: 'text-lg' },
+    default: { img: 52, text: 'text-xl' },
+    large: { img: 64, text: 'text-2xl' },
+    xlarge: { img: 80, text: 'text-3xl' }
   };
 
   const { img, text } = sizes[size] || sizes.default;
