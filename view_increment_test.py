@@ -5,7 +5,7 @@ import json
 import time
 
 # Configuration
-BASE_URL = "https://reviewer-workflow.preview.emergentagent.com"
+BASE_URL = "https://google-oauth-native.preview.emergentagent.com"
 ADMIN_EMAIL = "admin@unishaala.com"
 ADMIN_PASSWORD = "Shivani@1234"
 

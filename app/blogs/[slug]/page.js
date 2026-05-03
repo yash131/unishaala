@@ -237,6 +237,39 @@ export default function BlogDetailPage() {
           word-break: break-word;
         }
         .blog-content a:hover { color: #0f766e; }
+        .blog-content a[data-blog-button] {
+          display: inline-block;
+          background: linear-gradient(135deg, #0d9488, #0f766e);
+          color: #fff !important;
+          padding: 10px 24px;
+          border-radius: 8px;
+          text-decoration: none !important;
+          font-weight: 600;
+          font-size: 0.95rem;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
+          margin: 6px 4px 6px 0;
+          text-align: center;
+          overflow-wrap: normal;
+          word-break: normal;
+        }
+        .blog-content a[data-blog-button]:hover {
+          background: linear-gradient(135deg, #0f766e, #115e59);
+          color: #fff !important;
+          box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
+          transform: translateY(-1px);
+        }
+        .blog-content a[data-blog-button]:active {
+          transform: translateY(0);
+          box-shadow: 0 1px 4px rgba(13, 148, 136, 0.2);
+        }
+        @media (max-width: 639px) {
+          .blog-content a[data-blog-button] {
+            padding: 9px 18px;
+            font-size: 0.875rem;
+          }
+        }
         .blog-content ul, .blog-content ol { margin: 1em 0; padding-left: 1.25em; }
         .blog-content ul { list-style: disc; }
         .blog-content ol { list-style: decimal; }

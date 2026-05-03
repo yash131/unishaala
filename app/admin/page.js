@@ -2442,6 +2442,8 @@ function RichTextEditor({ value, onChange, placeholder }) {
   const editorRef = useRef(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
+  const [linkAsButton, setLinkAsButton] = useState(true);
+  const [linkLabel, setLinkLabel] = useState('');
   const savedSelection = useRef(null);
 
   useEffect(() => {
@@ -2480,22 +2482,34 @@ function RichTextEditor({ value, onChange, placeholder }) {
   const handleLinkClick = () => {
     saveSelection();
     setLinkUrl('');
+    setLinkLabel('');
+    setLinkAsButton(true);
     setLinkDialogOpen(true);
   };
 
   const applyLink = () => {
     restoreSelection();
     if (linkUrl) {
-      exec('createLink', linkUrl);
-      // Open link in new tab by default
-      setTimeout(() => {
-        const links = editorRef.current?.querySelectorAll('a');
-        links?.forEach(a => {
-          a.setAttribute('target', '_blank');
-          a.setAttribute('rel', 'noopener noreferrer');
-        });
+      if (linkAsButton) {
+        // Insert a button-styled link with data attribute
+        const label = linkLabel.trim() || 'Click Here';
+        const btnHtml = `<a href="${linkUrl}" data-blog-button="true" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#0d9488;color:#fff;padding:8px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;cursor:pointer;">${label}</a>&nbsp;`;
+        document.execCommand('insertHTML', false, btnHtml);
         handleInput();
-      }, 10);
+      } else {
+        exec('createLink', linkUrl);
+        // Open link in new tab by default
+        setTimeout(() => {
+          const links = editorRef.current?.querySelectorAll('a');
+          links?.forEach(a => {
+            if (!a.hasAttribute('data-blog-button')) {
+              a.setAttribute('target', '_blank');
+              a.setAttribute('rel', 'noopener noreferrer');
+            }
+          });
+          handleInput();
+        }, 10);
+      }
     }
     setLinkDialogOpen(false);
   };
@@ -2596,6 +2610,18 @@ function RichTextEditor({ value, onChange, placeholder }) {
         .rich-editor ol { list-style: decimal; padding-left: 1.5em; margin: 0.5em 0; }
         .rich-editor li { margin: 0.25em 0; }
         .rich-editor a { color: #0d9488; text-decoration: underline; }
+        .rich-editor a[data-blog-button] {
+          display: inline-block;
+          background: #0d9488;
+          color: #fff !important;
+          padding: 6px 16px;
+          border-radius: 6px;
+          text-decoration: none;
+          font-weight: 600;
+          font-size: 13px;
+          cursor: pointer;
+          margin: 2px 0;
+        }
         .rich-editor blockquote { border-left: 4px solid #14b8a6; padding: 0.25em 0.75em; margin: 0.75em 0; color: #4b5563; background: #f0fdfa; }
         .rich-editor pre { background: #0f172a; color: #e2e8f0; padding: 0.75em; border-radius: 0.375em; overflow-x: auto; }
         .rich-editor img { max-width: 100%; height: auto; border-radius: 0.5rem; margin: 0.5em 0; }
@@ -2608,19 +2634,38 @@ function RichTextEditor({ value, onChange, placeholder }) {
           <DialogHeader>
             <DialogTitle>Insert Link</DialogTitle>
           </DialogHeader>
-          <div className="py-2">
-            <Label>URL</Label>
-            <Input
-              autoFocus
-              value={linkUrl}
-              onChange={(e) => setLinkUrl(e.target.value)}
-              placeholder="https://example.com"
-              onKeyDown={(e) => { if (e.key === 'Enter') applyLink(); }}
-            />
+          <div className="space-y-3 py-2">
+            <div>
+              <Label>URL</Label>
+              <Input
+                autoFocus
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                placeholder="https://example.com"
+                onKeyDown={(e) => { if (e.key === 'Enter') applyLink(); }}
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <Switch checked={linkAsButton} onCheckedChange={setLinkAsButton} id="link-as-btn" />
+              <Label htmlFor="link-as-btn" className="cursor-pointer text-sm font-medium">Display as Button</Label>
+            </div>
+            {linkAsButton && (
+              <div>
+                <Label>Button Label <span className="text-gray-400 font-normal">(leave blank for &quot;Click Here&quot;)</span></Label>
+                <Input
+                  value={linkLabel}
+                  onChange={(e) => setLinkLabel(e.target.value)}
+                  placeholder="Click Here"
+                  onKeyDown={(e) => { if (e.key === 'Enter') applyLink(); }}
+                />
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>Cancel</Button>
-            <Button className="bg-brand-600 hover:bg-brand-700" onClick={applyLink}>Insert</Button>
+            <Button className="bg-brand-600 hover:bg-brand-700" onClick={applyLink}>
+              {linkAsButton ? 'Insert Button' : 'Insert Link'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
