@@ -11,7 +11,7 @@ import json
 import sys
 
 # Configuration
-BASE_URL = "https://google-oauth-native.preview.emergentagent.com"
+BASE_URL = "https://pdf-button-feature.preview.emergentagent.com"
 API_BASE = f"{BASE_URL}/api"
 
 # Test credentials

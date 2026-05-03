@@ -65,6 +65,9 @@ import {
   MapPin,
   ExternalLink,
   FileDown,
+  Library,
+  FolderOpen,
+  RefreshCw,
   Lock,
   Unlock,
   ScrollText,
@@ -2442,9 +2445,19 @@ function RichTextEditor({ value, onChange, placeholder }) {
   const editorRef = useRef(null);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
-  const [linkAsButton, setLinkAsButton] = useState(true);
-  const [linkLabel, setLinkLabel] = useState('');
+  const [pdfDialogOpen, setPdfDialogOpen] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState('');
+  const [pdfLabel, setPdfLabel] = useState('');
+  const [pdfTab, setPdfTab] = useState('library');
+  const [pdfLibrary, setPdfLibrary] = useState([]);
+  const [pdfLibLoading, setPdfLibLoading] = useState(false);
+  const [pdfSearch, setPdfSearch] = useState('');
+  const [selectedLibPdf, setSelectedLibPdf] = useState(null);
+  const [overrideLabel, setOverrideLabel] = useState('');
+  const [quickUploading, setQuickUploading] = useState(false);
   const savedSelection = useRef(null);
+  const quickUploadInputRef = useRef(null);
+  const [quickUploadLabel, setQuickUploadLabel] = useState('');
 
   useEffect(() => {
     if (editorRef.current && value !== editorRef.current.innerHTML) {
@@ -2482,36 +2495,120 @@ function RichTextEditor({ value, onChange, placeholder }) {
   const handleLinkClick = () => {
     saveSelection();
     setLinkUrl('');
-    setLinkLabel('');
-    setLinkAsButton(true);
     setLinkDialogOpen(true);
   };
 
   const applyLink = () => {
     restoreSelection();
     if (linkUrl) {
-      if (linkAsButton) {
-        // Insert a button-styled link with data attribute
-        const label = linkLabel.trim() || 'Click Here';
-        const btnHtml = `<a href="${linkUrl}" data-blog-button="true" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#0d9488;color:#fff;padding:8px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;cursor:pointer;">${label}</a>&nbsp;`;
-        document.execCommand('insertHTML', false, btnHtml);
+      exec('createLink', linkUrl);
+      // Open link in new tab by default
+      setTimeout(() => {
+        const links = editorRef.current?.querySelectorAll('a');
+        links?.forEach(a => {
+          if (!a.hasAttribute('data-blog-button')) {
+            a.setAttribute('target', '_blank');
+            a.setAttribute('rel', 'noopener noreferrer');
+          }
+        });
         handleInput();
-      } else {
-        exec('createLink', linkUrl);
-        // Open link in new tab by default
-        setTimeout(() => {
-          const links = editorRef.current?.querySelectorAll('a');
-          links?.forEach(a => {
-            if (!a.hasAttribute('data-blog-button')) {
-              a.setAttribute('target', '_blank');
-              a.setAttribute('rel', 'noopener noreferrer');
-            }
-          });
-          handleInput();
-        }, 10);
-      }
+      }, 10);
     }
     setLinkDialogOpen(false);
+  };
+
+  const fetchPdfLibrary = async () => {
+    setPdfLibLoading(true);
+    try {
+      const res = await fetch('/api/admin/blog-pdfs', { credentials: 'include' });
+      const d = await res.json();
+      if (d.success) setPdfLibrary(d.data || []);
+      else toast.error(d.error || 'Failed to load PDF library');
+    } catch (_e) {
+      toast.error('Failed to load PDF library');
+    }
+    setPdfLibLoading(false);
+  };
+
+  const handlePdfClick = () => {
+    saveSelection();
+    setPdfUrl('');
+    setPdfLabel('');
+    setSelectedLibPdf(null);
+    setOverrideLabel('');
+    setPdfSearch('');
+    setPdfTab('library');
+    setQuickUploadLabel('');
+    setPdfDialogOpen(true);
+    fetchPdfLibrary();
+  };
+
+  const handleQuickUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const label = quickUploadLabel.trim() || file.name.replace(/\.pdf$/i, '') || 'Download PDF';
+    if (!/pdf/i.test(file.type) && !/\.pdf$/i.test(file.name || '')) {
+      toast.error('File must be a PDF');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('PDF too large (max 25MB)');
+      e.target.value = '';
+      return;
+    }
+    setQuickUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('pdf', file);
+      fd.append('label', label);
+      const res = await fetch('/api/admin/blog-pdfs', {
+        method: 'POST',
+        body: fd,
+        credentials: 'include',
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success('PDF uploaded to library');
+        setPdfLibrary((prev) => [d.data, ...prev]);
+        setSelectedLibPdf(d.data);
+        setQuickUploadLabel('');
+      } else {
+        toast.error(d.error || 'Upload failed');
+      }
+    } catch (_e) {
+      toast.error('Upload failed');
+    }
+    setQuickUploading(false);
+    e.target.value = '';
+  };
+
+  const applyPdfButton = () => {
+    restoreSelection();
+    let viewerUrl = '';
+    let label = '';
+
+    if (pdfTab === 'library') {
+      if (!selectedLibPdf) {
+        toast.error('Select a PDF from the library');
+        return;
+      }
+      label = (overrideLabel.trim() || selectedLibPdf.label || 'Download PDF');
+      viewerUrl = `/blogs/pdf-viewer?pdfId=${encodeURIComponent(selectedLibPdf.id)}&label=${encodeURIComponent(label)}`;
+    } else {
+      // External URL mode
+      if (!pdfUrl || !/^https?:\/\//i.test(pdfUrl)) {
+        toast.error('Enter a valid http(s) PDF URL');
+        return;
+      }
+      label = pdfLabel.trim() || 'Click Here';
+      viewerUrl = `/blogs/pdf-viewer?url=${encodeURIComponent(pdfUrl)}&label=${encodeURIComponent(label)}`;
+    }
+
+    const btnHtml = `<a href="${viewerUrl}" data-blog-button="true" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#0d9488;color:#fff;padding:8px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;cursor:pointer;">${label}</a>&nbsp;`;
+    document.execCommand('insertHTML', false, btnHtml);
+    handleInput();
+    setPdfDialogOpen(false);
   };
 
   const handleImageInsert = async (e) => {
@@ -2577,6 +2674,7 @@ function RichTextEditor({ value, onChange, placeholder }) {
         <ToolButton onClick={() => exec('formatBlock', '<pre>')} title="Code Block"><Code className="w-4 h-4" /></ToolButton>
         <div className="w-px h-5 bg-gray-300 mx-1" />
         <ToolButton onClick={handleLinkClick} title="Insert Link"><Link2 className="w-4 h-4" /></ToolButton>
+        <ToolButton onClick={handlePdfClick} title="Insert PDF Button"><FileDown className="w-4 h-4" /></ToolButton>
         <label className="p-2 rounded hover:bg-brand-50 text-gray-700 hover:text-brand-700 transition-colors cursor-pointer" title="Insert Image">
           <ImageIcon className="w-4 h-4" />
           <input type="file" accept="image/*" className="hidden" onChange={handleImageInsert} />
@@ -2634,42 +2732,425 @@ function RichTextEditor({ value, onChange, placeholder }) {
           <DialogHeader>
             <DialogTitle>Insert Link</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <div>
-              <Label>URL</Label>
-              <Input
-                autoFocus
-                value={linkUrl}
-                onChange={(e) => setLinkUrl(e.target.value)}
-                placeholder="https://example.com"
-                onKeyDown={(e) => { if (e.key === 'Enter') applyLink(); }}
-              />
-            </div>
-            <div className="flex items-center gap-3">
-              <Switch checked={linkAsButton} onCheckedChange={setLinkAsButton} id="link-as-btn" />
-              <Label htmlFor="link-as-btn" className="cursor-pointer text-sm font-medium">Display as Button</Label>
-            </div>
-            {linkAsButton && (
-              <div>
-                <Label>Button Label <span className="text-gray-400 font-normal">(leave blank for &quot;Click Here&quot;)</span></Label>
-                <Input
-                  value={linkLabel}
-                  onChange={(e) => setLinkLabel(e.target.value)}
-                  placeholder="Click Here"
-                  onKeyDown={(e) => { if (e.key === 'Enter') applyLink(); }}
-                />
-              </div>
-            )}
+          <div className="py-2">
+            <Label>URL</Label>
+            <Input
+              autoFocus
+              value={linkUrl}
+              onChange={(e) => setLinkUrl(e.target.value)}
+              placeholder="https://example.com"
+              onKeyDown={(e) => { if (e.key === 'Enter') applyLink(); }}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setLinkDialogOpen(false)}>Cancel</Button>
-            <Button className="bg-brand-600 hover:bg-brand-700" onClick={applyLink}>
-              {linkAsButton ? 'Insert Button' : 'Insert Link'}
+            <Button className="bg-brand-600 hover:bg-brand-700" onClick={applyLink}>Insert Link</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* PDF Button dialog with Library picker + External URL */}
+      <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Insert PDF Button</DialogTitle>
+            <DialogDescription>Choose a PDF from your library, or paste an external URL.</DialogDescription>
+          </DialogHeader>
+
+          <Tabs value={pdfTab} onValueChange={setPdfTab} className="flex-1 flex flex-col overflow-hidden">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="library">
+                <Library className="w-4 h-4 mr-2" /> From Library
+              </TabsTrigger>
+              <TabsTrigger value="url">
+                <ExternalLink className="w-4 h-4 mr-2" /> External URL
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="library" className="flex-1 overflow-hidden flex flex-col mt-3">
+              {/* Quick upload */}
+              <div className="rounded-lg border border-dashed border-brand-300 bg-brand-50/50 p-3 mb-3">
+                <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+                  <Input
+                    placeholder="Button label for new PDF (e.g. Download Notes)"
+                    value={quickUploadLabel}
+                    onChange={(e) => setQuickUploadLabel(e.target.value)}
+                    className="flex-1"
+                  />
+                  <input
+                    ref={quickUploadInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={handleQuickUpload}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => quickUploadInputRef.current?.click()}
+                    disabled={quickUploading}
+                    className="shrink-0"
+                  >
+                    {quickUploading ? (
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading…</>
+                    ) : (
+                      <><Upload className="w-4 h-4 mr-2" /> Upload new PDF</>
+                    )}
+                  </Button>
+                </div>
+                <p className="text-[11px] text-gray-500 mt-1.5">Max 25 MB. Uploaded PDFs appear in the library below.</p>
+              </div>
+
+              {/* Search */}
+              <div className="relative mb-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  className="pl-9"
+                  placeholder="Search library by label or filename…"
+                  value={pdfSearch}
+                  onChange={(e) => setPdfSearch(e.target.value)}
+                />
+              </div>
+
+              {/* Library list */}
+              <div className="border rounded-lg overflow-y-auto flex-1 min-h-[180px] max-h-[280px]">
+                {pdfLibLoading ? (
+                  <div className="p-6 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-brand-600" /></div>
+                ) : pdfLibrary.length === 0 ? (
+                  <div className="p-6 text-center text-sm text-gray-500">
+                    <FileDown className="w-8 h-8 mx-auto text-gray-300 mb-2" />
+                    No PDFs in library. Upload one above to get started.
+                  </div>
+                ) : (
+                  (() => {
+                    const q = pdfSearch.trim().toLowerCase();
+                    const filtered = q
+                      ? pdfLibrary.filter((p) =>
+                          (p.label || '').toLowerCase().includes(q) ||
+                          (p.fileName || '').toLowerCase().includes(q)
+                        )
+                      : pdfLibrary;
+                    if (filtered.length === 0) {
+                      return <div className="p-6 text-center text-sm text-gray-500">No PDFs match your search.</div>;
+                    }
+                    return (
+                      <ul className="divide-y">
+                        {filtered.map((p) => {
+                          const selected = selectedLibPdf?.id === p.id;
+                          return (
+                            <li
+                              key={p.id}
+                              onClick={() => setSelectedLibPdf(p)}
+                              className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors ${
+                                selected ? 'bg-brand-50 ring-1 ring-brand-400' : 'hover:bg-gray-50'
+                              }`}
+                            >
+                              <div className="shrink-0 w-9 h-9 rounded bg-red-50 flex items-center justify-center">
+                                <FileDown className="w-4 h-4 text-red-500" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium text-sm text-gray-900 truncate">{p.label}</div>
+                                <div className="text-[11px] text-gray-500 truncate">{p.fileName} • {(p.size / 1024 / 1024).toFixed(2)} MB</div>
+                              </div>
+                              {selected && <CheckCircle className="w-4 h-4 text-brand-600 shrink-0" />}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    );
+                  })()
+                )}
+              </div>
+
+              {/* Optional label override */}
+              {selectedLibPdf && (
+                <div className="mt-3">
+                  <Label className="text-xs">
+                    Override button label (optional) <span className="text-gray-400 font-normal">— leave blank to use &quot;{selectedLibPdf.label}&quot;</span>
+                  </Label>
+                  <Input
+                    value={overrideLabel}
+                    onChange={(e) => setOverrideLabel(e.target.value)}
+                    placeholder={selectedLibPdf.label}
+                    className="mt-1"
+                  />
+                </div>
+              )}
+            </TabsContent>
+
+            <TabsContent value="url" className="mt-3 space-y-3">
+              <div>
+                <Label>PDF URL</Label>
+                <Input
+                  autoFocus={pdfTab === 'url'}
+                  value={pdfUrl}
+                  onChange={(e) => setPdfUrl(e.target.value)}
+                  placeholder="https://example.com/file.pdf"
+                  onKeyDown={(e) => { if (e.key === 'Enter') applyPdfButton(); }}
+                />
+              </div>
+              <div>
+                <Label>Button Label <span className="text-gray-400 font-normal">(default: &quot;Click Here&quot;)</span></Label>
+                <Input
+                  value={pdfLabel}
+                  onChange={(e) => setPdfLabel(e.target.value)}
+                  placeholder="Click Here"
+                  onKeyDown={(e) => { if (e.key === 'Enter') applyPdfButton(); }}
+                />
+              </div>
+              <p className="text-[11px] text-gray-500">External PDFs render via Google Docs Viewer. For your own PDFs prefer the Library tab.</p>
+            </TabsContent>
+          </Tabs>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPdfDialogOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-brand-600 hover:bg-brand-700"
+              onClick={applyPdfButton}
+              disabled={pdfTab === 'library' ? !selectedLibPdf : !pdfUrl}
+            >
+              Insert PDF Button
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function BlogPdfLibraryDialog({ open, onOpenChange }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [newLabel, setNewLabel] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editingLabel, setEditingLabel] = useState('');
+  const fileInputRef = useRef(null);
+
+  const fetchItems = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/blog-pdfs', { credentials: 'include' });
+      const d = await res.json();
+      if (d.success) setItems(d.data || []);
+      else toast.error(d.error || 'Failed to load PDFs');
+    } catch (_e) {
+      toast.error('Failed to load PDFs');
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (open) fetchItems();
+  }, [open]);
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const label = newLabel.trim() || file.name.replace(/\.pdf$/i, '');
+    if (!label) {
+      toast.error('Enter a button label first');
+      e.target.value = '';
+      return;
+    }
+    if (!/pdf/i.test(file.type) && !/\.pdf$/i.test(file.name || '')) {
+      toast.error('File must be a PDF');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      toast.error('PDF too large (max 25MB)');
+      e.target.value = '';
+      return;
+    }
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('pdf', file);
+      fd.append('label', label);
+      const res = await fetch('/api/admin/blog-pdfs', { method: 'POST', body: fd, credentials: 'include' });
+      const d = await res.json();
+      if (d.success) {
+        toast.success('PDF uploaded');
+        setItems((prev) => [d.data, ...prev]);
+        setNewLabel('');
+      } else {
+        toast.error(d.error || 'Upload failed');
+      }
+    } catch (_e) {
+      toast.error('Upload failed');
+    }
+    setUploading(false);
+    e.target.value = '';
+  };
+
+  const startEdit = (item) => {
+    setEditingId(item.id);
+    setEditingLabel(item.label);
+  };
+
+  const saveEdit = async (item) => {
+    const label = editingLabel.trim();
+    if (!label) { toast.error('Label cannot be empty'); return; }
+    try {
+      const res = await fetch(`/api/admin/blog-pdfs/${item.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ label }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success('Label updated');
+        setItems((prev) => prev.map((p) => (p.id === item.id ? d.data : p)));
+        setEditingId(null);
+      } else {
+        toast.error(d.error || 'Update failed');
+      }
+    } catch (_e) { toast.error('Update failed'); }
+  };
+
+  const handleDelete = async (item) => {
+    if (!window.confirm(`Delete PDF "${item.label}"? Buttons already inserted in blogs will show "PDF no longer available" when clicked.`)) return;
+    try {
+      const res = await fetch(`/api/admin/blog-pdfs/${item.id}`, { method: 'DELETE', credentials: 'include' });
+      const d = await res.json();
+      if (d.success) {
+        toast.success('PDF deleted');
+        setItems((prev) => prev.filter((p) => p.id !== item.id));
+      } else {
+        toast.error(d.error || 'Delete failed');
+      }
+    } catch (_e) { toast.error('Delete failed'); }
+  };
+
+  const copyShortcode = (item) => {
+    const url = `${window.location.origin}/api/blog-pdfs/${item.id}/file`;
+    navigator.clipboard?.writeText(url);
+    toast.success('Direct file URL copied');
+  };
+
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? items.filter((p) => (p.label || '').toLowerCase().includes(q) || (p.fileName || '').toLowerCase().includes(q))
+    : items;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-3xl max-h-[88vh] flex flex-col overflow-hidden">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Library className="w-5 h-5 text-brand-600" /> Blog PDF Library
+          </DialogTitle>
+          <DialogDescription>
+            Upload and manage PDFs available for insertion into any blog post. Up to 25 MB each, no quantity limit.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Uploader */}
+        <div className="rounded-lg border border-dashed border-brand-300 bg-brand-50/50 p-3">
+          <div className="flex flex-col sm:flex-row gap-2 items-stretch sm:items-center">
+            <Input
+              placeholder="Button label for this PDF (e.g. Download Notes, Click Here)"
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+              className="flex-1"
+            />
+            <input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={handleUpload} />
+            <Button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="bg-brand-600 hover:bg-brand-700 shrink-0"
+            >
+              {uploading ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading…</> : <><Upload className="w-4 h-4 mr-2" /> Upload PDF</>}
+            </Button>
+          </div>
+          <p className="text-[11px] text-gray-500 mt-1.5">The button label is shown inside the blog. You can override it per insertion.</p>
+        </div>
+
+        {/* Search */}
+        <div className="relative mt-3">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            className="pl-9"
+            placeholder="Search by label or filename…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+
+        {/* List */}
+        <div className="flex-1 overflow-y-auto border rounded-lg mt-3 min-h-[200px]">
+          {loading ? (
+            <div className="p-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-brand-600" /></div>
+          ) : filtered.length === 0 ? (
+            <div className="p-8 text-center text-sm text-gray-500">
+              <FileDown className="w-10 h-10 mx-auto text-gray-300 mb-2" />
+              {items.length === 0 ? 'No PDFs yet. Upload your first PDF above.' : 'No PDFs match your search.'}
+            </div>
+          ) : (
+            <ul className="divide-y">
+              {filtered.map((p) => (
+                <li key={p.id} className="flex items-center gap-3 px-3 py-3 hover:bg-gray-50">
+                  <div className="shrink-0 w-10 h-10 rounded bg-red-50 flex items-center justify-center">
+                    <FileDown className="w-5 h-5 text-red-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {editingId === p.id ? (
+                      <Input
+                        autoFocus
+                        value={editingLabel}
+                        onChange={(e) => setEditingLabel(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') setEditingId(null); }}
+                        className="h-8"
+                      />
+                    ) : (
+                      <div className="font-medium text-sm text-gray-900 truncate">{p.label}</div>
+                    )}
+                    <div className="text-[11px] text-gray-500 truncate mt-0.5">
+                      {p.fileName} • {(p.size / 1024 / 1024).toFixed(2)} MB • {new Date(p.createdAt).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {editingId === p.id ? (
+                      <>
+                        <Button size="sm" variant="outline" onClick={() => setEditingId(null)} title="Cancel">
+                          <X className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" className="bg-brand-600 hover:bg-brand-700" onClick={() => saveEdit(p)} title="Save">
+                          <Save className="w-4 h-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <a href={`/api/blog-pdfs/${p.id}/file`} target="_blank" rel="noopener noreferrer" title="Preview PDF">
+                          <Button size="sm" variant="outline" className="h-8 w-8 p-0"><Eye className="w-4 h-4" /></Button>
+                        </a>
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0" title="Rename label" onClick={() => startEdit(p)}>
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button size="sm" variant="outline" className="h-8 w-8 p-0" title="Delete" onClick={() => handleDelete(p)}>
+                          <Trash2 className="w-4 h-4 text-red-500" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-2">
+          <Button variant="outline" onClick={fetchItems} disabled={loading}>
+            <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
+          </Button>
+          <Button onClick={() => onOpenChange(false)}>Done</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -2692,6 +3173,7 @@ function BlogsTab() {
   });
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [pdfLibraryOpen, setPdfLibraryOpen] = useState(false);
 
   const fetchBlogs = async () => {
     setLoading(true);
@@ -2964,10 +3446,17 @@ function BlogsTab() {
           <h2 className="text-2xl font-bold text-gray-900">Blog Posts</h2>
           <p className="text-sm text-gray-500">Create and manage blog content shown on the website</p>
         </div>
-        <Button onClick={openCreate} className="bg-brand-600 hover:bg-brand-700">
-          <Plus className="w-4 h-4 mr-2" /> New Blog Post
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setPdfLibraryOpen(true)} variant="outline" className="border-brand-300 text-brand-700 hover:bg-brand-50">
+            <Library className="w-4 h-4 mr-2" /> PDF Library
+          </Button>
+          <Button onClick={openCreate} className="bg-brand-600 hover:bg-brand-700">
+            <Plus className="w-4 h-4 mr-2" /> New Blog Post
+          </Button>
+        </div>
       </div>
+
+      <BlogPdfLibraryDialog open={pdfLibraryOpen} onOpenChange={setPdfLibraryOpen} />
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-3 mb-4">

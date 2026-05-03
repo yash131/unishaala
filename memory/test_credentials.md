@@ -17,8 +17,8 @@
 ## Google OAuth (native)
 - Provider: Google Cloud Console (user-owned).
 - Client ID configured in `/app/.env` as `GOOGLE_CLIENT_ID`.
-- Redirect URI registered in Google Cloud: `https://google-oauth-native.preview.emergentagent.com/api/auth/google/callback`
-- Authorized JS origin: `https://google-oauth-native.preview.emergentagent.com`
+- Redirect URI registered in Google Cloud: `https://pdf-button-feature.preview.emergentagent.com/api/auth/google/callback`
+- Authorized JS origin: `https://pdf-button-feature.preview.emergentagent.com`
 - Login flow: `/login` or `/signup` → button → `GET /api/auth/google/start` → Google → `GET /api/auth/google/callback` → upserts user → `auth_token` cookie set → 302 to `next` (or `/`).
 - Test accounts must be added under "Test users" in OAuth consent screen while the app is in Testing mode.
 - Users created via Google OAuth are stored with `authProvider:'google'`, `googleId:<sub>`, `role:'USER'`, `phoneVerified:false`.

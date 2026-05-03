@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timedelta
 
 # Configuration
-BASE_URL = "https://google-oauth-native.preview.emergentagent.com"
+BASE_URL = "https://pdf-button-feature.preview.emergentagent.com"
 ADMIN_EMAIL = "admin@unishaala.com"
 ADMIN_PASSWORD = "Shivani@1234"
 
