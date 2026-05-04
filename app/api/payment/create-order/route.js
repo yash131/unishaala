@@ -18,7 +18,7 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const { examId, domainId, amount, paymentType } = body;
+    const { examId, domainId, amount, paymentType, couponCode } = body;
 
     // Only exam/domain/get_pass/PYQ-exam/PYQ-domain purchases are supported. Individual test purchases are disabled.
     const ALLOWED = new Set(['exam_purchase', 'domain_purchase', 'exam_pyq_purchase', 'domain_pyq_purchase', 'get_pass']);
@@ -34,6 +34,24 @@ export async function POST(request) {
     }
 
     await connectToDatabase();
+
+    // Server-side coupon validation (currently only get_pass supports coupons)
+    let coupon = null;
+    let finalAmount = parseFloat(amount);
+    if (couponCode) {
+      const { applyCouponServerSide } = await import('@/app/api/coupons/validate/route');
+      const result = await applyCouponServerSide({
+        code: couponCode,
+        paymentType,
+        amount: finalAmount,
+        userId: user.id,
+      });
+      if (!result.valid) {
+        return NextResponse.json({ success: false, error: result.error || 'Invalid coupon' }, { status: 400 });
+      }
+      coupon = result;
+      finalAmount = result.finalAmount;
+    }
 
     // Get item details
     let itemName = 'Unishaala Purchase';
@@ -57,10 +75,10 @@ export async function POST(request) {
       itemName = 'Unishaala Get Pass — All-Access';
     }
 
-    // Create Razorpay order
+    // Create Razorpay order (use server-derived finalAmount, not client amount)
     const receipt = `rcpt_${Date.now()}`;
     const order = await createOrder({
-      amount: parseFloat(amount),
+      amount: finalAmount,
       currency: 'INR',
       receipt,
       notes: {
@@ -69,6 +87,7 @@ export async function POST(request) {
         domainId: domainId || '',
         paymentType,
         itemName,
+        couponCode: coupon?.code || '',
       },
     });
 
@@ -87,7 +106,17 @@ export async function POST(request) {
       mockTestId: null,
       paymentType,
       itemName,
-      amount: parseFloat(amount),
+      amount: finalAmount,
+      baseAmount: parseFloat(amount),
+      coupon: coupon
+        ? {
+            id: coupon.couponId,
+            code: coupon.code,
+            type: coupon.type,
+            value: coupon.value,
+            discount: coupon.discount,
+          }
+        : null,
       currency: 'INR',
       status: 'PENDING',
       createdAt: new Date(),
@@ -105,6 +134,9 @@ export async function POST(request) {
         keyId: process.env.RAZORPAY_KEY_ID,
         name: 'Unishaala',
         description: itemName,
+        coupon: coupon
+          ? { code: coupon.code, type: coupon.type, value: coupon.value, discount: coupon.discount, baseAmount: coupon.baseAmount, finalAmount: coupon.finalAmount }
+          : null,
         prefill: {
           name: user.name,
           email: user.email,

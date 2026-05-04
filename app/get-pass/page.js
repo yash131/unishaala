@@ -5,9 +5,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { MainNavbar } from '@/components/MainNavbar';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Crown, Check, Loader2, Sparkles, ShieldCheck, Clock } from 'lucide-react';
+import { Crown, Check, Loader2, Sparkles, ShieldCheck, Clock, Tag, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function GetPassPage() {
@@ -16,6 +17,12 @@ export default function GetPassPage() {
   const [me, setMe] = useState(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
+
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState(null); // {code, discount, finalAmount, ...}
+  const [couponError, setCouponError] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -34,23 +41,70 @@ export default function GetPassPage() {
   }, []);
 
   const hasActivePass = !!me?.hasPass && (!me.passExpiresAt || new Date(me.passExpiresAt) > new Date());
+  const basePrice = Number(cfg?.getPassPrice || 0);
+  const finalPrice = appliedCoupon ? appliedCoupon.finalAmount : basePrice;
+
+  const applyCoupon = async () => {
+    const code = couponCode.trim().toUpperCase();
+    if (!code) { setCouponError('Enter a coupon code'); return; }
+    if (!basePrice) { setCouponError('Pricing not loaded yet'); return; }
+    setCouponError('');
+    setApplyingCoupon(true);
+    try {
+      const res = await fetch('/api/coupons/validate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ code, paymentType: 'get_pass', amount: basePrice }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setAppliedCoupon(d.data);
+        setCouponError('');
+        toast.success(`Coupon applied! You saved ₹${d.data.discount}`);
+      } else {
+        setAppliedCoupon(null);
+        setCouponError(d.error || 'Invalid coupon');
+      }
+    } catch (_e) {
+      setCouponError('Could not validate coupon');
+    }
+    setApplyingCoupon(false);
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponCode('');
+    setCouponError('');
+  };
 
   const handleBuyPass = async () => {
     if (!me?.id) { router.push('/login?next=/get-pass'); return; }
-    if (!cfg?.getPassEnabled || !cfg?.getPassPrice) {
+    if (!cfg?.getPassEnabled || !basePrice) {
       toast.error('Get Pass is not available right now. Please check back later.');
       return;
     }
     setPaying(true);
     try {
+      const payload = { paymentType: 'get_pass', amount: basePrice };
+      if (appliedCoupon?.code) payload.couponCode = appliedCoupon.code;
       const res = await fetch('/api/payment/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ paymentType: 'get_pass', amount: cfg.getPassPrice })
+        body: JSON.stringify(payload)
       });
       const d = await res.json();
-      if (!d.success) { toast.error(d.error || 'Failed to create order'); setPaying(false); return; }
+      if (!d.success) {
+        toast.error(d.error || 'Failed to create order');
+        // If coupon became invalid between apply and pay, drop it
+        if (appliedCoupon && /coupon/i.test(d.error || '')) {
+          setAppliedCoupon(null);
+          setCouponError(d.error);
+        }
+        setPaying(false);
+        return;
+      }
 
       if (!window.Razorpay) {
         await new Promise((resolve, reject) => {
@@ -130,10 +184,27 @@ export default function GetPassPage() {
                 <Sparkles className="w-4 h-4" /> Most complete plan — unlocks everything on the platform
               </div>
               <CardContent className="p-8">
+                {/* Price block */}
                 <div className="flex items-end gap-2 justify-center">
-                  <span className="text-5xl font-extrabold text-gray-900">₹{Math.round(cfg?.getPassPrice || 0).toLocaleString('en-IN')}</span>
-                  <span className="text-gray-500 pb-2">/ 1 year</span>
+                  {appliedCoupon ? (
+                    <>
+                      <span className="text-5xl font-extrabold text-gray-900">₹{Math.round(finalPrice).toLocaleString('en-IN')}</span>
+                      <span className="text-gray-500 pb-2 line-through">₹{Math.round(basePrice).toLocaleString('en-IN')}</span>
+                      <span className="text-gray-500 pb-2">/ 1 year</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-5xl font-extrabold text-gray-900">₹{Math.round(basePrice).toLocaleString('en-IN')}</span>
+                      <span className="text-gray-500 pb-2">/ 1 year</span>
+                    </>
+                  )}
                 </div>
+                {appliedCoupon && (
+                  <p className="text-center text-sm text-green-700 font-medium mt-1">
+                    🎉 You saved ₹{appliedCoupon.discount} with code {appliedCoupon.code}
+                  </p>
+                )}
+
                 <ul className="mt-6 space-y-3 max-w-md mx-auto">
                   {[
                     'Unlocks every Test Series across all exams',
@@ -148,12 +219,61 @@ export default function GetPassPage() {
                     </li>
                   ))}
                 </ul>
-                <div className="mt-8 flex flex-col items-center gap-3">
-                  <Button onClick={handleBuyPass} disabled={paying || !cfg?.getPassEnabled || !cfg?.getPassPrice}
+
+                {/* Coupon section */}
+                {cfg?.getPassEnabled && basePrice > 0 && (
+                  <div className="mt-7 max-w-md mx-auto rounded-xl border border-dashed border-amber-300 bg-amber-50/40 p-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-amber-900 mb-2">
+                      <Tag className="w-4 h-4" /> Have a coupon?
+                    </div>
+                    {appliedCoupon ? (
+                      <div className="flex items-center justify-between gap-2 bg-white border border-green-300 rounded-lg p-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-bold text-green-700 truncate">{appliedCoupon.code}</div>
+                          <div className="text-xs text-gray-600">
+                            {appliedCoupon.type === 'percent' ? `${appliedCoupon.value}% off` : `₹${appliedCoupon.value} off`}
+                            {' · '}You save ₹{appliedCoupon.discount}
+                          </div>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={removeCoupon} className="shrink-0">
+                          <X className="w-4 h-4 mr-1" /> Remove
+                        </Button>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Input
+                            value={couponCode}
+                            onChange={(e) => { setCouponCode(e.target.value.toUpperCase()); setCouponError(''); }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') applyCoupon(); }}
+                            placeholder="Enter code (e.g. SAVE20)"
+                            className="bg-white"
+                            disabled={applyingCoupon}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={applyCoupon}
+                            disabled={applyingCoupon || !couponCode.trim()}
+                            className="shrink-0 border-amber-400 text-amber-800 hover:bg-amber-100"
+                          >
+                            {applyingCoupon ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Applying…</> : <>Apply</>}
+                          </Button>
+                        </div>
+                        {couponError && <p className="text-xs text-red-600 mt-2">{couponError}</p>}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-7 flex flex-col items-center gap-3">
+                  <Button onClick={handleBuyPass} disabled={paying || !cfg?.getPassEnabled || !basePrice}
                     className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-lg px-8 py-6 h-auto shadow-lg">
-                    {paying ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Redirecting…</> : <><Crown className="w-5 h-5 mr-2" /> Get Pass Now</>}
+                    {paying ? <><Loader2 className="w-5 h-5 mr-2 animate-spin" /> Redirecting…</> : (
+                      <><Crown className="w-5 h-5 mr-2" /> Pay ₹{Math.round(finalPrice).toLocaleString('en-IN')} & Get Pass</>
+                    )}
                   </Button>
-                  {(!cfg?.getPassEnabled || !cfg?.getPassPrice) && (
+                  {(!cfg?.getPassEnabled || !basePrice) && (
                     <p className="text-sm text-amber-700">Get Pass is not enabled yet. Please check back soon.</p>
                   )}
                   <p className="text-xs text-gray-500 flex items-center gap-1 mt-2">

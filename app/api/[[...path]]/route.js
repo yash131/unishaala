@@ -904,8 +904,8 @@ export async function GET(request) {
         return { ...test, questionCount: qCount };
       }));
 
-      // Only return tests that have questions
-      const finalTests = testsWithCount.filter(t => t.questionCount > 0);
+      // Tests are visible if they have questions, OR if they're PYQ tests with a PDF attached (questions optional for PYQ)
+      const finalTests = testsWithCount.filter(t => t.questionCount > 0 || (t.testType === 'previous_year' && t.pdfFileId));
 
       return jsonResponse({
         success: true,
@@ -1653,7 +1653,8 @@ export async function GET(request) {
         });
         return { ...t, questionCount: qc };
       }));
-      return jsonResponse({ success: true, data: withCount.filter(t => t.questionCount > 0) });
+      // PYQ tests are also visible if they have a PDF attached (questions optional)
+      return jsonResponse({ success: true, data: withCount.filter(t => t.questionCount > 0 || t.pdfFileId) });
     }
 
     if (path.startsWith('/practice-test-questions/')) {

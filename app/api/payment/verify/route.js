@@ -104,6 +104,17 @@ export async function POST(request) {
 
     await users.updateOne({ id: transaction.userId }, userUpdate);
 
+    // Bump coupon usageCount on successful payment (best-effort)
+    if (transaction.coupon?.id) {
+      try {
+        const couponsCol = await getCollection('coupons');
+        await couponsCol.updateOne(
+          { id: transaction.coupon.id },
+          { $inc: { usageCount: 1 }, $set: { updatedAt: new Date() } }
+        );
+      } catch (_e) {}
+    }
+
     return NextResponse.json({
       success: true,
       status: 'SUCCESS',

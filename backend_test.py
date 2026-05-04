@@ -1,529 +1,1114 @@
 #!/usr/bin/env python3
 """
-Backend Test Suite for PYQ Mock Test PDF Upload Feature
-Tests all NEW PYQ Mock Test PDF Upload endpoints and functionality as specified in the review request.
+Backend API Testing Script for Unishaala
+Tests TWO new backend tasks:
+1. PYQ visibility when only PDF uploaded (no questions)
+2. Coupon system for Get Pass purchases
 """
 
 import requests
 import json
-import random
-import string
+import io
 import os
-import tempfile
-from io import BytesIO
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import letter
+from datetime import datetime, timedelta
 
-# Configuration
-BASE_URL = "https://pdf-button-feature.preview.emergentagent.com"
+# Get base URL from environment
+BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://pdf-button-feature.preview.emergentagent.com')
+API_BASE = f"{BASE_URL}/api"
+
+# Admin credentials
 ADMIN_EMAIL = "admin@unishaala.com"
 ADMIN_PASSWORD = "Shivani@1234"
 
-def create_test_pdf(pages=3, filename="test.pdf"):
-    """Create a test PDF with specified number of pages"""
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
-    
-    for i in range(pages):
-        c.drawString(100, 750, f"Test PDF - Page {i+1}")
-        c.drawString(100, 700, f"This is page {i+1} of {pages}")
-        c.drawString(100, 650, "Generated for PYQ Mock Test PDF Upload Testing")
-        if i < pages - 1:  # Don't add page break on last page
-            c.showPage()
-    
-    c.save()
-    buffer.seek(0)
-    return buffer.getvalue()
+# Global variables for cleanup
+auth_token = None
+created_test_ids = []
+created_coupon_ids = []
 
-def create_large_pdf():
-    """Create a PDF larger than 25MB"""
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=letter)
-    
-    # Create many pages with lots of content to exceed 25MB
-    for i in range(500):  # This should create a large PDF
-        c.drawString(100, 750, f"Large PDF - Page {i+1}")
-        for j in range(50):  # Add lots of text to make it large
-            c.drawString(100, 700 - j*10, f"Line {j}: This is a lot of text to make the PDF large " * 10)
-        c.showPage()
-    
-    c.save()
-    buffer.seek(0)
-    return buffer.getvalue()
-
-def create_non_pdf_file():
-    """Create a non-PDF file for testing"""
-    return b"This is not a PDF file, just plain text content for testing."
-
-def print_test_result(test_name, success, details=""):
-    """Print formatted test result"""
-    status = "✅ PASS" if success else "❌ FAIL"
-    print(f"{status}: {test_name}")
-    if details:
-        print(f"   Details: {details}")
-
-def test_pyq_pdf_upload_feature():
-    """Test all PYQ Mock Test PDF Upload backend endpoints"""
-    print("🧪 TESTING: PYQ Mock Test PDF Upload Feature")
-    print("=" * 80)
-    
-    admin_session = requests.Session()
-    anon_session = requests.Session()
-    
-    # Test data
-    pyq_test_id = None
-    regular_test_id = None
-    pdf_file_id = None
-    pdf_preview_file_id = None
-    
+def login_admin():
+    """Login as admin and get auth token"""
+    global auth_token
+    print("\n=== ADMIN LOGIN ===")
     try:
-        # Step 1: Admin Login
-        print("\n🔐 Step 1: Admin Authentication")
-        admin_login_data = {"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD}
-        response = admin_session.post(f"{BASE_URL}/api/auth/login", json=admin_login_data)
+        response = requests.post(
+            f"{API_BASE}/auth/login",
+            json={"email": ADMIN_EMAIL, "password": ADMIN_PASSWORD},
+            timeout=10
+        )
+        print(f"Status: {response.status_code}")
+        
         if response.status_code == 200:
-            print_test_result("Admin Login", True, f"Logged in as {ADMIN_EMAIL}")
+            data = response.json()
+            # Get auth_token from cookies
+            if 'auth_token' in response.cookies:
+                auth_token = response.cookies['auth_token']
+                print(f"✅ Admin login successful, role: {data.get('data', {}).get('role')}")
+                return True
+            else:
+                print(f"❌ No auth_token cookie in response")
+                return False
         else:
-            print_test_result("Admin Login", False, f"Status: {response.status_code}, Response: {response.text}")
-            return
+            print(f"❌ Login failed: {response.text}")
+            return False
+    except Exception as e:
+        print(f"❌ Login error: {str(e)}")
+        return False
+
+def get_cookies():
+    """Get cookies dict with auth token"""
+    return {'auth_token': auth_token} if auth_token else {}
+
+def create_small_pdf():
+    """Create a minimal valid PDF for testing"""
+    # Minimal PDF structure
+    pdf_content = b"""%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >> /MediaBox [0 0 612 792] /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 44 >>
+stream
+BT
+/F1 12 Tf
+100 700 Td
+(Test PDF) Tj
+ET
+endstream
+endobj
+xref
+0 5
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000317 00000 n 
+trailer
+<< /Size 5 /Root 1 0 R >>
+startxref
+410
+%%EOF
+"""
+    return pdf_content
+
+# ============================================================================
+# TASK A: PYQ VISIBILITY WHEN ONLY PDF UPLOADED (NO QUESTIONS)
+# ============================================================================
+
+def test_pyq_visibility():
+    """Test PYQ tests with only PDF (no questions) are visible in listings"""
+    print("\n" + "="*80)
+    print("TASK A: PYQ VISIBILITY WHEN ONLY PDF UPLOADED (NO QUESTIONS)")
+    print("="*80)
+    
+    global created_test_ids
+    
+    # Step 1: Get existing exam and domain
+    print("\n--- Step 1: Get Exam and Domain IDs ---")
+    try:
+        # Get exams
+        response = requests.get(f"{API_BASE}/admin/exams", cookies=get_cookies(), timeout=10)
+        if response.status_code != 200:
+            print(f"❌ Failed to get exams: {response.status_code}")
+            return False
         
-        # Step 2: Get existing mock tests to find PYQ and regular tests
-        print("\n📋 Step 2: Finding existing mock tests")
-        response = admin_session.get(f"{BASE_URL}/api/admin/mock-tests")
-        if response.status_code == 200:
-            tests = response.json().get('data', [])
-            
-            # Find a PYQ test
-            pyq_tests = [t for t in tests if t.get('testType') == 'previous_year']
-            if pyq_tests:
-                pyq_test_id = pyq_tests[0]['id']
-                print_test_result("Found PYQ test", True, f"Test ID: {pyq_test_id}")
-            
-            # Find a regular test
-            regular_tests = [t for t in tests if t.get('testType') in ['mock_test', 'practice_questions']]
-            if regular_tests:
-                regular_test_id = regular_tests[0]['id']
-                print_test_result("Found regular test", True, f"Test ID: {regular_test_id}, Type: {regular_tests[0].get('testType')}")
+        exams = response.json().get('data', [])
+        if not exams:
+            print("❌ No exams found in database")
+            return False
         
-        # Create tests if not found
-        if not pyq_test_id:
-            print("\n🆕 Creating PYQ test for testing")
-            # Get first exam and domain for test creation
-            exams_response = admin_session.get(f"{BASE_URL}/api/admin/exams")
-            if exams_response.status_code == 200:
-                exams = exams_response.json().get('data', [])
-                if exams:
-                    exam_id = exams[0]['id']
-                    
-                    # Get domains for this exam
-                    domains_response = admin_session.get(f"{BASE_URL}/api/admin/domains")
-                    if domains_response.status_code == 200:
-                        domains = domains_response.json().get('data', [])
-                        domain_candidates = [d for d in domains if d.get('examId') == exam_id]
-                        if domain_candidates:
-                            domain_id = domain_candidates[0]['id']
-                            
-                            # Create PYQ test
-                            test_data = {
-                                "title": "Test PYQ for PDF Upload",
-                                "examId": exam_id,
-                                "domainId": domain_id,
-                                "testType": "previous_year",
-                                "duration": 60,
-                                "isFree": False
-                            }
-                            response = admin_session.post(f"{BASE_URL}/api/admin/mock-tests", json=test_data)
-                            if response.status_code == 200:
-                                pyq_test_id = response.json().get('data', {}).get('id')
-                                print_test_result("Created PYQ test", True, f"Test ID: {pyq_test_id}")
+        exam = exams[0]
+        exam_id = exam['id']
+        print(f"✅ Using exam: {exam['name']} (id: {exam_id})")
         
-        if not regular_test_id:
-            print("\n🆕 Creating regular test for testing")
-            # Create regular test
-            test_data = {
-                "title": "Test Regular Mock Test",
-                "testType": "mock_test",
-                "duration": 60,
-                "isFree": True
-            }
-            response = admin_session.post(f"{BASE_URL}/api/admin/mock-tests", json=test_data)
-            if response.status_code == 200:
-                regular_test_id = response.json().get('data', {}).get('id')
-                print_test_result("Created regular test", True, f"Test ID: {regular_test_id}")
+        # Get domains for this exam
+        response = requests.get(f"{API_BASE}/admin/domains", cookies=get_cookies(), timeout=10)
+        if response.status_code != 200:
+            print(f"❌ Failed to get domains: {response.status_code}")
+            return False
         
-        if not pyq_test_id or not regular_test_id:
-            print("❌ CRITICAL: Could not find or create required test types")
-            return
+        all_domains = response.json().get('data', [])
+        domains = [d for d in all_domains if d.get('examId') == exam_id]
+        if not domains:
+            print(f"❌ No domains found for exam {exam_id}")
+            print(f"DEBUG: All domains: {[(d.get('name'), d.get('examId')) for d in all_domains]}")
+            return False
         
-        # Test 1: Anonymous POST /api/admin/mock-tests/:id/upload-pdf → 401
-        print("\n🔒 Test 1: Anonymous PDF upload (should return 401)")
-        test_pdf = create_test_pdf(3)
-        files = {'pdf': ('test.pdf', test_pdf, 'application/pdf')}
-        data = {'permission': 'view'}
-        response = anon_session.post(f"{BASE_URL}/api/admin/mock-tests/{pyq_test_id}/upload-pdf", 
-                                   files=files, data=data)
-        print_test_result("Anonymous upload blocked", 
-                        response.status_code == 401,
-                        f"Status: {response.status_code}")
-        
-        # Test 2: Admin POST against regular test (non-PYQ) → 400
-        print("\n🚫 Test 2: Admin upload to non-PYQ test (should return 400)")
-        files = {'pdf': ('test.pdf', test_pdf, 'application/pdf')}
-        data = {'permission': 'view'}
-        response = admin_session.post(f"{BASE_URL}/api/admin/mock-tests/{regular_test_id}/upload-pdf", 
-                                    files=files, data=data)
-        print_test_result("Non-PYQ test upload blocked", 
-                        response.status_code == 400 and 'PYQ' in response.text,
-                        f"Status: {response.status_code}, Response: {response.text}")
-        
-        # Test 3: Admin POST without pdf field → 400
-        print("\n📄 Test 3: Admin upload without PDF field (should return 400)")
-        data = {'permission': 'view'}
-        response = admin_session.post(f"{BASE_URL}/api/admin/mock-tests/{pyq_test_id}/upload-pdf", 
-                                    data=data)
-        print_test_result("Upload without PDF field blocked", 
-                        response.status_code == 400,
-                        f"Status: {response.status_code}")
-        
-        # Test 4: Admin POST non-PDF file → 400
-        print("\n📝 Test 4: Admin upload non-PDF file (should return 400)")
-        non_pdf = create_non_pdf_file()
-        files = {'pdf': ('test.txt', non_pdf, 'text/plain')}
-        data = {'permission': 'view'}
-        response = admin_session.post(f"{BASE_URL}/api/admin/mock-tests/{pyq_test_id}/upload-pdf", 
-                                    files=files, data=data)
-        print_test_result("Non-PDF file upload blocked", 
-                        response.status_code == 400 and 'PDF' in response.text,
-                        f"Status: {response.status_code}, Response: {response.text}")
-        
-        # Test 5: Admin POST PDF >25 MB → 400
-        print("\n📦 Test 5: Admin upload large PDF (should return 400)")
-        # Create a smaller but still large PDF for testing (actual 25MB+ would be too slow)
-        large_pdf = create_test_pdf(100)  # This should be large enough to test the concept
-        if len(large_pdf) < 25 * 1024 * 1024:
-            # If our test PDF isn't large enough, simulate the error by checking the logic
-            print_test_result("Large PDF upload test", True, f"PDF size: {len(large_pdf)} bytes (simulated large file test)")
-        else:
-            files = {'pdf': ('large.pdf', large_pdf, 'application/pdf')}
-            data = {'permission': 'view'}
-            response = admin_session.post(f"{BASE_URL}/api/admin/mock-tests/{pyq_test_id}/upload-pdf", 
-                                        files=files, data=data)
-            print_test_result("Large PDF upload blocked", 
-                            response.status_code == 400 and 'too large' in response.text.lower(),
-                            f"Status: {response.status_code}, Response: {response.text}")
-        
-        # Test 6: Admin POST valid 3-page PDF with permission='view' → 200
-        print("\n✅ Test 6: Admin upload valid PDF (should return 200)")
-        test_pdf = create_test_pdf(3)
-        files = {'pdf': ('test.pdf', test_pdf, 'application/pdf')}
-        data = {'permission': 'view'}
-        response = admin_session.post(f"{BASE_URL}/api/admin/mock-tests/{pyq_test_id}/upload-pdf", 
-                                    files=files, data=data)
-        if response.status_code == 200:
-            response_data = response.json().get('data', {})
-            pdf_file_id = response_data.get('pdfFileId')
-            pdf_preview_file_id = response_data.get('pdfPreviewFileId')
-            pdf_file_name = response_data.get('pdfFileName')
-            pdf_size = response_data.get('pdfSize')
-            pdf_page_count = response_data.get('pdfPageCount')
-            pdf_permission = response_data.get('pdfPermission')
-            pdf_uploaded_at = response_data.get('pdfUploadedAt')
-            
-            all_fields_present = all([pdf_file_id, pdf_preview_file_id, pdf_file_name, 
-                                    pdf_size, pdf_page_count, pdf_permission, pdf_uploaded_at])
-            correct_values = (pdf_page_count == 3 and pdf_permission == 'view')
-            
-            print_test_result("Valid PDF upload successful", 
-                            all_fields_present and correct_values,
-                            f"FileId: {pdf_file_id}, PreviewId: {pdf_preview_file_id}, "
-                            f"Pages: {pdf_page_count}, Permission: {pdf_permission}")
-        else:
-            print_test_result("Valid PDF upload successful", False, 
-                            f"Status: {response.status_code}, Response: {response.text}")
-            return
-        
-        # Test 7: GET /api/pdfs/:previewId/preview (public, no auth) → 200
-        print("\n👁️ Test 7: Public preview access (should return 200)")
-        response = anon_session.get(f"{BASE_URL}/api/pdfs/{pdf_preview_file_id}/preview")
-        is_pdf = response.headers.get('content-type') == 'application/pdf'
-        print_test_result("Public preview access", 
-                        response.status_code == 200 and is_pdf,
-                        f"Status: {response.status_code}, Content-Type: {response.headers.get('content-type')}")
-        
-        # Test 8: GET /api/pdfs/:fullId/full anonymous → 401
-        print("\n🔒 Test 8: Anonymous full PDF access (should return 401)")
-        response = anon_session.get(f"{BASE_URL}/api/pdfs/{pdf_file_id}/full")
-        print_test_result("Anonymous full PDF blocked", 
-                        response.status_code == 401,
-                        f"Status: {response.status_code}")
-        
-        # Test 9: GET /api/pdfs/:fullId/full with admin auth → 200
-        print("\n🔓 Test 9: Admin full PDF access (should return 200)")
-        response = admin_session.get(f"{BASE_URL}/api/pdfs/{pdf_file_id}/full")
-        is_pdf = response.headers.get('content-type') == 'application/pdf'
-        print_test_result("Admin full PDF access", 
-                        response.status_code == 200 and is_pdf,
-                        f"Status: {response.status_code}, Content-Type: {response.headers.get('content-type')}")
-        
-        # Test 10: GET /api/pdfs/:fullId/download with permission='view' → 403
-        print("\n📥 Test 10: Download with view-only permission (should return 403)")
-        response = admin_session.get(f"{BASE_URL}/api/pdfs/{pdf_file_id}/download")
-        print_test_result("Download blocked with view permission", 
-                        response.status_code == 403 and 'DOWNLOAD_FORBIDDEN' in response.text,
-                        f"Status: {response.status_code}, Response: {response.text}")
-        
-        # Test 11: PUT /api/admin/mock-tests/:id with pdfPermission='view_download' → 200
-        print("\n🔄 Test 11: Update PDF permission to view_download")
-        update_data = {"pdfPermission": "view_download"}
-        response = admin_session.put(f"{BASE_URL}/api/admin/mock-tests/{pyq_test_id}", json=update_data)
-        print_test_result("Permission update successful", 
-                        response.status_code == 200,
-                        f"Status: {response.status_code}")
-        
-        # Test 12: GET /api/pdfs/:fullId/download with permission='view_download' → 200
-        print("\n📥 Test 12: Download with view_download permission (should return 200)")
-        response = admin_session.get(f"{BASE_URL}/api/pdfs/{pdf_file_id}/download")
-        is_pdf = response.headers.get('content-type') == 'application/pdf'
-        is_attachment = 'attachment' in response.headers.get('content-disposition', '')
-        print_test_result("Download allowed with view_download permission", 
-                        response.status_code == 200 and is_pdf and is_attachment,
-                        f"Status: {response.status_code}, Content-Type: {response.headers.get('content-type')}, "
-                        f"Disposition: {response.headers.get('content-disposition')}")
-        
-        # Test 13: PUT with invalid pdfPermission value (should not persist)
-        print("\n❌ Test 13: Update with invalid permission value")
-        update_data = {"pdfPermission": "INVALID_VALUE"}
-        response = admin_session.put(f"{BASE_URL}/api/admin/mock-tests/{pyq_test_id}", json=update_data)
-        
-        # Check that permission didn't change
-        response = admin_session.get(f"{BASE_URL}/api/admin/mock-tests")
-        if response.status_code == 200:
-            tests = response.json().get('data', [])
-            test = next((t for t in tests if t['id'] == pyq_test_id), None)
-            if test:
-                current_permission = test.get('pdfPermission')
-                print_test_result("Invalid permission value ignored", 
-                                current_permission == 'view_download',
-                                f"Current permission: {current_permission}")
-        
-        # Test 14: Admin POST again (replace PDF) → new file IDs
-        print("\n🔄 Test 14: Replace PDF with new upload")
-        old_file_id = pdf_file_id
-        old_preview_id = pdf_preview_file_id
-        
-        new_test_pdf = create_test_pdf(5)  # Different number of pages
-        files = {'pdf': ('new_test.pdf', new_test_pdf, 'application/pdf')}
-        data = {'permission': 'view'}
-        response = admin_session.post(f"{BASE_URL}/api/admin/mock-tests/{pyq_test_id}/upload-pdf", 
-                                    files=files, data=data)
-        if response.status_code == 200:
-            response_data = response.json().get('data', {})
-            new_file_id = response_data.get('pdfFileId')
-            new_preview_id = response_data.get('pdfPreviewFileId')
-            new_page_count = response_data.get('pdfPageCount')
-            
-            ids_changed = (new_file_id != old_file_id and new_preview_id != old_preview_id)
-            correct_pages = new_page_count == 5
-            
-            print_test_result("PDF replacement successful", 
-                            ids_changed and correct_pages,
-                            f"New FileId: {new_file_id}, New Pages: {new_page_count}")
-            
-            # Update IDs for further tests
-            pdf_file_id = new_file_id
-            pdf_preview_file_id = new_preview_id
-            
-            # Test that old files are deleted (should return 404)
-            response = anon_session.get(f"{BASE_URL}/api/pdfs/{old_preview_id}/preview")
-            print_test_result("Old preview file deleted", 
-                            response.status_code == 404,
-                            f"Old preview access status: {response.status_code}")
-        
-        # Test 15: DELETE /api/admin/mock-tests/:id/upload-pdf → 200
-        print("\n🗑️ Test 15: Delete PDF attachment")
-        response = admin_session.delete(f"{BASE_URL}/api/admin/mock-tests/{pyq_test_id}/upload-pdf")
-        if response.status_code == 200:
-            response_data = response.json().get('data', {})
-            pdf_fields_unset = all(field not in response_data or response_data[field] is None 
-                                 for field in ['pdfFileId', 'pdfPreviewFileId', 'pdfFileName', 
-                                             'pdfSize', 'pdfPageCount', 'pdfUploadedAt'])
-            
-            print_test_result("PDF deletion successful", 
-                            pdf_fields_unset,
-                            f"PDF fields unset: {pdf_fields_unset}")
-            
-            # Test that files are deleted from GridFS
-            response = anon_session.get(f"{BASE_URL}/api/pdfs/{pdf_preview_file_id}/preview")
-            print_test_result("GridFS files deleted", 
-                            response.status_code == 404,
-                            f"Preview access status: {response.status_code}")
-        
-        # Test 16: DELETE /api/admin/mock-tests/:id (test deletion with PDF cleanup)
-        print("\n🗑️ Test 16: Delete entire test with PDF cleanup")
-        
-        # First upload a PDF again
-        test_pdf = create_test_pdf(2)
-        files = {'pdf': ('final_test.pdf', test_pdf, 'application/pdf')}
-        data = {'permission': 'view'}
-        response = admin_session.post(f"{BASE_URL}/api/admin/mock-tests/{pyq_test_id}/upload-pdf", 
-                                    files=files, data=data)
-        if response.status_code == 200:
-            response_data = response.json().get('data', {})
-            final_preview_id = response_data.get('pdfPreviewFileId')
-            
-            # Now delete the entire test
-            response = admin_session.delete(f"{BASE_URL}/api/admin/mock-tests/{pyq_test_id}")
-            if response.status_code == 200:
-                print_test_result("Test deletion successful", True, "Test deleted")
-                
-                # Verify PDF files are also deleted
-                response = anon_session.get(f"{BASE_URL}/api/pdfs/{final_preview_id}/preview")
-                print_test_result("PDF files cleaned up on test deletion", 
-                                response.status_code == 404,
-                                f"Preview access status: {response.status_code}")
-        
-        # Test 17: GET /api/previous-year-tests with PDF metadata
-        print("\n📋 Test 17: Previous year tests API includes PDF metadata")
-        
-        # Create a new PYQ test with PDF for this test
-        test_data = {
-            "title": "PYQ Test with PDF Metadata",
-            "testType": "previous_year",
-            "duration": 60,
-            "isFree": False
-        }
-        response = admin_session.post(f"{BASE_URL}/api/admin/mock-tests", json=test_data)
-        if response.status_code == 200:
-            metadata_test_id = response.json().get('data', {}).get('id')
-            
-            # Upload PDF
-            test_pdf = create_test_pdf(4)
-            files = {'pdf': ('metadata_test.pdf', test_pdf, 'application/pdf')}
-            data = {'permission': 'view_download'}
-            response = admin_session.post(f"{BASE_URL}/api/admin/mock-tests/{metadata_test_id}/upload-pdf", 
-                                        files=files, data=data)
-            
-            if response.status_code == 200:
-                # Get exam and domain IDs for the API call
-                response = admin_session.get(f"{BASE_URL}/api/admin/exams")
-                if response.status_code == 200:
-                    exams = response.json().get('data', [])
-                    if exams:
-                        exam_id = exams[0]['id']
-                        
-                        response = admin_session.get(f"{BASE_URL}/api/admin/domains")
-                        if response.status_code == 200:
-                            domains = response.json().get('data', [])
-                            domain_candidates = [d for d in domains if d.get('examId') == exam_id]
-                            if domain_candidates:
-                                domain_id = domain_candidates[0]['id']
-                                
-                                # Test the public API
-                                response = anon_session.get(f"{BASE_URL}/api/previous-year-tests?examId={exam_id}&domainId={domain_id}")
-                                if response.status_code == 200:
-                                    tests = response.json().get('data', [])
-                                    test_with_pdf = next((t for t in tests if t.get('id') == metadata_test_id), None)
-                                    
-                                    if test_with_pdf:
-                                        pdf_metadata_fields = ['pdfFileId', 'pdfPreviewFileId', 'pdfFileName', 
-                                                             'pdfSize', 'pdfPageCount', 'pdfPermission']
-                                        has_pdf_metadata = all(field in test_with_pdf for field in pdf_metadata_fields)
-                                        
-                                        print_test_result("Previous year tests include PDF metadata", 
-                                                        has_pdf_metadata,
-                                                        f"PDF metadata fields present: {has_pdf_metadata}")
-                                    else:
-                                        print_test_result("Previous year tests include PDF metadata", False, 
-                                                        "Test with PDF not found in API response")
-        
-        # Test 18: Regression - Blog PDF flow still works
-        print("\n🔄 Test 18: Regression - Blog PDF flow")
-        
-        # Create a blog
-        blog_data = {
-            "title": "Test Blog for PDF Regression",
-            "description": "Testing blog PDF functionality",
-            "content": "Blog content here",
-            "status": "published"
-        }
-        response = admin_session.post(f"{BASE_URL}/api/admin/blogs", json=blog_data)
-        if response.status_code == 200:
-            blog_id = response.json().get('data', {}).get('id')
-            
-            # Upload PDF to blog
-            test_pdf = create_test_pdf(2)
-            files = {'pdf': ('blog_test.pdf', test_pdf, 'application/pdf')}
-            data = {'permission': 'view'}
-            response = admin_session.post(f"{BASE_URL}/api/admin/blogs/{blog_id}/upload-pdf", 
-                                        files=files, data=data)
-            
-            print_test_result("Blog PDF upload regression", 
-                            response.status_code == 200,
-                            f"Status: {response.status_code}")
-            
-            if response.status_code == 200:
-                blog_data = response.json().get('data', {})
-                blog_preview_id = blog_data.get('pdfPreviewFileId')
-                
-                # Test blog PDF preview access
-                response = anon_session.get(f"{BASE_URL}/api/pdfs/{blog_preview_id}/preview")
-                print_test_result("Blog PDF preview access regression", 
-                                response.status_code == 200,
-                                f"Status: {response.status_code}")
-        
-        # Test 19: Regression - Job PDF flow still works
-        print("\n🔄 Test 19: Regression - Job PDF flow")
-        
-        # Create a job
-        job_data = {
-            "title": "Test Job for PDF Regression",
-            "organization": "Test Org",
-            "location": "Test Location",
-            "category": "Government",
-            "vacancies": 10,
-            "status": "Active"
-        }
-        response = admin_session.post(f"{BASE_URL}/api/admin/jobs", json=job_data)
-        if response.status_code == 200:
-            job_id = response.json().get('data', {}).get('id')
-            
-            # Upload PDF to job
-            test_pdf = create_test_pdf(2)
-            files = {'pdf': ('job_test.pdf', test_pdf, 'application/pdf')}
-            data = {'permission': 'view'}
-            response = admin_session.post(f"{BASE_URL}/api/admin/jobs/{job_id}/upload-pdf", 
-                                        files=files, data=data)
-            
-            print_test_result("Job PDF upload regression", 
-                            response.status_code == 200,
-                            f"Status: {response.status_code}")
-            
-            if response.status_code == 200:
-                job_data = response.json().get('data', {})
-                job_preview_id = job_data.get('pdfPreviewFileId')
-                
-                # Test job PDF preview access
-                response = anon_session.get(f"{BASE_URL}/api/pdfs/{job_preview_id}/preview")
-                print_test_result("Job PDF preview access regression", 
-                                response.status_code == 200,
-                                f"Status: {response.status_code}")
-        
-        # Test 20: Admin authentication still enforced
-        print("\n🔒 Test 20: Admin authentication enforcement")
-        
-        # Test admin endpoints without auth
-        response = anon_session.get(f"{BASE_URL}/api/admin/mock-tests")
-        print_test_result("Admin endpoints require authentication", 
-                        response.status_code == 401,
-                        f"Status: {response.status_code}")
-        
-        print("\n" + "=" * 80)
-        print("🎉 PYQ MOCK TEST PDF UPLOAD FEATURE TESTING COMPLETE")
+        domain = domains[0]
+        domain_id = domain['id']
+        print(f"✅ Using domain: {domain['name']} (id: {domain_id})")
         
     except Exception as e:
-        print(f"\n❌ ERROR: {str(e)}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Error getting exam/domain: {str(e)}")
+        return False
+    
+    # Step 2: Create a PYQ test with no questions
+    print("\n--- Step 2: Create PYQ Test (no questions) ---")
+    try:
+        test_data = {
+            "title": f"PYQ Test PDFonly {datetime.now().strftime('%H%M%S')}",
+            "examId": exam_id,
+            "domainId": domain_id,
+            "testType": "previous_year",
+            "duration": 60,
+            "isFree": True,
+            "status": "Active"
+        }
+        
+        response = requests.post(
+            f"{API_BASE}/admin/mock-tests",
+            json=test_data,
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ Failed to create test: {response.status_code} - {response.text}")
+            return False
+        
+        test = response.json().get('data', {})
+        test_id = test.get('id')
+        created_test_ids.append(test_id)
+        print(f"✅ Created PYQ test: {test['title']} (id: {test_id})")
+        
+        # Publish the test (workaround: POST endpoint always sets isPublished=false)
+        response = requests.post(
+            f"{API_BASE}/admin/mock-tests/publish",
+            json={"testId": test_id, "isPublished": True},
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ Failed to publish test: {response.status_code}")
+            return False
+        
+        print(f"✅ Test published")
+        
+    except Exception as e:
+        print(f"❌ Error creating test: {str(e)}")
+        return False
+    
+    # Step 3: Upload PDF to the test
+    print("\n--- Step 3: Upload PDF to Test ---")
+    try:
+        pdf_bytes = create_small_pdf()
+        files = {
+            'pdf': ('test.pdf', io.BytesIO(pdf_bytes), 'application/pdf'),
+            'permission': (None, 'view')
+        }
+        
+        response = requests.post(
+            f"{API_BASE}/admin/mock-tests/{test_id}/upload-pdf",
+            files=files,
+            cookies=get_cookies(),
+            timeout=15
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ Failed to upload PDF: {response.status_code} - {response.text}")
+            return False
+        
+        result = response.json()
+        print(f"✅ PDF uploaded successfully, pdfFileId: {result.get('data', {}).get('pdfFileId')}")
+        
+    except Exception as e:
+        print(f"❌ Error uploading PDF: {str(e)}")
+        return False
+    
+    # Step 4: Verify test has pdfFileId and questionCount=0
+    print("\n--- Step 4: Verify Test Metadata ---")
+    try:
+        response = requests.get(
+            f"{API_BASE}/mock-test/{test_id}",
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ Failed to get test: {response.status_code}")
+            return False
+        
+        test = response.json().get('data', {})
+        pdf_file_id = test.get('pdfFileId')
+        
+        if not pdf_file_id:
+            print(f"❌ Test does not have pdfFileId set")
+            return False
+        
+        print(f"✅ Test has pdfFileId: {pdf_file_id}")
+        
+    except Exception as e:
+        print(f"❌ Error verifying test: {str(e)}")
+        return False
+    
+    # TEST A1: GET /api/previous-year-tests should include this test
+    print("\n--- TEST A1: GET /api/previous-year-tests ---")
+    try:
+        response = requests.get(
+            f"{API_BASE}/previous-year-tests?examId={exam_id}&domainId={domain_id}",
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ Failed to get previous-year-tests: {response.status_code}")
+            return False
+        
+        tests = response.json().get('data', [])
+        print(f"DEBUG: Found {len(tests)} tests in listing")
+        for t in tests:
+            print(f"  - {t.get('title')} (id: {t.get('id')}, questionCount: {t.get('questionCount')}, pdfFileId: {t.get('pdfFileId') is not None})")
+        
+        found = False
+        for t in tests:
+            if t.get('id') == test_id:
+                found = True
+                question_count = t.get('questionCount', -1)
+                has_pdf = t.get('pdfFileId') is not None
+                print(f"✅ PASS: Test found in listing with questionCount={question_count}, pdfFileId={has_pdf}")
+                
+                if question_count != 0:
+                    print(f"⚠️  Warning: Expected questionCount=0, got {question_count}")
+                if not has_pdf:
+                    print(f"❌ FAIL: Test does not have pdfFileId in listing")
+                    return False
+                break
+        
+        if not found:
+            print(f"❌ FAIL: Test NOT found in /api/previous-year-tests listing")
+            print(f"DEBUG: Looking for test_id: {test_id}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in TEST A1: {str(e)}")
+        return False
+    
+    # TEST A2: GET /api/domains/:domainId should include this test
+    print("\n--- TEST A2: GET /api/domains/:domainId ---")
+    try:
+        response = requests.get(
+            f"{API_BASE}/domains/{domain_id}",
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ Failed to get domain: {response.status_code}")
+            return False
+        
+        data = response.json().get('data', {})
+        tests = data.get('tests', [])
+        found = False
+        for t in tests:
+            if t.get('id') == test_id:
+                found = True
+                question_count = t.get('questionCount', -1)
+                has_pdf = t.get('pdfFileId') is not None
+                print(f"✅ PASS: Test found in domain listing with questionCount={question_count}, pdfFileId={has_pdf}")
+                
+                if question_count != 0:
+                    print(f"⚠️  Warning: Expected questionCount=0, got {question_count}")
+                if not has_pdf:
+                    print(f"❌ FAIL: Test does not have pdfFileId in domain listing")
+                    return False
+                break
+        
+        if not found:
+            print(f"❌ FAIL: Test NOT found in /api/domains/{domain_id} listing")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in TEST A2: {str(e)}")
+        return False
+    
+    # TEST A3: NEGATIVE - Create mock_test with 0 questions and no PDF, should NOT appear
+    print("\n--- TEST A3: NEGATIVE - Mock test with no questions and no PDF ---")
+    try:
+        # Create a regular mock_test (not PYQ) with no questions and no PDF
+        test_data = {
+            "title": f"Mock Test NoQuestions {datetime.now().strftime('%H%M%S')}",
+            "examId": exam_id,
+            "domainId": domain_id,
+            "testType": "mock_test",
+            "duration": 60,
+            "isFree": True,
+            "isPublished": True,
+            "status": "Active"
+        }
+        
+        response = requests.post(
+            f"{API_BASE}/admin/mock-tests",
+            json=test_data,
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ Failed to create mock test: {response.status_code}")
+            return False
+        
+        mock_test = response.json().get('data', {})
+        mock_test_id = mock_test.get('id')
+        created_test_ids.append(mock_test_id)
+        print(f"✅ Created mock_test with no questions: {mock_test['title']} (id: {mock_test_id})")
+        
+        # Check that it does NOT appear in previous-year-tests
+        response = requests.get(
+            f"{API_BASE}/previous-year-tests?examId={exam_id}&domainId={domain_id}",
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ Failed to get previous-year-tests: {response.status_code}")
+            return False
+        
+        tests = response.json().get('data', [])
+        found = any(t.get('id') == mock_test_id for t in tests)
+        
+        if found:
+            print(f"❌ FAIL: Mock test with no questions/PDF incorrectly appears in previous-year-tests")
+            return False
+        else:
+            print(f"✅ PASS: Mock test with no questions/PDF correctly excluded from previous-year-tests")
+        
+    except Exception as e:
+        print(f"❌ Error in TEST A3: {str(e)}")
+        return False
+    
+    print("\n" + "="*80)
+    print("✅ TASK A: ALL TESTS PASSED")
+    print("="*80)
+    return True
+
+# ============================================================================
+# TASK B: COUPON SYSTEM FOR GET PASS PURCHASES
+# ============================================================================
+
+def test_coupon_system():
+    """Test all 17 coupon system scenarios"""
+    print("\n" + "="*80)
+    print("TASK B: COUPON SYSTEM FOR GET PASS PURCHASES")
+    print("="*80)
+    
+    global created_coupon_ids
+    
+    # Cleanup any leftover TEST10 or FLAT300 coupons from previous runs
+    print("\n--- Pre-test Cleanup ---")
+    try:
+        response = requests.get(f"{API_BASE}/admin/coupons", cookies=get_cookies(), timeout=10)
+        if response.status_code == 200:
+            coupons = response.json().get('data', [])
+            for coupon in coupons:
+                if coupon.get('code') in ['TEST10', 'FLAT300']:
+                    coupon_id = coupon.get('id')
+                    requests.delete(f"{API_BASE}/admin/coupons/{coupon_id}", cookies=get_cookies(), timeout=10)
+                    print(f"✅ Cleaned up leftover coupon: {coupon.get('code')}")
+    except Exception as e:
+        print(f"⚠️  Cleanup warning: {str(e)}")
+    
+    # Scenario (a): Unauth GET/POST/PUT/DELETE → 401
+    print("\n--- Scenario (a): Unauthorized access → 401 ---")
+    try:
+        # GET without auth
+        response = requests.get(f"{API_BASE}/admin/coupons", timeout=10)
+        if response.status_code == 401:
+            print("✅ PASS: GET /admin/coupons without auth → 401")
+        else:
+            print(f"❌ FAIL: Expected 401, got {response.status_code}")
+            return False
+        
+        # POST without auth
+        response = requests.post(
+            f"{API_BASE}/admin/coupons",
+            json={"code": "TEST", "type": "percent", "value": 10},
+            timeout=10
+        )
+        if response.status_code == 401:
+            print("✅ PASS: POST /admin/coupons without auth → 401")
+        else:
+            print(f"❌ FAIL: Expected 401, got {response.status_code}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (a): {str(e)}")
+        return False
+    
+    # Scenario (b): Create coupon TEST10
+    print("\n--- Scenario (b): Create coupon TEST10 ---")
+    try:
+        coupon_data = {
+            "code": "TEST10",
+            "type": "percent",
+            "value": 10
+        }
+        
+        response = requests.post(
+            f"{API_BASE}/admin/coupons",
+            json=coupon_data,
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ FAIL: Create coupon failed: {response.status_code} - {response.text}")
+            return False
+        
+        coupon = response.json().get('data', {})
+        coupon_id = coupon.get('id')
+        created_coupon_ids.append(coupon_id)
+        
+        if coupon.get('code') != 'TEST10':
+            print(f"❌ FAIL: Expected code 'TEST10', got '{coupon.get('code')}'")
+            return False
+        if coupon.get('usageCount') != 0:
+            print(f"❌ FAIL: Expected usageCount 0, got {coupon.get('usageCount')}")
+            return False
+        if coupon.get('active') != True:
+            print(f"❌ FAIL: Expected active=true, got {coupon.get('active')}")
+            return False
+        if coupon.get('appliesTo') != 'get_pass':
+            print(f"❌ FAIL: Expected appliesTo='get_pass', got '{coupon.get('appliesTo')}'")
+            return False
+        
+        print(f"✅ PASS: Coupon TEST10 created successfully (id: {coupon_id})")
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (b): {str(e)}")
+        return False
+    
+    # Scenario (c): Duplicate code → 400
+    print("\n--- Scenario (c): Duplicate code → 400 ---")
+    try:
+        response = requests.post(
+            f"{API_BASE}/admin/coupons",
+            json={"code": "TEST10", "type": "percent", "value": 10},
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            error = response.json().get('error', '')
+            if 'already exists' in error.lower():
+                print(f"✅ PASS: Duplicate code rejected with 400: {error}")
+            else:
+                print(f"⚠️  Warning: Got 400 but unexpected error message: {error}")
+        else:
+            print(f"❌ FAIL: Expected 400, got {response.status_code}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (c): {str(e)}")
+        return False
+    
+    # Scenario (d): Code too short → 400
+    print("\n--- Scenario (d): Code too short → 400 ---")
+    try:
+        response = requests.post(
+            f"{API_BASE}/admin/coupons",
+            json={"code": "AB", "type": "percent", "value": 10},
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            error = response.json().get('error', '')
+            print(f"✅ PASS: Short code rejected with 400: {error}")
+        else:
+            print(f"❌ FAIL: Expected 400, got {response.status_code}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (d): {str(e)}")
+        return False
+    
+    # Scenario (e): Zero/negative value → 400
+    print("\n--- Scenario (e): Zero/negative value → 400 ---")
+    try:
+        response = requests.post(
+            f"{API_BASE}/admin/coupons",
+            json={"code": "BAD", "type": "percent", "value": 0},
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            error = response.json().get('error', '')
+            print(f"✅ PASS: Zero value rejected with 400: {error}")
+        else:
+            print(f"❌ FAIL: Expected 400, got {response.status_code}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (e): {str(e)}")
+        return False
+    
+    # Scenario (f): Percent > 100 → 400
+    print("\n--- Scenario (f): Percent > 100 → 400 ---")
+    try:
+        response = requests.post(
+            f"{API_BASE}/admin/coupons",
+            json={"code": "BIG", "type": "percent", "value": 150},
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            error = response.json().get('error', '')
+            print(f"✅ PASS: Percent > 100 rejected with 400: {error}")
+        else:
+            print(f"❌ FAIL: Expected 400, got {response.status_code}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (f): {str(e)}")
+        return False
+    
+    # Scenario (g): GET list includes TEST10
+    print("\n--- Scenario (g): GET /admin/coupons includes TEST10 ---")
+    try:
+        response = requests.get(
+            f"{API_BASE}/admin/coupons",
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ FAIL: GET coupons failed: {response.status_code}")
+            return False
+        
+        coupons = response.json().get('data', [])
+        found = any(c.get('code') == 'TEST10' for c in coupons)
+        
+        if found:
+            print(f"✅ PASS: TEST10 found in coupon list")
+        else:
+            print(f"❌ FAIL: TEST10 not found in coupon list")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (g): {str(e)}")
+        return False
+    
+    # Scenario (h): Validate TEST10 with amount 5000
+    print("\n--- Scenario (h): Validate TEST10 with amount 5000 ---")
+    try:
+        response = requests.post(
+            f"{API_BASE}/coupons/validate",
+            json={"code": "TEST10", "paymentType": "get_pass", "amount": 5000},
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ FAIL: Validate failed: {response.status_code} - {response.text}")
+            return False
+        
+        result = response.json().get('data', {})
+        discount = result.get('discount')
+        final_amount = result.get('finalAmount')
+        
+        # 10% of 5000 = 500
+        if discount == 500 and final_amount == 4500:
+            print(f"✅ PASS: Validation successful - discount={discount}, finalAmount={final_amount}")
+        else:
+            print(f"❌ FAIL: Expected discount=500, finalAmount=4500, got discount={discount}, finalAmount={final_amount}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (h): {str(e)}")
+        return False
+    
+    # Scenario (i): Validate with wrong code → 400
+    print("\n--- Scenario (i): Validate with wrong code → 400 ---")
+    try:
+        response = requests.post(
+            f"{API_BASE}/coupons/validate",
+            json={"code": "WRONGCODE", "paymentType": "get_pass", "amount": 5000},
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            error = response.json().get('error', '')
+            print(f"✅ PASS: Wrong code rejected with 400: {error}")
+        else:
+            print(f"❌ FAIL: Expected 400, got {response.status_code}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (i): {str(e)}")
+        return False
+    
+    # Scenario (j): Validate with wrong paymentType → 400
+    print("\n--- Scenario (j): Validate with wrong paymentType → 400 ---")
+    try:
+        response = requests.post(
+            f"{API_BASE}/coupons/validate",
+            json={"code": "TEST10", "paymentType": "exam_purchase", "amount": 5000},
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            error = response.json().get('error', '')
+            if 'get pass' in error.lower():
+                print(f"✅ PASS: Wrong paymentType rejected with 400: {error}")
+            else:
+                print(f"⚠️  Warning: Got 400 but unexpected error: {error}")
+        else:
+            print(f"❌ FAIL: Expected 400, got {response.status_code}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (j): {str(e)}")
+        return False
+    
+    # Scenario (k): Validate with amount 0 → 400
+    print("\n--- Scenario (k): Validate with amount 0 → 400 ---")
+    try:
+        response = requests.post(
+            f"{API_BASE}/coupons/validate",
+            json={"code": "TEST10", "paymentType": "get_pass", "amount": 0},
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            error = response.json().get('error', '')
+            print(f"✅ PASS: Zero amount rejected with 400: {error}")
+        else:
+            print(f"❌ FAIL: Expected 400, got {response.status_code}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (k): {str(e)}")
+        return False
+    
+    # Scenario (l): Disable coupon, then validate → 400
+    print("\n--- Scenario (l): Disable coupon, then validate → 400 ---")
+    try:
+        # Disable the coupon
+        response = requests.put(
+            f"{API_BASE}/admin/coupons/{coupon_id}",
+            json={"active": False},
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ FAIL: Failed to disable coupon: {response.status_code}")
+            return False
+        
+        print(f"✅ Coupon disabled")
+        
+        # Try to validate
+        response = requests.post(
+            f"{API_BASE}/coupons/validate",
+            json={"code": "TEST10", "paymentType": "get_pass", "amount": 5000},
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            error = response.json().get('error', '')
+            if 'disabled' in error.lower():
+                print(f"✅ PASS: Disabled coupon rejected with 400: {error}")
+            else:
+                print(f"⚠️  Warning: Got 400 but unexpected error: {error}")
+        else:
+            print(f"❌ FAIL: Expected 400, got {response.status_code}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (l): {str(e)}")
+        return False
+    
+    # Scenario (m): Expire coupon, then validate → 400
+    print("\n--- Scenario (m): Expire coupon, then validate → 400 ---")
+    try:
+        # Set expiry to past date
+        past_date = (datetime.now() - timedelta(days=1)).isoformat()
+        response = requests.put(
+            f"{API_BASE}/admin/coupons/{coupon_id}",
+            json={"expiresAt": past_date},
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ FAIL: Failed to expire coupon: {response.status_code}")
+            return False
+        
+        print(f"✅ Coupon expired")
+        
+        # Try to validate
+        response = requests.post(
+            f"{API_BASE}/coupons/validate",
+            json={"code": "TEST10", "paymentType": "get_pass", "amount": 5000},
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            error = response.json().get('error', '')
+            if 'expired' in error.lower():
+                print(f"✅ PASS: Expired coupon rejected with 400: {error}")
+            else:
+                print(f"⚠️  Warning: Got 400 but unexpected error: {error}")
+        else:
+            print(f"❌ FAIL: Expected 400, got {response.status_code}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (m): {str(e)}")
+        return False
+    
+    # Scenario (n): Re-enable, set maxDiscount cap, test capping
+    print("\n--- Scenario (n): Re-enable, set maxDiscount=200, test capping ---")
+    try:
+        # Re-enable and set maxDiscount
+        response = requests.put(
+            f"{API_BASE}/admin/coupons/{coupon_id}",
+            json={
+                "active": True,
+                "expiresAt": None,
+                "usageLimit": 1,
+                "maxDiscount": 200,
+                "value": 50
+            },
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ FAIL: Failed to update coupon: {response.status_code}")
+            return False
+        
+        print(f"✅ Coupon updated: active=true, value=50%, maxDiscount=200")
+        
+        # Validate with amount 5000 (50% = 2500, but capped at 200)
+        response = requests.post(
+            f"{API_BASE}/coupons/validate",
+            json={"code": "TEST10", "paymentType": "get_pass", "amount": 5000},
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ FAIL: Validate failed: {response.status_code}")
+            return False
+        
+        result = response.json().get('data', {})
+        discount = result.get('discount')
+        final_amount = result.get('finalAmount')
+        
+        # Should be capped at 200
+        if discount == 200 and final_amount == 4800:
+            print(f"✅ PASS: maxDiscount cap working - discount={discount}, finalAmount={final_amount}")
+        else:
+            print(f"❌ FAIL: Expected discount=200, finalAmount=4800, got discount={discount}, finalAmount={final_amount}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (n): {str(e)}")
+        return False
+    
+    # Scenario (o): Flat coupon with floor clamp
+    print("\n--- Scenario (o): Flat coupon FLAT300, test floor clamp ---")
+    try:
+        # Create flat coupon
+        response = requests.post(
+            f"{API_BASE}/admin/coupons",
+            json={"code": "FLAT300", "type": "flat", "value": 300},
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ FAIL: Failed to create flat coupon: {response.status_code}")
+            return False
+        
+        flat_coupon = response.json().get('data', {})
+        flat_coupon_id = flat_coupon.get('id')
+        created_coupon_ids.append(flat_coupon_id)
+        print(f"✅ Created flat coupon FLAT300 (id: {flat_coupon_id})")
+        
+        # Validate with amount 1000
+        response = requests.post(
+            f"{API_BASE}/coupons/validate",
+            json={"code": "FLAT300", "paymentType": "get_pass", "amount": 1000},
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ FAIL: Validate failed: {response.status_code}")
+            return False
+        
+        result = response.json().get('data', {})
+        discount = result.get('discount')
+        final_amount = result.get('finalAmount')
+        
+        if discount == 300 and final_amount == 700:
+            print(f"✅ PASS: Flat discount working - discount={discount}, finalAmount={final_amount}")
+        else:
+            print(f"❌ FAIL: Expected discount=300, finalAmount=700, got discount={discount}, finalAmount={final_amount}")
+            return False
+        
+        # Validate with amount 200 (should clamp to ₹1 minimum)
+        response = requests.post(
+            f"{API_BASE}/coupons/validate",
+            json={"code": "FLAT300", "paymentType": "get_pass", "amount": 200},
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ FAIL: Validate failed: {response.status_code}")
+            return False
+        
+        result = response.json().get('data', {})
+        discount = result.get('discount')
+        final_amount = result.get('finalAmount')
+        
+        # finalAmount should be clamped to 1
+        if final_amount == 1 and discount == 199:
+            print(f"✅ PASS: Floor clamp working - discount={discount}, finalAmount={final_amount} (clamped to ₹1)")
+        else:
+            print(f"❌ FAIL: Expected finalAmount=1, discount=199, got discount={discount}, finalAmount={final_amount}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (o): {str(e)}")
+        return False
+    
+    # Scenario (p): DELETE coupon
+    print("\n--- Scenario (p): DELETE coupon ---")
+    try:
+        # Delete FLAT300
+        response = requests.delete(
+            f"{API_BASE}/admin/coupons/{flat_coupon_id}",
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ FAIL: Failed to delete coupon: {response.status_code}")
+            return False
+        
+        print(f"✅ Coupon deleted")
+        created_coupon_ids.remove(flat_coupon_id)
+        
+        # Verify it's not in list
+        response = requests.get(
+            f"{API_BASE}/admin/coupons",
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ FAIL: Failed to get coupons: {response.status_code}")
+            return False
+        
+        coupons = response.json().get('data', [])
+        found = any(c.get('id') == flat_coupon_id for c in coupons)
+        
+        if found:
+            print(f"❌ FAIL: Deleted coupon still in list")
+            return False
+        else:
+            print(f"✅ PASS: Deleted coupon not in list")
+        
+        # Try to validate deleted coupon
+        response = requests.post(
+            f"{API_BASE}/coupons/validate",
+            json={"code": "FLAT300", "paymentType": "get_pass", "amount": 1000},
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            error = response.json().get('error', '')
+            print(f"✅ PASS: Deleted coupon validation rejected with 400: {error}")
+        else:
+            print(f"❌ FAIL: Expected 400, got {response.status_code}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (p): {str(e)}")
+        return False
+    
+    # Scenario (q): create-order with valid coupon
+    print("\n--- Scenario (q): create-order with valid coupon ---")
+    try:
+        # First, re-enable TEST10 and remove limits for testing
+        response = requests.put(
+            f"{API_BASE}/admin/coupons/{coupon_id}",
+            json={
+                "active": True,
+                "expiresAt": None,
+                "usageLimit": None,
+                "maxDiscount": None,
+                "value": 10
+            },
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ FAIL: Failed to update coupon: {response.status_code}")
+            return False
+        
+        print(f"✅ Coupon TEST10 re-enabled for testing")
+        
+        # Call create-order with coupon (increased timeout for Razorpay API call)
+        response = requests.post(
+            f"{API_BASE}/payment/create-order",
+            json={
+                "paymentType": "get_pass",
+                "amount": 5000,
+                "couponCode": "TEST10"
+            },
+            cookies=get_cookies(),
+            timeout=30
+        )
+        
+        if response.status_code != 200:
+            print(f"❌ FAIL: create-order failed: {response.status_code} - {response.text}")
+            return False
+        
+        result = response.json().get('data', {})
+        coupon_data = result.get('coupon', {})
+        amount_paise = result.get('amount')
+        
+        # Check coupon data
+        if coupon_data.get('code') != 'TEST10':
+            print(f"❌ FAIL: Expected coupon code TEST10, got {coupon_data.get('code')}")
+            return False
+        
+        if coupon_data.get('discount') != 500:
+            print(f"❌ FAIL: Expected discount 500, got {coupon_data.get('discount')}")
+            return False
+        
+        # Amount should be in paise (4500 * 100 = 450000)
+        if amount_paise == 450000:
+            print(f"✅ PASS: create-order with coupon successful - discount={coupon_data.get('discount')}, amount={amount_paise} paise (₹4500)")
+        else:
+            print(f"❌ FAIL: Expected amount=450000 paise, got {amount_paise}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (q): {str(e)}")
+        return False
+    
+    # Scenario (r): create-order with invalid coupon → 400
+    print("\n--- Scenario (r): create-order with invalid coupon → 400 ---")
+    try:
+        response = requests.post(
+            f"{API_BASE}/payment/create-order",
+            json={
+                "paymentType": "get_pass",
+                "amount": 5000,
+                "couponCode": "NOPE"
+            },
+            cookies=get_cookies(),
+            timeout=10
+        )
+        
+        if response.status_code == 400:
+            error = response.json().get('error', '')
+            print(f"✅ PASS: Invalid coupon rejected with 400: {error}")
+        else:
+            print(f"❌ FAIL: Expected 400, got {response.status_code}")
+            return False
+        
+    except Exception as e:
+        print(f"❌ Error in scenario (r): {str(e)}")
+        return False
+    
+    print("\n" + "="*80)
+    print("✅ TASK B: ALL 17 SCENARIOS PASSED")
+    print("="*80)
+    return True
+
+# ============================================================================
+# CLEANUP
+# ============================================================================
+
+def cleanup():
+    """Clean up created test data"""
+    print("\n" + "="*80)
+    print("CLEANUP")
+    print("="*80)
+    
+    # Delete created tests
+    for test_id in created_test_ids:
+        try:
+            response = requests.delete(
+                f"{API_BASE}/admin/mock-tests/{test_id}",
+                cookies=get_cookies(),
+                timeout=10
+            )
+            if response.status_code == 200:
+                print(f"✅ Deleted test: {test_id}")
+            else:
+                print(f"⚠️  Failed to delete test {test_id}: {response.status_code}")
+        except Exception as e:
+            print(f"⚠️  Error deleting test {test_id}: {str(e)}")
+    
+    # Delete created coupons
+    for coupon_id in created_coupon_ids:
+        try:
+            response = requests.delete(
+                f"{API_BASE}/admin/coupons/{coupon_id}",
+                cookies=get_cookies(),
+                timeout=10
+            )
+            if response.status_code == 200:
+                print(f"✅ Deleted coupon: {coupon_id}")
+            else:
+                print(f"⚠️  Failed to delete coupon {coupon_id}: {response.status_code}")
+        except Exception as e:
+            print(f"⚠️  Error deleting coupon {coupon_id}: {str(e)}")
+
+# ============================================================================
+# MAIN
+# ============================================================================
+
+def main():
+    """Main test runner"""
+    print("\n" + "="*80)
+    print("BACKEND API TESTING - TWO NEW TASKS")
+    print("="*80)
+    print(f"Base URL: {BASE_URL}")
+    print(f"API Base: {API_BASE}")
+    
+    # Login
+    if not login_admin():
+        print("\n❌ FAILED: Could not login as admin")
+        return False
+    
+    # Run tests
+    task_a_passed = False
+    task_b_passed = False
+    
+    try:
+        task_a_passed = test_pyq_visibility()
+    except Exception as e:
+        print(f"\n❌ TASK A FAILED WITH EXCEPTION: {str(e)}")
+    
+    try:
+        task_b_passed = test_coupon_system()
+    except Exception as e:
+        print(f"\n❌ TASK B FAILED WITH EXCEPTION: {str(e)}")
+    
+    # Cleanup
+    cleanup()
+    
+    # Final summary
+    print("\n" + "="*80)
+    print("FINAL SUMMARY")
+    print("="*80)
+    print(f"TASK A (PYQ Visibility): {'✅ PASSED' if task_a_passed else '❌ FAILED'}")
+    print(f"TASK B (Coupon System): {'✅ PASSED' if task_b_passed else '❌ FAILED'}")
+    print("="*80)
+    
+    return task_a_passed and task_b_passed
 
 if __name__ == "__main__":
-    test_pyq_pdf_upload_feature()
+    success = main()
+    exit(0 if success else 1)

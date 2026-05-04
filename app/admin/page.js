@@ -6110,6 +6110,300 @@ function NotificationsTab({ exams }) {
 
 
 // =========================== PRICING TAB ===========================
+function CouponsManager() {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState({
+    code: '',
+    type: 'percent',
+    value: '',
+    expiresAt: '',
+    usageLimit: '',
+    maxDiscount: '',
+    minAmount: '',
+    description: '',
+    active: true,
+  });
+
+  const fetchItems = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin/coupons', { credentials: 'include' });
+      const d = await res.json();
+      if (d.success) setItems(d.data || []);
+      else toast.error(d.error || 'Failed to load coupons');
+    } catch (_e) { toast.error('Failed to load coupons'); }
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchItems(); }, []);
+
+  const resetForm = () => {
+    setForm({ code: '', type: 'percent', value: '', expiresAt: '', usageLimit: '', maxDiscount: '', minAmount: '', description: '', active: true });
+    setEditingId(null);
+  };
+
+  const startEdit = (c) => {
+    setEditingId(c.id);
+    setForm({
+      code: c.code,
+      type: c.type,
+      value: String(c.value || ''),
+      expiresAt: c.expiresAt ? new Date(c.expiresAt).toISOString().slice(0, 10) : '',
+      usageLimit: c.usageLimit ? String(c.usageLimit) : '',
+      maxDiscount: c.maxDiscount ? String(c.maxDiscount) : '',
+      minAmount: c.minAmount ? String(c.minAmount) : '',
+      description: c.description || '',
+      active: c.active !== false,
+    });
+  };
+
+  const submit = async () => {
+    if (!form.code.trim()) { toast.error('Code is required'); return; }
+    if (!form.value || Number(form.value) <= 0) { toast.error('Discount value must be positive'); return; }
+    setCreating(true);
+    try {
+      const payload = {
+        code: form.code.trim().toUpperCase(),
+        type: form.type,
+        value: Number(form.value),
+        expiresAt: form.expiresAt || null,
+        usageLimit: form.usageLimit ? Number(form.usageLimit) : null,
+        maxDiscount: form.maxDiscount ? Number(form.maxDiscount) : null,
+        minAmount: form.minAmount ? Number(form.minAmount) : 0,
+        description: form.description,
+        active: form.active,
+      };
+      const url = editingId ? `/api/admin/coupons/${editingId}` : '/api/admin/coupons';
+      const method = editingId ? 'PUT' : 'POST';
+      // PUT cannot change code (treat as immutable post-create)
+      if (editingId) delete payload.code;
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload),
+      });
+      const d = await res.json();
+      if (d.success) {
+        toast.success(editingId ? 'Coupon updated' : 'Coupon created');
+        resetForm();
+        fetchItems();
+      } else {
+        toast.error(d.error || 'Save failed');
+      }
+    } catch (_e) { toast.error('Save failed'); }
+    setCreating(false);
+  };
+
+  const toggleActive = async (c) => {
+    try {
+      const res = await fetch(`/api/admin/coupons/${c.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ active: !c.active }),
+      });
+      const d = await res.json();
+      if (d.success) {
+        setItems((prev) => prev.map((p) => (p.id === c.id ? d.data : p)));
+        toast.success(`Coupon ${d.data.active ? 'enabled' : 'disabled'}`);
+      } else toast.error(d.error || 'Update failed');
+    } catch (_e) { toast.error('Update failed'); }
+  };
+
+  const handleDelete = async (c) => {
+    if (!window.confirm(`Delete coupon "${c.code}"? This cannot be undone.`)) return;
+    try {
+      const res = await fetch(`/api/admin/coupons/${c.id}`, { method: 'DELETE', credentials: 'include' });
+      const d = await res.json();
+      if (d.success) {
+        setItems((prev) => prev.filter((p) => p.id !== c.id));
+        toast.success('Coupon deleted');
+      } else toast.error(d.error || 'Delete failed');
+    } catch (_e) { toast.error('Delete failed'); }
+  };
+
+  return (
+    <Card className="border-2 border-pink-200">
+      <CardContent className="p-6">
+        <div className="flex items-start gap-4 mb-5">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-pink-500 to-rose-500 text-white flex items-center justify-center shrink-0">
+            <Sparkles className="w-6 h-6" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-xl font-bold text-gray-900">Coupon Codes <span className="text-sm font-normal text-gray-500">— Get Pass only</span></h3>
+            <p className="text-sm text-gray-600">Create discount codes for Get Pass purchases. Set type, value, expiry, usage limits, and toggle active state.</p>
+          </div>
+        </div>
+
+        {/* Create / edit form */}
+        <div className="rounded-lg border bg-gray-50 p-4 mb-5">
+          <h4 className="font-semibold text-gray-800 mb-3">{editingId ? 'Edit Coupon' : 'Create New Coupon'}</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div>
+              <Label>Code</Label>
+              <Input
+                value={form.code}
+                onChange={(e) => setForm((f) => ({ ...f, code: e.target.value.toUpperCase() }))}
+                placeholder="SAVE20"
+                disabled={!!editingId}
+                className="bg-white uppercase"
+              />
+              {editingId && <p className="text-[11px] text-gray-500 mt-1">Code cannot be changed after creation.</p>}
+            </div>
+            <div>
+              <Label>Type</Label>
+              <Select value={form.type} onValueChange={(v) => setForm((f) => ({ ...f, type: v }))}>
+                <SelectTrigger className="bg-white"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="percent">Percentage (%)</SelectItem>
+                  <SelectItem value="flat">Flat Amount (₹)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Discount Value {form.type === 'percent' ? '(%)' : '(₹)'}</Label>
+              <Input type="number" min="1" value={form.value}
+                onChange={(e) => setForm((f) => ({ ...f, value: e.target.value }))}
+                placeholder={form.type === 'percent' ? '20' : '500'}
+                className="bg-white" />
+            </div>
+            <div>
+              <Label>Expires At <span className="text-gray-400 font-normal">(optional)</span></Label>
+              <Input type="date" value={form.expiresAt}
+                onChange={(e) => setForm((f) => ({ ...f, expiresAt: e.target.value }))}
+                className="bg-white" />
+            </div>
+            <div>
+              <Label>Usage Limit <span className="text-gray-400 font-normal">(total uses)</span></Label>
+              <Input type="number" min="1" value={form.usageLimit}
+                onChange={(e) => setForm((f) => ({ ...f, usageLimit: e.target.value }))}
+                placeholder="Unlimited"
+                className="bg-white" />
+            </div>
+            {form.type === 'percent' && (
+              <div>
+                <Label>Max Discount (₹) <span className="text-gray-400 font-normal">(optional)</span></Label>
+                <Input type="number" min="0" value={form.maxDiscount}
+                  onChange={(e) => setForm((f) => ({ ...f, maxDiscount: e.target.value }))}
+                  placeholder="Cap on discount"
+                  className="bg-white" />
+              </div>
+            )}
+            <div className={form.type === 'percent' ? 'md:col-span-2' : ''}>
+              <Label>Min Order Amount (₹) <span className="text-gray-400 font-normal">(optional)</span></Label>
+              <Input type="number" min="0" value={form.minAmount}
+                onChange={(e) => setForm((f) => ({ ...f, minAmount: e.target.value }))}
+                placeholder="0"
+                className="bg-white" />
+            </div>
+            <div className="md:col-span-3">
+              <Label>Description <span className="text-gray-400 font-normal">(internal note, optional)</span></Label>
+              <Input value={form.description}
+                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                placeholder="e.g. Diwali offer 2025"
+                className="bg-white" />
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={form.active} onCheckedChange={(v) => setForm((f) => ({ ...f, active: v }))} />
+              <Label className="!mb-0">Active</Label>
+            </div>
+          </div>
+          <div className="mt-4 flex gap-2">
+            <Button onClick={submit} disabled={creating} className="bg-pink-600 hover:bg-pink-700">
+              {creating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving…</> : editingId ? <><Save className="w-4 h-4 mr-2" /> Update Coupon</> : <><Plus className="w-4 h-4 mr-2" /> Create Coupon</>}
+            </Button>
+            {editingId && (
+              <Button variant="outline" onClick={resetForm}>Cancel Edit</Button>
+            )}
+          </div>
+        </div>
+
+        {/* List */}
+        <div className="border rounded-lg overflow-hidden">
+          {loading ? (
+            <div className="p-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-pink-600" /></div>
+          ) : items.length === 0 ? (
+            <div className="p-8 text-center text-sm text-gray-500">
+              No coupons yet. Create your first coupon above.
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Code</TableHead>
+                  <TableHead>Discount</TableHead>
+                  <TableHead>Expires</TableHead>
+                  <TableHead>Usage</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {items.map((c) => {
+                  const expired = c.expiresAt && new Date(c.expiresAt).getTime() < Date.now();
+                  const exhausted = c.usageLimit && (c.usageCount || 0) >= c.usageLimit;
+                  return (
+                    <TableRow key={c.id}>
+                      <TableCell>
+                        <div className="font-mono font-bold text-pink-700">{c.code}</div>
+                        {c.description && <div className="text-[11px] text-gray-500 line-clamp-1">{c.description}</div>}
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-semibold">
+                          {c.type === 'percent' ? `${c.value}%` : `₹${c.value}`}
+                        </div>
+                        {c.type === 'percent' && c.maxDiscount && (
+                          <div className="text-[11px] text-gray-500">max ₹{c.maxDiscount}</div>
+                        )}
+                        {c.minAmount > 0 && (
+                          <div className="text-[11px] text-gray-500">min order ₹{c.minAmount}</div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {c.expiresAt ? (
+                          <span className={expired ? 'text-red-600' : 'text-gray-700'}>
+                            {new Date(c.expiresAt).toLocaleDateString()}
+                          </span>
+                        ) : <span className="text-gray-400">No expiry</span>}
+                      </TableCell>
+                      <TableCell>
+                        {c.usageCount || 0}{c.usageLimit ? ` / ${c.usageLimit}` : ''}
+                      </TableCell>
+                      <TableCell>
+                        {!c.active ? <Badge variant="outline" className="text-gray-500">Disabled</Badge>
+                          : expired ? <Badge variant="outline" className="text-red-600 border-red-300">Expired</Badge>
+                          : exhausted ? <Badge variant="outline" className="text-amber-600 border-amber-300">Exhausted</Badge>
+                          : <Badge className="bg-green-500">Active</Badge>}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="inline-flex items-center gap-1">
+                          <Button size="sm" variant="outline" className="h-8 w-8 p-0" title={c.active ? 'Disable' : 'Enable'} onClick={() => toggleActive(c)}>
+                            {c.active ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 w-8 p-0" title="Edit" onClick={() => startEdit(c)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 w-8 p-0" title="Delete" onClick={() => handleDelete(c)}>
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function PricingTab({ exams }) {
   const [loading, setLoading] = useState(true);
   const [pass, setPass] = useState({ getPassPrice: 0, getPassEnabled: false, getPassDurationDays: 365 });
@@ -6286,6 +6580,9 @@ function PricingTab({ exams }) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Coupon Codes (Get Pass only) */}
+      <CouponsManager />
 
       {/* Structured flow: Type -> Section -> Exam/Domain */}
       <Card>

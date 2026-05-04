@@ -600,6 +600,7 @@ function TestList({ tests, domain, unlocked, onStart, onPdf }) {
           const canStart = free || unlocked;
           const hasPdf = !!t.pdfFileId;
           const canDownload = t.pdfPermission === 'view_download';
+          const hasQuestions = (t.questionCount || 0) > 0;
           return (
             <Card key={t.id} className="hover:shadow-lg transition">
               <CardContent className="p-5">
@@ -627,19 +628,21 @@ function TestList({ tests, domain, unlocked, onStart, onPdf }) {
                     <button
                       type="button"
                       onClick={() => onPdf(t)}
-                      className="flex-1 inline-flex items-center justify-center gap-2 bg-white border border-purple-300 text-purple-700 hover:bg-purple-50 px-4 py-2.5 text-sm font-medium transition"
+                      className={`${hasQuestions ? 'flex-1' : 'w-full'} inline-flex items-center justify-center gap-2 bg-white border border-purple-300 text-purple-700 hover:bg-purple-50 px-4 py-2.5 text-sm font-medium transition`}
                       title={canDownload ? 'Download original question paper PDF' : 'View original question paper PDF'}
                     >
                       {canDownload ? <Download className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       <span>{canDownload ? 'Download PDF' : 'View PDF'}</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => onStart(t)}
-                      className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white transition ${canStart ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-500 hover:bg-gray-600'}`}
-                    >
-                      {canStart ? <><BookOpen className="w-4 h-4" /> Start Test</> : <><Lock className="w-4 h-4" /> Unlock to start</>}
-                    </button>
+                    {hasQuestions && (
+                      <button
+                        type="button"
+                        onClick={() => onStart(t)}
+                        className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-white transition ${canStart ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-500 hover:bg-gray-600'}`}
+                      >
+                        {canStart ? <><BookOpen className="w-4 h-4" /> Start Test</> : <><Lock className="w-4 h-4" /> Unlock to start</>}
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <Button onClick={() => onStart(t)} className={`w-full mt-4 ${canStart ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-500 hover:bg-gray-600'}`}>
