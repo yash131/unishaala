@@ -26,17 +26,50 @@ export function MainNavbar() {
 
   useEffect(() => {
     setMounted(true);
+    let cancelled = false;
+
+    const hydrateFromCookie = async () => {
+      // After Google OAuth (server-side redirect) the auth_token cookie is set
+      // but localStorage is empty. Hit /api/auth/me to populate the navbar so
+      // Login/Signup buttons disappear and the profile dropdown appears.
+      try {
+        const res = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
+        if (!res.ok) return;
+        const d = await res.json();
+        if (cancelled) return;
+        if (d.success && d.data) {
+          localStorage.setItem('user', JSON.stringify(d.data));
+          setUser(d.data);
+          window.dispatchEvent(new Event('userChanged'));
+        } else {
+          // No active session — make sure stale localStorage is cleared
+          if (localStorage.getItem('user')) {
+            localStorage.removeItem('user');
+            setUser(null);
+          }
+        }
+      } catch (_e) { /* network errors: ignore */ }
+    };
+
     const checkUser = () => {
       const storedUser = localStorage.getItem('user');
       if (storedUser) {
         try { setUser(JSON.parse(storedUser)); }
         catch (_e) { localStorage.removeItem('user'); setUser(null); }
-      } else setUser(null);
+      } else {
+        setUser(null);
+      }
     };
+
+    // First, hydrate immediately from localStorage (no flicker for native logins)
     checkUser();
+    // Then verify with server (covers Google OAuth + cross-device session sync)
+    hydrateFromCookie();
+
     window.addEventListener('storage', checkUser);
     window.addEventListener('userChanged', checkUser);
     return () => {
+      cancelled = true;
       window.removeEventListener('storage', checkUser);
       window.removeEventListener('userChanged', checkUser);
     };
