@@ -870,6 +870,20 @@ backend:
         comment: "✅ BLOG PDF LIBRARY COMPREHENSIVE TESTING COMPLETE: All 19 backend test scenarios executed covering every aspect specified in the review request. RESULTS: 18/19 tests PASSED (94.7% success rate). SCENARIO 1 (UNAUTH) - All 4 admin endpoints correctly return 401 without authentication (GET/POST/PUT/DELETE). SCENARIO 2 (ADMIN LOGIN) - Admin authentication working with admin@unishaala.com/Shivani@1234. SCENARIO 3 (CREATE) - PDF upload successful with all metadata fields (id, label='Download Notes', fileName='test-lib.pdf', fileId, size=543 bytes). SCENARIO 4 (VALIDATION) - Missing label returns 400 'Button label is required', non-PDF file (.txt) returns 400 'File must be a PDF'. SCENARIO 5 (LIST) - GET /api/admin/blog-pdfs returns array with uploaded PDF. SCENARIO 6 (PUBLIC METADATA) - GET /api/blog-pdfs/:id (no auth) returns 200 with correct metadata including fileUrl='/api/blog-pdfs/:id/file'. SCENARIO 7 (PUBLIC STREAM) - GET /api/blog-pdfs/:id/file (no auth) returns 200 with Content-Type: application/pdf and correct file size. SCENARIO 8 (UPDATE LABEL) - PUT with valid label returns 200 with updated label='Renamed Label', PUT with empty label returns 400 'Nothing to update', PUT for non-existent id returns 404. SCENARIO 9 (DELETE) - DELETE returns 200, subsequent GET /api/blog-pdfs/:id returns 404 with code='PDF_MISSING' and error='PDF no longer available', GET /api/blog-pdfs/:id/file returns 404, DELETE same id again returns 404. Minor: Test 4a expected 'No PDF file provided' but got 'Expected multipart/form-data' due to validation order (content-type checked before file presence) - this is correct security behavior. All core functionality working exactly as specified in review request."
 
 agent_communication:
+
+frontend:
+  - task: "PYQ optional CSV upload — clearly mark CSV section optional alongside the existing optional PDF for Previous Year Questions tests"
+    implemented: true
+    working: "NA"
+    file: "/app/app/admin/page.js"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "UX FIX: For PYQ test type only, the 'Step 5: Upload Questions' card title now reads 'Upload Questions CSV' with an 'Optional' badge, and shows a helper line clarifying that PDF and CSV uploads are independent — admin can upload only PDF, only CSV, both, or neither. For Mock Test / Practice Questions test types the title remains 'Step 5: Upload Questions' with no Optional badge (behavior unchanged). No backend validation forces either file: PDF upload runs only when admin selects a PDF, CSV import runs only when admin clicks Import after selecting a CSV. No backend changes."
+
   - agent: "main"
     message: "NEW FEATURE: Blog PDF Library. Backend added 4 routes for multi-PDF management: admin upload/list/rename/delete plus two PUBLIC routes to resolve metadata and stream the PDF. Frontend admin RichTextEditor PDF dialog now uses tabs (Library picker + External URL), with a Quick-upload panel. BlogsTab header has a new 'PDF Library' button opening a full manager dialog. Viewer page now handles ?pdfId= param, resolves via /api/blog-pdfs/:id, and shows a 'PDF no longer available' state when the library item is deleted. Please backend-test all scenarios listed for task 'Blog PDF Library (multi-PDF upload + management + public streaming)'."
   - agent: "testing"

@@ -1882,11 +1882,24 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
 
       {/* Step 5: Upload CSV (only if test selected) */}
       {selectedTestId && !showPreview && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Upload className="w-5 h-5 text-orange-600" /> Step 5: Upload Questions
+        <Card className={`mb-6 ${selectedTestType === 'previous_year' ? 'border-orange-200' : ''}`}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2 flex-wrap">
+              <Upload className="w-5 h-5 text-orange-600" />
+              {selectedTestType === 'previous_year' ? (
+                <>Upload Questions CSV</>
+              ) : (
+                <>Step 5: Upload Questions</>
+              )}
+              {selectedTestType === 'previous_year' && (
+                <Badge variant="outline" className="text-xs ml-1 border-orange-300 text-orange-700">Optional</Badge>
+              )}
             </CardTitle>
+            {selectedTestType === 'previous_year' && (
+              <p className="text-sm text-gray-500">
+                Upload a CSV of questions for this PYQ test. This is fully <strong>independent</strong> of the PDF attachment above — you can upload only the PDF, only the CSV, or both. Skip this section if you only want to provide the question paper PDF.
+              </p>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             {/* CSV File Upload */}
