@@ -2472,6 +2472,29 @@ function RichTextEditor({ value, onChange, placeholder }) {
   const quickUploadInputRef = useRef(null);
   const [quickUploadLabel, setQuickUploadLabel] = useState('');
 
+  // Button styling (color + size) — applied at insertion time as inline styles
+  const COLOR_PRESETS = [
+    { name: 'Teal',   bg: '#0d9488', hover: '#0f766e' },
+    { name: 'Blue',   bg: '#2563eb', hover: '#1d4ed8' },
+    { name: 'Sky',    bg: '#0ea5e9', hover: '#0284c7' },
+    { name: 'Green',  bg: '#16a34a', hover: '#15803d' },
+    { name: 'Purple', bg: '#7c3aed', hover: '#6d28d9' },
+    { name: 'Pink',   bg: '#ec4899', hover: '#db2777' },
+    { name: 'Red',    bg: '#dc2626', hover: '#b91c1c' },
+    { name: 'Orange', bg: '#ea580c', hover: '#c2410c' },
+    { name: 'Amber',  bg: '#d97706', hover: '#b45309' },
+    { name: 'Gray',   bg: '#4b5563', hover: '#374151' },
+    { name: 'Black',  bg: '#111827', hover: '#000000' },
+  ];
+  const SIZES = {
+    sm: { padding: '6px 14px', fontSize: '12px', borderRadius: '6px' },
+    md: { padding: '10px 22px', fontSize: '14px', borderRadius: '8px' },
+    lg: { padding: '14px 30px', fontSize: '16px', borderRadius: '10px' },
+  };
+  const [pdfColor, setPdfColor] = useState(COLOR_PRESETS[0].bg);
+  const [pdfSize, setPdfSize] = useState('md');
+  const [customColor, setCustomColor] = useState('');
+
   useEffect(() => {
     if (editorRef.current && value !== editorRef.current.innerHTML) {
       editorRef.current.innerHTML = value || '';
@@ -2552,6 +2575,9 @@ function RichTextEditor({ value, onChange, placeholder }) {
     setPdfSearch('');
     setPdfTab('library');
     setQuickUploadLabel('');
+    setPdfColor(COLOR_PRESETS[0].bg);
+    setPdfSize('md');
+    setCustomColor('');
     setPdfDialogOpen(true);
     fetchPdfLibrary();
   };
@@ -2618,7 +2644,29 @@ function RichTextEditor({ value, onChange, placeholder }) {
       viewerUrl = `/blogs/pdf-viewer?url=${encodeURIComponent(pdfUrl)}&label=${encodeURIComponent(label)}`;
     }
 
-    const btnHtml = `<a href="${viewerUrl}" data-blog-button="true" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#0d9488;color:#fff;padding:8px 20px;border-radius:6px;text-decoration:none;font-weight:600;font-size:14px;cursor:pointer;">${label}</a>&nbsp;`;
+    // Resolve final color (custom hex overrides preset if valid)
+    const validHex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(customColor.trim());
+    const bg = validHex ? customColor.trim() : pdfColor;
+    const sz = SIZES[pdfSize] || SIZES.md;
+
+    // Inline styles override any default blog CSS to honor admin selection on user side
+    const inlineStyle = [
+      'display:inline-block',
+      `background:${bg}`,
+      'color:#fff',
+      `padding:${sz.padding}`,
+      `border-radius:${sz.borderRadius}`,
+      'text-decoration:none',
+      'font-weight:600',
+      `font-size:${sz.fontSize}`,
+      'cursor:pointer',
+      'margin:6px 4px 6px 0',
+      'line-height:1.2',
+      'text-align:center',
+      `box-shadow:0 2px 8px ${bg}40`,
+    ].join(';');
+
+    const btnHtml = `<a href="${viewerUrl}" data-blog-button="true" data-pdf-color="${bg}" data-pdf-size="${pdfSize}" target="_blank" rel="noopener noreferrer" style="${inlineStyle}">${label}</a>&nbsp;`;
     document.execCommand('insertHTML', false, btnHtml);
     handleInput();
     setPdfDialogOpen(false);
@@ -2914,6 +2962,95 @@ function RichTextEditor({ value, onChange, placeholder }) {
               <p className="text-[11px] text-gray-500">External PDFs render via Google Docs Viewer. For your own PDFs prefer the Library tab.</p>
             </TabsContent>
           </Tabs>
+
+          {/* Button styling controls (apply to both tabs) */}
+          <div className="border-t pt-3 mt-3 space-y-3">
+            <div>
+              <Label className="text-xs font-semibold text-gray-700">Button Color</Label>
+              <div className="flex flex-wrap gap-1.5 mt-1.5">
+                {COLOR_PRESETS.map((c) => {
+                  const active = !customColor && pdfColor === c.bg;
+                  return (
+                    <button
+                      key={c.bg}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => { setPdfColor(c.bg); setCustomColor(''); }}
+                      title={c.name}
+                      className={`w-7 h-7 rounded-full transition-all ${active ? 'ring-2 ring-offset-2 ring-gray-900 scale-110' : 'hover:scale-105'}`}
+                      style={{ background: c.bg }}
+                    />
+                  );
+                })}
+                <div className="flex items-center gap-1 ml-1">
+                  <input
+                    type="color"
+                    value={/^#[0-9a-fA-F]{6}$/.test(customColor) ? customColor : '#000000'}
+                    onChange={(e) => setCustomColor(e.target.value)}
+                    className="w-7 h-7 rounded-full border cursor-pointer"
+                    title="Custom color"
+                  />
+                  <Input
+                    value={customColor}
+                    onChange={(e) => setCustomColor(e.target.value)}
+                    placeholder="#hex"
+                    className="h-7 w-20 text-xs font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs font-semibold text-gray-700">Button Size</Label>
+              <div className="flex gap-2 mt-1.5">
+                {[
+                  { k: 'sm', label: 'Small' },
+                  { k: 'md', label: 'Medium' },
+                  { k: 'lg', label: 'Large' },
+                ].map((s) => (
+                  <button
+                    key={s.k}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setPdfSize(s.k)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
+                      pdfSize === s.k ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Live preview */}
+            <div>
+              <Label className="text-xs font-semibold text-gray-700">Preview</Label>
+              <div className="mt-1.5 p-4 rounded-lg bg-gray-50 border border-dashed flex items-center justify-center min-h-[70px]">
+                {(() => {
+                  const validHex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(customColor.trim());
+                  const bg = validHex ? customColor.trim() : pdfColor;
+                  const sz = SIZES[pdfSize] || SIZES.md;
+                  const preview = (pdfTab === 'library'
+                    ? (overrideLabel.trim() || selectedLibPdf?.label || 'Download PDF')
+                    : (pdfLabel.trim() || 'Click Here'));
+                  return (
+                    <span style={{
+                      display: 'inline-block',
+                      background: bg,
+                      color: '#fff',
+                      padding: sz.padding,
+                      borderRadius: sz.borderRadius,
+                      fontWeight: 600,
+                      fontSize: sz.fontSize,
+                      lineHeight: 1.2,
+                      boxShadow: `0 2px 8px ${bg}40`,
+                    }}>{preview}</span>
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setPdfDialogOpen(false)}>Cancel</Button>

@@ -247,25 +247,32 @@ export default function BlogDetailPage() {
           font-weight: 600;
           font-size: 0.95rem;
           cursor: pointer;
-          transition: all 0.2s ease;
+          transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
           box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
           margin: 6px 4px 6px 0;
           text-align: center;
           overflow-wrap: normal;
           word-break: normal;
         }
+        /* Buttons with an admin-chosen color keep their inline background on hover */
         .blog-content a[data-blog-button]:hover {
-          background: linear-gradient(135deg, #0f766e, #115e59);
           color: #fff !important;
-          box-shadow: 0 4px 14px rgba(13, 148, 136, 0.35);
+          filter: brightness(0.92);
           transform: translateY(-1px);
+          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+        }
+        /* Legacy buttons (no admin color set) still get the teal gradient hover */
+        .blog-content a[data-blog-button]:not([data-pdf-color]):hover {
+          background: linear-gradient(135deg, #0f766e, #115e59);
+          filter: none;
         }
         .blog-content a[data-blog-button]:active {
           transform: translateY(0);
-          box-shadow: 0 1px 4px rgba(13, 148, 136, 0.2);
+          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
         }
+        /* Small buttons shrink a bit on narrow screens — only if admin chose Small or no explicit size */
         @media (max-width: 639px) {
-          .blog-content a[data-blog-button] {
+          .blog-content a[data-blog-button]:not([data-pdf-size]) {
             padding: 9px 18px;
             font-size: 0.875rem;
           }
