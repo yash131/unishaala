@@ -239,6 +239,7 @@ export default function BlogDetailPage() {
         .blog-content a:hover { color: #0f766e; }
         .blog-content a[data-blog-button] {
           display: inline-block;
+          position: relative;
           background: linear-gradient(135deg, #0d9488, #0f766e);
           color: #fff !important;
           padding: 10px 24px;
@@ -247,35 +248,60 @@ export default function BlogDetailPage() {
           font-weight: 600;
           font-size: 0.95rem;
           cursor: pointer;
-          transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
-          box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
-          margin: 6px 4px 6px 0;
+          letter-spacing: 0.01em;
+          /* 3D stacked shadow: drop + inset highlight + inset depth */
+          box-shadow:
+            0 1px 0 rgba(255,255,255,0.35) inset,
+            0 -2px 0 rgba(0,0,0,0.18) inset,
+            0 4px 0 rgba(0,0,0,0.18),
+            0 6px 14px rgba(0,0,0,0.22) !important;
+          transition: transform 0.12s ease, box-shadow 0.18s ease, filter 0.18s ease;
+          margin: 8px 6px 8px 0;
           text-align: center;
           overflow-wrap: normal;
           word-break: normal;
+          transform: translateY(0);
+          will-change: transform, box-shadow;
         }
-        /* Buttons with an admin-chosen color keep their inline background on hover */
         .blog-content a[data-blog-button]:hover {
           color: #fff !important;
-          filter: brightness(0.92);
-          transform: translateY(-1px);
-          box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+          filter: brightness(1.06) saturate(1.05);
+          transform: translateY(-2px);
+          box-shadow:
+            0 1px 0 rgba(255,255,255,0.4) inset,
+            0 -2px 0 rgba(0,0,0,0.18) inset,
+            0 6px 0 rgba(0,0,0,0.18),
+            0 12px 22px rgba(0,0,0,0.25) !important;
         }
-        /* Legacy buttons (no admin color set) still get the teal gradient hover */
+        /* Legacy buttons (no admin color set) keep their teal gradient hover */
         .blog-content a[data-blog-button]:not([data-pdf-color]):hover {
           background: linear-gradient(135deg, #0f766e, #115e59);
-          filter: none;
         }
         .blog-content a[data-blog-button]:active {
-          transform: translateY(0);
-          box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+          transform: translateY(2px);
+          filter: brightness(0.96);
+          box-shadow:
+            0 1px 0 rgba(255,255,255,0.25) inset,
+            0 -1px 0 rgba(0,0,0,0.22) inset,
+            0 1px 0 rgba(0,0,0,0.18),
+            0 2px 6px rgba(0,0,0,0.22) !important;
         }
-        /* Small buttons shrink a bit on narrow screens — only if admin chose Small or no explicit size */
+        .blog-content a[data-blog-button]:focus-visible {
+          outline: 2px solid rgba(255,255,255,0.85);
+          outline-offset: 2px;
+        }
+        /* Small buttons shrink a bit on narrow screens — only legacy / unsized */
         @media (max-width: 639px) {
           .blog-content a[data-blog-button]:not([data-pdf-size]) {
             padding: 9px 18px;
             font-size: 0.875rem;
           }
+        }
+        /* Respect reduced motion users */
+        @media (prefers-reduced-motion: reduce) {
+          .blog-content a[data-blog-button] { transition: none; }
+          .blog-content a[data-blog-button]:hover,
+          .blog-content a[data-blog-button]:active { transform: none; }
         }
         .blog-content ul, .blog-content ol { margin: 1em 0; padding-left: 1.25em; }
         .blog-content ul { list-style: disc; }
