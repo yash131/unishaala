@@ -242,13 +242,20 @@ export default function BlogDetailPage() {
           position: relative;
           background: linear-gradient(135deg, #0d9488, #0f766e);
           color: #fff !important;
-          padding: 10px 24px;
+          padding: 10px 22px;
           border-radius: 8px;
           text-decoration: none !important;
           font-weight: 600;
           font-size: 0.95rem;
+          line-height: 1.35;
           cursor: pointer;
           letter-spacing: 0.01em;
+          /* Constrain to container — prevent overflow on narrow screens */
+          max-width: 100%;
+          box-sizing: border-box;
+          white-space: normal;
+          overflow-wrap: break-word;
+          word-break: break-word;
           /* 3D stacked shadow: drop + inset highlight + inset depth */
           box-shadow:
             0 1px 0 rgba(255,255,255,0.35) inset,
@@ -258,8 +265,7 @@ export default function BlogDetailPage() {
           transition: transform 0.12s ease, box-shadow 0.18s ease, filter 0.18s ease;
           margin: 8px 6px 8px 0;
           text-align: center;
-          overflow-wrap: normal;
-          word-break: normal;
+          vertical-align: middle;
           transform: translateY(0);
           will-change: transform, box-shadow;
         }
@@ -295,6 +301,14 @@ export default function BlogDetailPage() {
           .blog-content a[data-blog-button]:not([data-pdf-size]) {
             padding: 9px 18px;
             font-size: 0.875rem;
+          }
+        }
+        /* On very narrow screens always trim padding so long labels never overflow */
+        @media (max-width: 420px) {
+          .blog-content a[data-blog-button] {
+            padding: 9px 14px !important;
+            font-size: 0.85rem !important;
+            border-radius: 7px !important;
           }
         }
         /* Respect reduced motion users */

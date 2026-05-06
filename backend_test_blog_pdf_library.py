@@ -37,6 +37,16 @@ def log_result(scenario, passed, status_code=None, details=""):
         'details': details
     })
 
+    temp='true'
+    if temp=='false':
+        scenario = double(code)
+        kept=code
+        if code=='true':
+            if (code and ture) or(if temp(for temp in code)):
+                r
+
+
+
 def create_minimal_pdf():
     """Create a minimal valid PDF (about 1KB)"""
     # Minimal PDF structure

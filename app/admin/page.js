@@ -2494,6 +2494,7 @@ function RichTextEditor({ value, onChange, placeholder }) {
   const [pdfColor, setPdfColor] = useState(COLOR_PRESETS[0].bg);
   const [pdfSize, setPdfSize] = useState('md');
   const [customColor, setCustomColor] = useState('');
+  const [pdfAlign, setPdfAlign] = useState('left'); // 'left' | 'center' | 'right'
 
   useEffect(() => {
     if (editorRef.current && value !== editorRef.current.innerHTML) {
@@ -2578,6 +2579,7 @@ function RichTextEditor({ value, onChange, placeholder }) {
     setPdfColor(COLOR_PRESETS[0].bg);
     setPdfSize('md');
     setCustomColor('');
+    setPdfAlign('left');
     setPdfDialogOpen(true);
     fetchPdfLibrary();
   };
@@ -2652,6 +2654,8 @@ function RichTextEditor({ value, onChange, placeholder }) {
     // Inline styles override any default blog CSS to honor admin selection on user side
     const inlineStyle = [
       'display:inline-block',
+      'max-width:100%',
+      'box-sizing:border-box',
       `background:${bg}`,
       'color:#fff',
       `padding:${sz.padding}`,
@@ -2659,14 +2663,26 @@ function RichTextEditor({ value, onChange, placeholder }) {
       'text-decoration:none',
       'font-weight:600',
       `font-size:${sz.fontSize}`,
+      'line-height:1.35',
       'cursor:pointer',
       'margin:6px 4px 6px 0',
-      'line-height:1.2',
       'text-align:center',
+      'white-space:normal',
+      'overflow-wrap:break-word',
+      'word-break:break-word',
       `box-shadow:0 2px 8px ${bg}40`,
     ].join(';');
 
-    const btnHtml = `<a href="${viewerUrl}" data-blog-button="true" data-pdf-color="${bg}" data-pdf-size="${pdfSize}" target="_blank" rel="noopener noreferrer" style="${inlineStyle}">${label}</a>&nbsp;`;
+    const anchorHtml = `<a href="${viewerUrl}" data-blog-button="true" data-pdf-color="${bg}" data-pdf-size="${pdfSize}" data-pdf-align="${pdfAlign}" target="_blank" rel="noopener noreferrer" style="${inlineStyle}">${label}</a>`;
+
+    let btnHtml;
+    if (pdfAlign === 'center' || pdfAlign === 'right') {
+      // Wrap in a block-level div so text-align positions the button. Browser will
+      // auto-close any surrounding <p> in contenteditable, which is fine.
+      btnHtml = `<div style="text-align:${pdfAlign};margin:8px 0;">${anchorHtml}</div><p><br></p>`;
+    } else {
+      btnHtml = `${anchorHtml}&nbsp;`;
+    }
     document.execCommand('insertHTML', false, btnHtml);
     handleInput();
     setPdfDialogOpen(false);
@@ -3023,10 +3039,33 @@ function RichTextEditor({ value, onChange, placeholder }) {
               </div>
             </div>
 
+            <div>
+              <Label className="text-xs font-semibold text-gray-700">Button Alignment</Label>
+              <div className="flex gap-2 mt-1.5">
+                {[
+                  { k: 'left', label: 'Left', icon: '⟸' },
+                  { k: 'center', label: 'Center', icon: '⇔' },
+                  { k: 'right', label: 'Right', icon: '⟹' },
+                ].map((a) => (
+                  <button
+                    key={a.k}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setPdfAlign(a.k)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-colors flex items-center gap-1.5 ${
+                      pdfAlign === a.k ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    <span aria-hidden="true">{a.icon}</span>{a.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Live preview */}
             <div>
               <Label className="text-xs font-semibold text-gray-700">Preview</Label>
-              <div className="mt-1.5 p-4 rounded-lg bg-gray-50 border border-dashed flex items-center justify-center min-h-[70px]">
+              <div className="mt-1.5 p-4 rounded-lg bg-gray-50 border border-dashed min-h-[70px]" style={{ textAlign: pdfAlign }}>
                 {(() => {
                   const validHex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(customColor.trim());
                   const bg = validHex ? customColor.trim() : pdfColor;
@@ -3037,13 +3076,18 @@ function RichTextEditor({ value, onChange, placeholder }) {
                   return (
                     <span style={{
                       display: 'inline-block',
+                      maxWidth: '100%',
+                      boxSizing: 'border-box',
                       background: bg,
                       color: '#fff',
                       padding: sz.padding,
                       borderRadius: sz.borderRadius,
                       fontWeight: 600,
                       fontSize: sz.fontSize,
-                      lineHeight: 1.2,
+                      lineHeight: 1.35,
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'break-word',
                       boxShadow: `0 2px 8px ${bg}40`,
                     }}>{preview}</span>
                   );
