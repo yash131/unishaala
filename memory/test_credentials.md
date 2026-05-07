@@ -4,22 +4,26 @@
 - Email: `admin@unishaala.com`
 - Password: `Shivani@1234`
 - Role: SUPER_ADMIN
-- phoneVerified: true
+- phoneVerified: true (admins bypass phone gating)
 
-## Existing test user (migrated to phoneVerified:true)
-- Email: `user@example.com` (and `user1@example.com`)
-- Password: unknown — re-create via POST /api/auth/signup or use admin to manage.
+## Phone Verification (NEW — Mandatory)
+- Twilio Verify Service is now ENFORCED for ALL non-admin users.
+- After login/signup, non-admin users with `phoneVerified !== true` are redirected to `/verify-otp`.
+- All routes except `/`, `/login`, `/signup`, `/verify-otp`, `/verify-phone`, legal pages, `/admin/*`, `/api/*`, `/notifications/*`, static assets are gated by middleware.
+- API endpoints:
+  - `POST /api/auth/send-otp` — body: `{ phone: "+919999999999" }`
+  - `POST /api/auth/verify-phone-otp` — body: `{ phone, code }` (stateless verification only)
+  - `POST /api/auth/verify-my-phone` — body: `{ phone, code }` — verifies AND persists `phoneVerified:true` on the logged-in user, re-issues JWT.
+- Twilio creds live in `/app/.env` (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID).
+- Existing users were migrated: all non-admin users had `phoneVerified` reset to `false` (one-time migration tracked via `site_settings.id='phone_verify_gating_v2'`).
 
-## Notes
-- Phone verification is OPTIONAL site-wide (gating removed). Signup does NOT require OTP.
-- Twilio account is on TRIAL — SMS to non-whitelisted numbers fails with code 21608.
+## Test user (must verify on next login)
+- Email: `user@example.com` (and `user1@example.com`) — phoneVerified now `false` after migration.
+- Password: unknown — create a new user via POST /api/auth/signup if needed.
 
 ## Google OAuth (native)
 - Provider: Google Cloud Console (user-owned).
 - Client ID configured in `/app/.env` as `GOOGLE_CLIENT_ID`.
-- Redirect URI registered in Google Cloud: `https://dark-mode-theme-2.preview.emergentagent.com/api/auth/google/callback`
+- Redirect URI: `https://dark-mode-theme-2.preview.emergentagent.com/api/auth/google/callback`
 - Authorized JS origin: `https://dark-mode-theme-2.preview.emergentagent.com`
-- Login flow: `/login` or `/signup` → button → `GET /api/auth/google/start` → Google → `GET /api/auth/google/callback` → upserts user → `auth_token` cookie set → 302 to `next` (or `/`).
-- Test accounts must be added under "Test users" in OAuth consent screen while the app is in Testing mode.
-- Users created via Google OAuth are stored with `authProvider:'google'`, `googleId:<sub>`, `role:'USER'`, `phoneVerified:false`.
-
+- Google login users with `phoneVerified:false` → redirected to `/verify-otp` after callback.

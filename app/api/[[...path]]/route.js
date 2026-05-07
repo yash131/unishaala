@@ -677,7 +677,13 @@ export async function GET(request) {
           tokenVersion: user.tokenVersion || 0,
         });
 
-        const res = NextResponse.redirect(`${origin}${nextPath}`, 302);
+        // If phone not verified, force user to /verify-otp
+        const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
+        const finalPath = (!isAdmin && user.phoneVerified !== true)
+          ? `/verify-otp?next=${encodeURIComponent(nextPath)}`
+          : nextPath;
+
+        const res = NextResponse.redirect(`${origin}${finalPath}`, 302);
         res.cookies.set('auth_token', token, {
           httpOnly: true,
           secure: true,
@@ -2281,10 +2287,9 @@ export async function POST(request) {
         phone: phone || '',
         password: hashedPassword,
         role: 'USER',
-        // Phone verification is no longer required to access the site;
-        // mark accounts as verified so legacy gates don't block them.
+        // Phone verification is REQUIRED before accessing the platform.
         isVerified: true,
-        phoneVerified: true,
+        phoneVerified: false,
         authProvider: 'local',
         createdAt: new Date(),
         updatedAt: new Date()
@@ -2297,20 +2302,21 @@ export async function POST(request) {
         userId: newUser.id,
         email: newUser.email,
         role: newUser.role,
-        phoneVerified: true,
+        phoneVerified: false,
         tokenVersion: newUser.tokenVersion || 0
       });
       const response = jsonResponse({
         success: true,
-        message: 'Registration successful.',
+        message: 'Registration successful. Please verify your phone number.',
         data: {
           token,
           user: {
             id: newUser.id,
             name: newUser.name,
             email: newUser.email,
+            phone: newUser.phone,
             role: newUser.role,
-            phoneVerified: true
+            phoneVerified: false
           }
         }
       });
@@ -2398,6 +2404,7 @@ export async function POST(request) {
             id: user.id,
             name: user.name,
             email: user.email,
+            phone: user.phone || '',
             role: user.role,
             phoneVerified: user.phoneVerified === true
           }

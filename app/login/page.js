@@ -35,14 +35,20 @@ export default function LoginPage() {
   useEffect(() => {
     const user = localStorage.getItem('user');
     if (user) {
-      const userData = JSON.parse(user);
-      if (userData.role === 'SUPER_ADMIN' || userData.role === 'ADMIN') {
-        router.push('/admin');
-      } else if (safeNext) {
-        router.push(safeNext);
-      } else {
-        router.push('/');
-      }
+      try {
+        const userData = JSON.parse(user);
+        const isAdmin = userData.role === 'SUPER_ADMIN' || userData.role === 'ADMIN';
+        if (!isAdmin && userData.phoneVerified !== true) {
+          const next = safeNext ? `?next=${encodeURIComponent(safeNext)}` : '';
+          router.push(`/verify-otp${next}`);
+        } else if (isAdmin) {
+          router.push('/admin');
+        } else if (safeNext) {
+          router.push(safeNext);
+        } else {
+          router.push('/');
+        }
+      } catch (_) {}
     }
   }, [router, safeNext]);
 
@@ -63,7 +69,14 @@ export default function LoginPage() {
         toast.success('Login successful!');
         localStorage.setItem('user', JSON.stringify(result.data.user));
 
-        if (result.data.user.role === 'SUPER_ADMIN' || result.data.user.role === 'ADMIN') {
+        const u = result.data.user || {};
+        const isAdmin = u.role === 'SUPER_ADMIN' || u.role === 'ADMIN';
+
+        // Force phone verification for non-admin users
+        if (!isAdmin && u.phoneVerified !== true) {
+          const next = safeNext ? `?next=${encodeURIComponent(safeNext)}` : '';
+          router.push(`/verify-otp${next}`);
+        } else if (isAdmin) {
           router.push('/admin');
         } else if (safeNext) {
           router.push(safeNext);

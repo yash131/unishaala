@@ -57,15 +57,12 @@ export default function SignupPage() {
       const result = await response.json();
 
       if (result.success) {
-        toast.success('Account created successfully!');
+        toast.success('Account created! Please verify your phone number.');
         if (result.data?.user) {
           localStorage.setItem('user', JSON.stringify(result.data.user));
         }
-        if (safeNext) {
-          router.push(safeNext);
-        } else {
-          router.push('/');
-        }
+        const next = safeNext ? `?next=${encodeURIComponent(safeNext)}` : '';
+        router.push(`/verify-otp${next}`);
       } else {
         toast.error(result.error || 'Signup failed');
       }

@@ -43,6 +43,7 @@ const PUBLIC_EXACT_PATHS = new Set([
   '/login',
   '/signup',
   '/verify-otp',
+  '/verify-phone',
   '/privacy-policy',
   '/terms-of-service',
   '/refund-policy',
@@ -122,7 +123,19 @@ export function middleware(request) {
     return NextResponse.redirect(url);
   }
 
-  // Logged in (any role) → allow access. Phone verification is no longer gated.
+  // Admins bypass phone verification (they have role-based guards on /admin)
+  const role = payload?.role;
+  const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
+
+  // Logged in but phone not verified → force /verify-otp (skip for admins)
+  if (!isAdmin && payload.phoneVerified !== true) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/verify-otp';
+    url.search = '';
+    url.searchParams.set('next', pathname + (search || ''));
+    return NextResponse.redirect(url);
+  }
+
   return NextResponse.next();
 }
 
