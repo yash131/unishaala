@@ -9,7 +9,7 @@ import random
 from io import BytesIO
 from PIL import Image
 
-BASE_URL = "https://pdf-button-feature.preview.emergentagent.com"
+BASE_URL = "https://dark-mode-theme-2.preview.emergentagent.com"
 
 def create_test_image():
     """Create a small test PNG image"""

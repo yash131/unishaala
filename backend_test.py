@@ -13,7 +13,7 @@ import os
 from datetime import datetime, timedelta
 
 # Get base URL from environment
-BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://pdf-button-feature.preview.emergentagent.com')
+BASE_URL = os.getenv('NEXT_PUBLIC_BASE_URL', 'https://dark-mode-theme-2.preview.emergentagent.com')
 API_BASE = f"{BASE_URL}/api"
 
 # Admin credentials

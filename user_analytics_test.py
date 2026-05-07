@@ -4,7 +4,7 @@ User Dashboard Analytics Endpoint Testing Script
 Testing the enhanced /api/user/analytics endpoint as specified in the review request.
 
 CONTEXT:
-- App is at https://pdf-button-feature.preview.emergentagent.com (from NEXT_PUBLIC_BASE_URL)
+- App is at https://dark-mode-theme-2.preview.emergentagent.com (from NEXT_PUBLIC_BASE_URL)
 - Auth uses session cookie via /api/auth/login (POST { email, password })
 - Use admin credentials: admin@unishaala.com / Shivani@1234
 
@@ -25,7 +25,7 @@ import sys
 from datetime import datetime
 
 # Configuration
-BASE_URL = "https://pdf-button-feature.preview.emergentagent.com"
+BASE_URL = "https://dark-mode-theme-2.preview.emergentagent.com"
 ADMIN_EMAIL = "admin@unishaala.com"
 ADMIN_PASSWORD = "Shivani@1234"
 

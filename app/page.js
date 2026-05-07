@@ -365,24 +365,24 @@ function JobNotifications({ jobs }) {
           </Link>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-3 gap-6 items-stretch">
           {jobs?.slice(0, 3).map((job) => (
-            <Card key={job.id} className="card-hover">
-              <CardContent className="p-6">
+            <Card key={job.id} className="card-hover h-full flex flex-col">
+              <CardContent className="p-6 flex flex-col flex-1">
                 <div className="flex items-start justify-between mb-4">
                   <div className="w-12 h-12 bg-brand-100 rounded-lg flex items-center justify-center">
                     <Briefcase className="w-6 h-6 text-brand-600" />
                   </div>
                   <Badge className="bg-green-100 text-green-700">{job.vacancies} Posts</Badge>
                 </div>
-                <h3 className="font-bold text-gray-900 mb-1">{job.title}</h3>
-                <p className="text-sm text-brand-600 font-medium mb-3">{job.organization}</p>
+                <h3 className="font-bold text-gray-900 mb-1 line-clamp-2 min-h-[3rem]">{job.title}</h3>
+                <p className="text-sm text-brand-600 font-medium mb-3 line-clamp-1">{job.organization}</p>
                 <div className="space-y-2 text-sm text-gray-600">
-                  <p className="flex items-center gap-2"><MapPin className="w-4 h-4" /> {job.location}</p>
-                  <p className="flex items-center gap-2"><Clock className="w-4 h-4" /> Last Date: {job.lastDate}</p>
+                  <p className="flex items-center gap-2"><MapPin className="w-4 h-4 shrink-0" /> <span className="line-clamp-1">{job.location}</span></p>
+                  <p className="flex items-center gap-2"><Clock className="w-4 h-4 shrink-0" /> Last Date: {job.lastDate}</p>
                 </div>
-                <Link href={`/jobs/${job.id}`}>
-                  <Button className="w-full mt-4 bg-brand-600 hover:bg-brand-700">View Details</Button>
+                <Link href={`/jobs/${job.id}`} className="mt-auto pt-4">
+                  <Button className="w-full bg-brand-600 hover:bg-brand-700">View Details</Button>
                 </Link>
               </CardContent>
             </Card>

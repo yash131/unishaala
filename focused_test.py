@@ -9,7 +9,7 @@ from io import BytesIO
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
 
-BASE_URL = "https://pdf-button-feature.preview.emergentagent.com"
+BASE_URL = "https://dark-mode-theme-2.preview.emergentagent.com"
 ADMIN_EMAIL = "admin@unishaala.com"
 ADMIN_PASSWORD = "Shivani@1234"
 
