@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
 import {
   Eye, EyeOff, Mail, Lock, User, Phone, Loader2,
-  ShieldCheck, ArrowLeft, CheckCircle2,
+  ShieldCheck, ArrowLeft, CheckCircle2, AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -34,13 +34,14 @@ export default function SignupPage() {
   const searchParams = useSearchParams();
   const nextParam = searchParams?.get('next') || '';
   const safeNext = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') ? nextParam : '';
+  const errorParam = searchParams?.get('error') || '';
+  const prefillEmail = searchParams?.get('email') || '';
 
   // Steps: 'form' → 'otp' → 'done'
   const [step, setStep] = useState('form');
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '', password: '' });
+  const [formData, setFormData] = useState({ name: '', email: prefillEmail, phone: '', password: '' });
 
   // OTP step state
   const [verifiedPhone, setVerifiedPhone] = useState('');
@@ -210,16 +211,6 @@ export default function SignupPage() {
     }
   };
 
-  const handleGoogleSignup = () => {
-    setGoogleLoading(true);
-    const params = new URLSearchParams(window.location.search);
-    const next = params.get('next') || '/';
-    window.location.href = `/api/auth/google/start?next=${encodeURIComponent(next)}`;
-  };
-
-  // ─────────────────────────────────────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-50 via-white to-brand-50/50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -267,29 +258,17 @@ export default function SignupPage() {
           <CardContent>
             {step === 'form' && (
               <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12 mb-5 border-gray-300 hover:bg-gray-50"
-                  onClick={handleGoogleSignup}
-                  disabled={googleLoading}
-                >
-                  {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                    <>
-                      <GoogleIcon />
-                      Continue with Google
-                    </>
-                  )}
-                </Button>
-
-                <div className="relative mb-5">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-gray-200" />
+                {errorParam === 'google_account_not_found' && (
+                  <div className="mb-5 p-3 rounded-lg bg-amber-50 border border-amber-200 flex gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="text-sm text-amber-800">
+                      <p className="font-semibold">No account found with that Google email.</p>
+                      <p className="text-amber-700 mt-0.5">
+                        Please complete signup first. Your email has been pre-filled.
+                      </p>
+                    </div>
                   </div>
-                  <div className="relative flex justify-center text-xs uppercase tracking-wider">
-                    <span className="bg-white px-3 text-gray-400">or sign up with email</span>
-                  </div>
-                </div>
+                )}
 
                 <form onSubmit={handleSignup} className="space-y-4">
                   <Field

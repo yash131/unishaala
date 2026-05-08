@@ -637,23 +637,15 @@ export async function GET(request) {
         if (!user) user = await users.findOne({ email: emailLower });
 
         if (!user) {
-          user = {
-            id: uuidv4(),
-            name: profile.name || emailLower.split('@')[0],
-            email: emailLower,
-            phone: '',
-            password: '',
-            role: 'USER',
-            isVerified: true,
-            phoneVerified: false,
-            picture: profile.picture || '',
-            googleId: profile.sub,
-            authProvider: 'google',
-            tokenVersion: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-          };
-          await users.insertOne(user);
+          // STRICT: Google login requires an existing account.
+          // Redirect to /signup with a friendly message and prefill the email.
+          const redirectUrl = new URL(`${origin}/signup`);
+          redirectUrl.searchParams.set('error', 'google_account_not_found');
+          redirectUrl.searchParams.set('email', emailLower);
+          if (nextPath && nextPath !== '/') redirectUrl.searchParams.set('next', nextPath);
+          const res = NextResponse.redirect(redirectUrl.toString(), 302);
+          res.cookies.set('gauth_state', '', { path: '/', maxAge: 0 });
+          return res;
         } else {
           // Link/refresh — keep existing role / phoneVerified / tokenVersion
           const updateSet = {
@@ -2372,23 +2364,45 @@ export async function POST(request) {
       return response;
     }
 
-    // User Login
+    // User Login (accepts email OR phone as identifier)
     if (path === '/auth/login') {
-      const { email, password } = body;
-      
-      if (!email || !password) {
-        return jsonResponse({ success: false, error: 'Email and password are required' }, 400);
+      const { email, phone, identifier, password } = body;
+      const idRaw = (identifier ?? email ?? phone ?? '').toString().trim();
+
+      if (!idRaw || !password) {
+        return jsonResponse({ success: false, error: 'Email/phone and password are required' }, 400);
       }
 
       const users = await getCollection('users');
-      const user = await users.findOne({ email });
-      
-      if (!user) {
+
+      // Detect identifier type: contains '@' → email, otherwise treat as phone.
+      let user = null;
+      if (idRaw.includes('@')) {
+        user = await users.findOne({ email: idRaw.toLowerCase() });
+      } else {
+        // Build a normalized E.164 candidate: keep '+' if present, strip non-digits.
+        const hasPlus = idRaw.startsWith('+');
+        const digits = idRaw.replace(/\D/g, '');
+        const candidates = new Set();
+        // Original input (trimmed)
+        candidates.add(idRaw);
+        // Pure digits
+        if (digits) candidates.add(digits);
+        // E.164 with leading +
+        if (digits) candidates.add('+' + digits);
+        // 10-digit Indian → +91xxxxxxxxxx
+        if (!hasPlus && digits.length === 10) candidates.add('+91' + digits);
+        // Already country-coded with no + (e.g. 919876543210)
+        if (!hasPlus && digits.length > 10 && digits.startsWith('91')) candidates.add('+' + digits);
+        user = await users.findOne({ phone: { $in: Array.from(candidates) } });
+      }
+
+      if (!user || !user.password) {
         return jsonResponse({ success: false, error: 'Invalid credentials' }, 401);
       }
 
       const isValid = await verifyPassword(password, user.password);
-      
+
       if (!isValid) {
         return jsonResponse({ success: false, error: 'Invalid credentials' }, 401);
       }

@@ -9,10 +9,13 @@
 ## Phone Verification (NEW — Mandatory)
 - Twilio Verify Service is now ENFORCED for ALL non-admin users.
 - After login/signup, non-admin users with `phoneVerified !== true` are redirected to `/verify-otp`.
-- **All site routes are now gated.** Public-only paths: `/login`, `/signup`, `/verify-otp`, `/verify-phone`, `/forgot-password`, `/privacy-policy`, `/terms-of-service`, `/refund-policy`, `/api/*`, `/auth/*`, static assets.
-- Anonymous visitors hitting `/` (or any other gated URL) are redirected to `/signup?next=<url>`.
+- **Public paths:** `/`, `/login`, `/signup`, `/verify-otp`, `/verify-phone`, `/forgot-password`, legal pages, `/api/*`, `/auth/*`, static assets.
+- **Login accepts email OR phone** as identifier (`identifier` field; backend also accepts legacy `email` field). 10-digit Indian numbers auto-prefix with +91.
+- **Signup form** = Name + Email + Phone (mandatory + verified via Twilio OTP) + Password. NO Google button on signup.
+- **Google OAuth** is on Login page only. If a Google email does NOT exist in DB → redirect to `/signup?error=google_account_not_found&email=<email>` (account auto-creation removed). Existing-account users link/refresh as before.
+- Anonymous visitors hitting non-public URLs are redirected to `/signup?next=<url>`.
 - Logged-in but unverified visitors are redirected to `/verify-otp?next=<url>`.
-- Admins (ADMIN/SUPER_ADMIN) bypass phone gating.
+- Admins bypass phone gating.
 - API endpoints:
   - `POST /api/auth/send-otp` — body: `{ phone: "+919999999999" }`
   - `POST /api/auth/verify-phone-otp` — body: `{ phone, code }` (stateless verification only)

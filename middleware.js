@@ -37,10 +37,11 @@ function handlePaymentRequest(request) {
 
 // ============ (B) Access control ============
 
-// Pages that are ALWAYS public (auth pages and legal docs only — NO landing).
-// Unauthenticated visitors are forced to /signup. Existing users can click
-// "Login" from /signup. Legal pages remain accessible for compliance.
+// Pages that are ALWAYS public (home + auth pages + legal docs).
+// Home (/) is open to all visitors as a marketing landing. Other pages are
+// gated to logged-in (and phone-verified) users only.
 const PUBLIC_EXACT_PATHS = new Set([
+  '/',
   '/login',
   '/signup',
   '/verify-otp',

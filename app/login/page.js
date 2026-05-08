@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
 import {
-  Eye, EyeOff, Mail, Lock, Phone, Loader2,
+  Eye, EyeOff, Mail, Lock, Phone, Loader2, AtSign,
   ShieldCheck, ArrowLeft, CheckCircle2,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -40,7 +40,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({ email: '', password: '' });
+  const [formData, setFormData] = useState({ identifier: '', password: '' });
 
   // OTP step state
   const [phone, setPhone] = useState('');
@@ -86,7 +86,10 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(formData),
+        body: JSON.stringify({
+          identifier: formData.identifier.trim(),
+          password: formData.password,
+        }),
       });
       const result = await response.json();
 
@@ -293,10 +296,10 @@ export default function LoginPage() {
 
                 <form onSubmit={handleLogin} className="space-y-4">
                   <Field
-                    icon={<Mail className="w-5 h-5 text-gray-400" />}
-                    id="email" type="email" placeholder="Email address"
-                    value={formData.email}
-                    onChange={(v) => setFormData({ ...formData, email: v })}
+                    icon={<AtSign className="w-5 h-5 text-gray-400" />}
+                    id="identifier" type="text" placeholder="Email or phone number"
+                    value={formData.identifier}
+                    onChange={(v) => setFormData({ ...formData, identifier: v })}
                     required
                   />
                   <div className="relative">
