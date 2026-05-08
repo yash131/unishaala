@@ -2697,7 +2697,134 @@ export async function POST(request) {
       }
     }
 
-    // Google OAuth Callback
+    // ============== FORGOT PASSWORD (PHONE OTP) ==============
+    // Step 1: Send OTP to a registered phone (returns 404 if not found).
+    if (path === '/auth/forgot-password/send-otp') {
+      const { phone } = body || {};
+      if (!phone) {
+        return jsonResponse({ success: false, error: 'Phone number is required' }, 400);
+      }
+
+      // Build E.164 candidates for lookup (10-digit Indian numbers auto-prefix +91)
+      const idRaw = String(phone).trim();
+      const hasPlus = idRaw.startsWith('+');
+      const digits = idRaw.replace(/\D/g, '');
+      const candidates = new Set();
+      candidates.add(idRaw);
+      if (digits) candidates.add(digits);
+      if (digits) candidates.add('+' + digits);
+      if (!hasPlus && digits.length === 10) candidates.add('+91' + digits);
+      if (!hasPlus && digits.length > 10 && digits.startsWith('91')) candidates.add('+' + digits);
+
+      const users = await getCollection('users');
+      const user = await users.findOne({ phone: { $in: Array.from(candidates) } });
+
+      if (!user) {
+        return jsonResponse({
+          success: false,
+          error: 'No account is registered with this phone number'
+        }, 404);
+      }
+
+      // Use the canonical phone string actually stored on the user (Twilio Verify needs E.164)
+      const targetPhone = user.phone && /^\+\d/.test(user.phone)
+        ? user.phone
+        : (digits.length === 10 ? '+91' + digits : (hasPlus ? idRaw : '+' + digits));
+
+      try {
+        const twilio = require('twilio');
+        const client = twilio(
+          process.env.TWILIO_ACCOUNT_SID,
+          process.env.TWILIO_AUTH_TOKEN
+        );
+        const verification = await client.verify.v2
+          .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+          .verifications.create({ to: targetPhone, channel: 'sms' });
+
+        return jsonResponse({
+          success: true,
+          message: 'OTP sent successfully',
+          data: { phone: targetPhone, status: verification.status }
+        });
+      } catch (error) {
+        console.error('Forgot-password send-otp Twilio error:', error);
+        return jsonResponse({ success: false, error: 'Failed to send OTP. Please try again.' }, 400);
+      }
+    }
+
+    // Step 2: Verify OTP and reset password atomically.
+    if (path === '/auth/forgot-password/reset') {
+      const { phone, code, newPassword } = body || {};
+      if (!phone || !code || !newPassword) {
+        return jsonResponse({ success: false, error: 'Phone, OTP code, and new password are required' }, 400);
+      }
+      if (String(newPassword).length < 6) {
+        return jsonResponse({ success: false, error: 'Password must be at least 6 characters' }, 400);
+      }
+
+      // Lookup user by phone
+      const idRaw = String(phone).trim();
+      const hasPlus = idRaw.startsWith('+');
+      const digits = idRaw.replace(/\D/g, '');
+      const candidates = new Set();
+      candidates.add(idRaw);
+      if (digits) candidates.add(digits);
+      if (digits) candidates.add('+' + digits);
+      if (!hasPlus && digits.length === 10) candidates.add('+91' + digits);
+      if (!hasPlus && digits.length > 10 && digits.startsWith('91')) candidates.add('+' + digits);
+
+      const users = await getCollection('users');
+      const user = await users.findOne({ phone: { $in: Array.from(candidates) } });
+      if (!user) {
+        return jsonResponse({ success: false, error: 'No account is registered with this phone number' }, 404);
+      }
+
+      const targetPhone = user.phone && /^\+\d/.test(user.phone)
+        ? user.phone
+        : (digits.length === 10 ? '+91' + digits : (hasPlus ? idRaw : '+' + digits));
+
+      try {
+        const twilio = require('twilio');
+        const client = twilio(
+          process.env.TWILIO_ACCOUNT_SID,
+          process.env.TWILIO_AUTH_TOKEN
+        );
+        const check = await client.verify.v2
+          .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+          .verificationChecks.create({ to: targetPhone, code });
+
+        if (check.status !== 'approved') {
+          return jsonResponse({ success: false, error: 'Invalid or expired OTP' }, 400);
+        }
+      } catch (error) {
+        console.error('Forgot-password verify Twilio error:', error);
+        return jsonResponse({ success: false, error: 'OTP verification failed' }, 400);
+      }
+
+      // OTP verified — update password (hashed), mark phone verified, bump tokenVersion
+      // to invalidate any existing JWT sessions issued before the reset.
+      const newHash = await hashPassword(newPassword);
+      const newTokenVersion = (user.tokenVersion || 0) + 1;
+      await users.updateOne(
+        { id: user.id },
+        {
+          $set: {
+            password: newHash,
+            phoneVerified: true,
+            tokenVersion: newTokenVersion,
+            authProvider: user.authProvider === 'google' ? 'google' : 'local',
+            updatedAt: new Date()
+          }
+        }
+      );
+
+      return jsonResponse({
+        success: true,
+        message: 'Password reset successful. You can now log in with your new password.'
+      });
+    }
+
+    // Google OAuth Callback (Emergent legacy session-id flow)
     if (path === '/auth/google-callback') {
       const { sessionId } = body;
       
