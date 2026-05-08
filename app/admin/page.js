@@ -1399,16 +1399,69 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
 
     try {
       const text = await file.text();
-      const lines = text.split(/\r?\n/).filter(l => l.trim());
-      
-      if (lines.length < 2) {
+
+      // Robust CSV parser that respects multi-line quoted cells and "" escapes.
+      // Returns an array of rows, each row is an array of cell strings.
+      const parseCsvText = (raw, delim) => {
+        const rows = [];
+        let row = [];
+        let cell = '';
+        let inQuotes = false;
+        const src = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        for (let i = 0; i < src.length; i++) {
+          const ch = src[i];
+          if (inQuotes) {
+            if (ch === '"') {
+              if (src[i + 1] === '"') { cell += '"'; i++; }
+              else { inQuotes = false; }
+            } else {
+              cell += ch;
+            }
+          } else {
+            if (ch === '"') {
+              inQuotes = true;
+            } else if (ch === delim) {
+              row.push(cell);
+              cell = '';
+            } else if (ch === '\n') {
+              row.push(cell);
+              rows.push(row);
+              row = [];
+              cell = '';
+            } else {
+              cell += ch;
+            }
+          }
+        }
+        // flush last cell/row
+        if (cell.length > 0 || row.length > 0) {
+          row.push(cell);
+          rows.push(row);
+        }
+        // drop completely-empty trailing rows
+        return rows.filter(r => r.some(c => String(c).trim() !== ''));
+      };
+
+      // Detect delimiter from the first non-empty line
+      const firstNlIdx = (() => {
+        let inQ = false;
+        for (let i = 0; i < text.length; i++) {
+          const c = text[i];
+          if (c === '"') inQ = !inQ;
+          else if (c === '\n' && !inQ) return i;
+        }
+        return text.length;
+      })();
+      const headerSample = text.slice(0, firstNlIdx);
+      const delimiter = headerSample.includes('\t') ? '\t' : ',';
+
+      const allRows = parseCsvText(text, delimiter);
+      if (allRows.length < 2) {
         toast.error('CSV is empty');
         return;
       }
 
-      const firstLine = lines[0];
-      const delimiter = firstLine.includes('\t') ? '\t' : ',';
-      const headers = firstLine.split(delimiter).map(h => h.trim().toLowerCase().replace(/"/g, ''));
+      const headers = allRows[0].map(h => String(h).trim().toLowerCase().replace(/^"|"$/g, ''));
 
       const required = ['question_title', 'option1_title', 'option2_title', 'option3_title', 'option4_title', 'correct_option_number'];
       const missing = required.filter(r => !headers.includes(r));
@@ -1418,23 +1471,9 @@ function QuestionsTab({ mockTests, exams, onRefresh }) {
         return;
       }
 
-      const parseRow = (row) => {
-        if (delimiter === '\t') return row.split('\t').map(v => v.trim().replace(/^"|"$/g, ''));
-        const result = [];
-        let current = '', inQuotes = false;
-        for (const char of row) {
-          if (char === '"') inQuotes = !inQuotes;
-          else if (char === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
-          else current += char;
-        }
-        result.push(current.trim());
-        return result;
-      };
-
-      const parsed = lines.slice(1).map((line, i) => {
-        const values = parseRow(line);
+      const parsed = allRows.slice(1).map((values, i) => {
         const obj = { rowNumber: i + 2 };
-        headers.forEach((h, idx) => { obj[h] = values[idx] || ''; });
+        headers.forEach((h, idx) => { obj[h] = (values[idx] !== undefined ? String(values[idx]).trim() : ''); });
         
         // Validate
         obj.isValid = true;
