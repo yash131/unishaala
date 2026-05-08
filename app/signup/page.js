@@ -56,6 +56,26 @@ export default function SignupPage() {
     return () => clearInterval(t);
   }, [resendIn]);
 
+  // Auto-redirect already-logged-in users (don't let them re-signup)
+  useEffect(() => {
+    const user = localStorage.getItem('user');
+    if (!user) return;
+    try {
+      const u = JSON.parse(user);
+      const isAdmin = u.role === 'SUPER_ADMIN' || u.role === 'ADMIN';
+      if (isAdmin) {
+        router.push('/admin');
+      } else if (u.phoneVerified !== true) {
+        const next = safeNext ? `?next=${encodeURIComponent(safeNext)}` : '';
+        router.push(`/verify-otp${next}`);
+      } else if (safeNext) {
+        router.push(safeNext);
+      } else {
+        router.push('/');
+      }
+    } catch (_) {}
+  }, [router, safeNext]);
+
   // Send OTP via Twilio Verify
   const sendOtp = async (phoneE164) => {
     const e164 = phoneE164 || verifiedPhone;

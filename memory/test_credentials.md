@@ -9,7 +9,10 @@
 ## Phone Verification (NEW — Mandatory)
 - Twilio Verify Service is now ENFORCED for ALL non-admin users.
 - After login/signup, non-admin users with `phoneVerified !== true` are redirected to `/verify-otp`.
-- All routes except `/`, `/login`, `/signup`, `/verify-otp`, `/verify-phone`, legal pages, `/admin/*`, `/api/*`, `/notifications/*`, static assets are gated by middleware.
+- **All site routes are now gated.** Public-only paths: `/login`, `/signup`, `/verify-otp`, `/verify-phone`, `/forgot-password`, `/privacy-policy`, `/terms-of-service`, `/refund-policy`, `/api/*`, `/auth/*`, static assets.
+- Anonymous visitors hitting `/` (or any other gated URL) are redirected to `/signup?next=<url>`.
+- Logged-in but unverified visitors are redirected to `/verify-otp?next=<url>`.
+- Admins (ADMIN/SUPER_ADMIN) bypass phone gating.
 - API endpoints:
   - `POST /api/auth/send-otp` — body: `{ phone: "+919999999999" }`
   - `POST /api/auth/verify-phone-otp` — body: `{ phone, code }` (stateless verification only)

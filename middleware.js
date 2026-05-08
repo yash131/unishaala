@@ -37,13 +37,15 @@ function handlePaymentRequest(request) {
 
 // ============ (B) Access control ============
 
-// Pages that are ALWAYS public (landing, auth pages, legal)
+// Pages that are ALWAYS public (auth pages and legal docs only — NO landing).
+// Unauthenticated visitors are forced to /signup. Existing users can click
+// "Login" from /signup. Legal pages remain accessible for compliance.
 const PUBLIC_EXACT_PATHS = new Set([
-  '/',
   '/login',
   '/signup',
   '/verify-otp',
   '/verify-phone',
+  '/forgot-password',
   '/privacy-policy',
   '/terms-of-service',
   '/refund-policy',
@@ -51,10 +53,8 @@ const PUBLIC_EXACT_PATHS = new Set([
 
 // Path prefixes that are always public
 const PUBLIC_PREFIXES = [
-  '/admin',   // Admin panel has its own role-based guard
   '/api',     // API routes implement their own auth
   '/auth',    // OAuth callback (e.g. /auth/callback) — must be reachable pre-login
-  '/notifications', // Public exam notifications list & details
   '/_next',   // Next.js internals/assets
   '/favicon',
   '/robots',
@@ -113,13 +113,14 @@ export function middleware(request) {
   const token = request.cookies.get('auth_token')?.value;
   const payload = token ? decodeToken(token) : null;
 
-  // Not logged in → redirect to landing
+  // Not logged in → force user to sign up (they can click Login from there)
   if (!payload) {
     const url = request.nextUrl.clone();
-    url.pathname = '/';
+    url.pathname = '/signup';
     url.search = '';
-    url.searchParams.set('auth', 'required');
-    url.searchParams.set('next', pathname + (search || ''));
+    if (pathname && pathname !== '/' && pathname !== '/signup' && pathname !== '/login') {
+      url.searchParams.set('next', pathname + (search || ''));
+    }
     return NextResponse.redirect(url);
   }
 
@@ -132,7 +133,9 @@ export function middleware(request) {
     const url = request.nextUrl.clone();
     url.pathname = '/verify-otp';
     url.search = '';
-    url.searchParams.set('next', pathname + (search || ''));
+    if (pathname && pathname !== '/verify-otp') {
+      url.searchParams.set('next', pathname + (search || ''));
+    }
     return NextResponse.redirect(url);
   }
 
