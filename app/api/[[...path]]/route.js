@@ -2256,8 +2256,11 @@ export async function POST(request) {
         return jsonResponse({ success: false, error: 'Name, email and password are required' }, 400);
       }
 
+      // Always normalize email to lowercase for consistent lookup at login time
+      const emailLower = String(email).trim().toLowerCase();
+
       const users = await getCollection('users');
-      const existingUser = await users.findOne({ email });
+      const existingUser = await users.findOne({ email: emailLower });
       if (existingUser) {
         return jsonResponse({ success: false, error: 'Email already registered' }, 400);
       }
@@ -2274,8 +2277,8 @@ export async function POST(request) {
       
       const newUser = {
         id: uuidv4(),
-        name,
-        email,
+        name: String(name).trim(),
+        email: emailLower,
         phone: phone || '',
         password: hashedPassword,
         role: 'USER',
@@ -2283,6 +2286,7 @@ export async function POST(request) {
         isVerified: true,
         phoneVerified: false,
         authProvider: 'local',
+        tokenVersion: 0,
         createdAt: new Date(),
         updatedAt: new Date()
       };
