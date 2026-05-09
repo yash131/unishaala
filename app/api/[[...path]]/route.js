@@ -2594,8 +2594,25 @@ export async function POST(request) {
           data: { status: verification.status }
         });
       } catch (error) {
-        console.error('Twilio error:', error);
-        return jsonResponse({ success: false, error: 'Failed to send OTP. Please check phone number.' }, 400);
+        console.error('Twilio send-otp error:', {
+          code: error?.code,
+          status: error?.status,
+          message: error?.message,
+          moreInfo: error?.moreInfo,
+        });
+        // Twilio error code 20003 = auth failed (bad SID/token).
+        // 20404 = service not found (bad VERIFY_SERVICE_SID).
+        // 60200 = invalid 'to' parameter.
+        const userMessage = error?.code === 20003
+          ? 'SMS service is misconfigured. Please contact support.'
+          : error?.code === 60200
+            ? 'Invalid phone number. Please include the country code.'
+            : 'Failed to send OTP. Please try again.';
+        return jsonResponse({
+          success: false,
+          error: userMessage,
+          ...(error?.code ? { errorCode: error.code } : {}),
+        }, 400);
       }
     }
 
@@ -2747,8 +2764,22 @@ export async function POST(request) {
           data: { phone: targetPhone, status: verification.status }
         });
       } catch (error) {
-        console.error('Forgot-password send-otp Twilio error:', error);
-        return jsonResponse({ success: false, error: 'Failed to send OTP. Please try again.' }, 400);
+        console.error('Forgot-password send-otp Twilio error:', {
+          code: error?.code,
+          status: error?.status,
+          message: error?.message,
+          moreInfo: error?.moreInfo,
+        });
+        const userMessage = error?.code === 20003
+          ? 'SMS service is misconfigured. Please contact support.'
+          : error?.code === 60200
+            ? 'Invalid phone number. Please include the country code.'
+            : 'Failed to send OTP. Please try again.';
+        return jsonResponse({
+          success: false,
+          error: userMessage,
+          ...(error?.code ? { errorCode: error.code } : {}),
+        }, 400);
       }
     }
 
