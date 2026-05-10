@@ -2820,11 +2820,11 @@ export async function POST(request) {
     }
 
     // Step 2: Verify OTP, enforce single-device session, issue JWT.
-    // Body: { phone, code, forceLogout? }
+    // Body: { phone, code }
     // - If user has an "active session" (lastLoginAt within 7 days, activeSessionId set),
-    //   reject with 409 ALREADY_LOGGED_IN unless forceLogout=true is passed.
+    //   reject with 409 ALREADY_LOGGED_IN. The user MUST manually log out on the other device.
     if (path === '/auth/login-otp/verify') {
-      const { phone, code, forceLogout } = body || {};
+      const { phone, code } = body || {};
       if (!phone || !code) {
         return jsonResponse({ success: false, error: 'Phone and OTP are required' }, 400);
       }
@@ -2868,18 +2868,18 @@ export async function POST(request) {
         return jsonResponse({ success: false, error: 'OTP verification failed' }, 400);
       }
 
-      // 2. Single-device check (admins are exempt)
+      // 2. Single-device check (admins are exempt). Force-takeover is no longer allowed —
+      //    user must log out from the other device first.
       const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
-      if (!isAdmin && !forceLogout) {
+      if (!isAdmin) {
         const lastLogin = user.lastLoginAt ? new Date(user.lastLoginAt).getTime() : 0;
         const ageMs = Date.now() - lastLogin;
         const sessionAlive = user.activeSessionId && ageMs < 7 * 24 * 60 * 60 * 1000;
         if (sessionAlive) {
           return jsonResponse({
             success: false,
-            error: 'You are already logged in on another device. Please log out from that device first, or use "Continue here" to force log out the other device.',
+            error: 'Your account is already active on another device. Please log out from the other device before signing in here.',
             code: 'ALREADY_LOGGED_IN',
-            canForce: true,
           }, 409);
         }
       }

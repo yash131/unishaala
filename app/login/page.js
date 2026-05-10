@@ -94,7 +94,7 @@ export default function LoginPage() {
     }
   };
 
-  const verifyOtp = async (e, force = false) => {
+  const verifyOtp = async (e) => {
     if (e) e.preventDefault();
     if (!otp || otp.length < 4) {
       toast.error('Please enter the OTP');
@@ -106,7 +106,7 @@ export default function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ phone, code: otp, forceLogout: !!force }),
+        body: JSON.stringify({ phone, code: otp }),
       });
       const json = await res.json();
 
@@ -227,7 +227,7 @@ export default function LoginPage() {
             )}
 
             {step === 'otp' && (
-              <form onSubmit={(e) => verifyOtp(e, false)} className="space-y-4">
+              <form onSubmit={verifyOtp} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="otp">6-Digit OTP</Label>
                   <Input
@@ -248,19 +248,10 @@ export default function LoginPage() {
                   <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 flex gap-2">
                     <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                     <div className="text-sm text-amber-800 flex-1">
-                      <p className="font-semibold">Already logged in on another device.</p>
+                      <p className="font-semibold">Your account is already active on another device.</p>
                       <p className="text-amber-700 mt-0.5">
-                        Click "Continue here" to log out of the other device and sign in here.
+                        Please log out from the other device before signing in here.
                       </p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        className="mt-2 bg-amber-600 hover:bg-amber-700 text-white"
-                        onClick={() => verifyOtp(null, true)}
-                        disabled={verifying}
-                      >
-                        {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Continue here →'}
-                      </Button>
                     </div>
                   </div>
                 )}
