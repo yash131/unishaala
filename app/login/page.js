@@ -9,8 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
 import {
-  Eye, EyeOff, Mail, Lock, Phone, Loader2, AtSign,
-  ShieldCheck, ArrowLeft, CheckCircle2,
+  Phone, ShieldCheck, Loader2, ArrowLeft, CheckCircle2, AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -29,45 +28,28 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const nextUrl = searchParams?.get('next') || '';
-  const safeNext = (() => {
-    if (!nextUrl) return '';
-    if (!nextUrl.startsWith('/') || nextUrl.startsWith('//')) return '';
-    return nextUrl;
-  })();
+  const safeNext = (nextUrl && nextUrl.startsWith('/') && !nextUrl.startsWith('//')) ? nextUrl : '';
 
-  // Steps: 'login' → 'otp' → 'done'
-  const [step, setStep] = useState('login');
-  const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({ identifier: '', password: '' });
-
-  // OTP step state
+  // 'phone' → 'otp' → 'done'
+  const [step, setStep] = useState('phone');
   const [phone, setPhone] = useState('');
-  const [phoneEditable, setPhoneEditable] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
+  const [maskedPhone, setMaskedPhone] = useState('');
   const [otp, setOtp] = useState('');
-  const [otpSending, setOtpSending] = useState(false);
-  const [otpVerifying, setOtpVerifying] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [resendIn, setResendIn] = useState(0);
+  const [forceConfirm, setForceConfirm] = useState(false); // showing "Continue here" after 409
 
-  // Auto-redirect if already logged in
+  // Auto-redirect if already logged in (and verified)
   useEffect(() => {
     const user = localStorage.getItem('user');
-    if (user) {
-      try {
-        const u = JSON.parse(user);
-        const isAdmin = u.role === 'SUPER_ADMIN' || u.role === 'ADMIN';
-        if (isAdmin) router.push('/admin');
-        else if (u.phoneVerified !== true) {
-          // stay on login but advance to OTP step with existing phone
-          setPhone(u.phone || '');
-          setPhoneEditable(!u.phone);
-          setStep('otp');
-        } else if (safeNext) router.push(safeNext);
-        else router.push('/');
-      } catch (_) {}
-    }
+    if (!user) return;
+    try {
+      const u = JSON.parse(user);
+      const isAdmin = u.role === 'SUPER_ADMIN' || u.role === 'ADMIN';
+      if (isAdmin) router.push('/admin');
+      else if (u.phoneVerified === true) router.push(safeNext || '/');
+    } catch (_) {}
   }, [router, safeNext]);
 
   // Resend countdown
@@ -77,69 +59,16 @@ export default function LoginPage() {
     return () => clearInterval(t);
   }, [resendIn]);
 
-  // STEP 1: Login
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          identifier: formData.identifier.trim(),
-          password: formData.password,
-        }),
-      });
-      const result = await response.json();
-
-      if (!result.success) {
-        toast.error(result.error || 'Login failed');
-        setLoading(false);
-        return;
-      }
-
-      const user = result.data?.user || {};
-      localStorage.setItem('user', JSON.stringify(user));
-      const isAdmin = user.role === 'SUPER_ADMIN' || user.role === 'ADMIN';
-
-      if (isAdmin) {
-        toast.success('Welcome back, admin!');
-        router.push('/admin');
-        return;
-      }
-
-      if (user.phoneVerified === true) {
-        toast.success('Login successful!');
-        router.push(safeNext || '/');
-        return;
-      }
-
-      // User must verify phone
-      toast.success('Login successful — please verify your phone');
-      setPhone(user.phone || '');
-      setPhoneEditable(!user.phone);
-      setStep('otp');
-      setLoading(false);
-      // Auto-send OTP if phone is on file
-      if (user.phone && isValidE164(user.phone)) {
-        sendOtp(user.phone);
-      }
-    } catch (_err) {
-      toast.error('Something went wrong');
-      setLoading(false);
-    }
-  };
-
-  const sendOtp = async (phoneE164) => {
-    const e164 = normalizePhoneE164(phoneE164 || phone);
+  const sendOtp = async (e) => {
+    if (e) e.preventDefault();
+    const e164 = normalizePhoneE164(phone);
     if (!isValidE164(e164)) {
       toast.error('Please enter a valid phone number with country code');
-      return false;
+      return;
     }
-    setOtpSending(true);
+    setSending(true);
     try {
-      const res = await fetch('/api/auth/send-otp', {
+      const res = await fetch('/api/auth/login-otp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -147,76 +76,61 @@ export default function LoginPage() {
       });
       const json = await res.json();
       if (json?.success) {
-        toast.success(`OTP sent to ${e164}`);
         setPhone(e164);
-        setOtpSent(true);
+        setMaskedPhone(json.data?.maskedPhone || e164);
+        setStep('otp');
         setResendIn(30);
-        return true;
+        toast.success(`OTP sent to ${json.data?.maskedPhone || e164}`);
+      } else if (json?.code === 'ACCOUNT_NOT_FOUND') {
+        toast.error('No account found. Redirecting to signup…');
+        setTimeout(() => router.push('/signup' + (safeNext ? `?next=${encodeURIComponent(safeNext)}` : '')), 1500);
+      } else {
+        toast.error(json?.error || 'Failed to send OTP');
       }
-      toast.error(json?.error || 'Failed to send OTP');
-      return false;
-    } catch (_e) {
-      toast.error('Network error sending OTP');
-      return false;
+    } catch (_) {
+      toast.error('Network error. Please try again.');
     } finally {
-      setOtpSending(false);
+      setSending(false);
     }
   };
 
-  const handleVerifyOtp = async (e) => {
-    e.preventDefault();
+  const verifyOtp = async (e, force = false) => {
+    if (e) e.preventDefault();
     if (!otp || otp.length < 4) {
       toast.error('Please enter the OTP');
       return;
     }
-    setOtpVerifying(true);
+    setVerifying(true);
     try {
-      const res = await fetch('/api/auth/verify-my-phone', {
+      const res = await fetch('/api/auth/login-otp/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ phone, code: otp }),
+        body: JSON.stringify({ phone, code: otp, forceLogout: !!force }),
       });
       const json = await res.json();
-      if (json?.success) {
-        toast.success('Phone verified!');
-        try {
-          const meRes = await fetch('/api/auth/me', { credentials: 'include', cache: 'no-store' });
-          if (meRes.ok) {
-            const me = await meRes.json();
-            if (me?.data) {
-              localStorage.setItem('user', JSON.stringify({
-                id: me.data.id, name: me.data.name, email: me.data.email,
-                phone: me.data.phone, role: me.data.role, phoneVerified: true,
-              }));
-            }
-          }
-        } catch (_) {}
-        setStep('done');
-        setTimeout(() => { window.location.href = safeNext || '/'; }, 800);
-      } else {
-        toast.error(json?.error || 'Invalid OTP');
+
+      if (res.status === 409 && json?.code === 'ALREADY_LOGGED_IN') {
+        // Show "Continue here" option to force-logout the other device
+        setForceConfirm(true);
+        toast.error(json?.error || 'Already logged in on another device');
+        return;
       }
-    } catch (_e) {
+
+      if (json?.success) {
+        const u = json.data?.user || {};
+        localStorage.setItem('user', JSON.stringify(u));
+        toast.success('Login successful!');
+        setStep('done');
+        setTimeout(() => { window.location.href = safeNext || '/'; }, 700);
+      } else {
+        toast.error(json?.error || 'Verification failed');
+      }
+    } catch (_) {
       toast.error('Network error. Please try again.');
     } finally {
-      setOtpVerifying(false);
+      setVerifying(false);
     }
-  };
-
-  const handleGoogleLogin = () => {
-    setGoogleLoading(true);
-    const params = new URLSearchParams(window.location.search);
-    const next = params.get('next') || '/';
-    window.location.href = `/api/auth/google/start?next=${encodeURIComponent(next)}`;
-  };
-
-  const handleLogout = async () => {
-    try { await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }); } catch (_) {}
-    localStorage.removeItem('user');
-    setStep('login');
-    setOtp(''); setOtpSent(false); setPhone('');
-    setFormData({ email: '', password: '' });
   };
 
   return (
@@ -226,21 +140,24 @@ export default function LoginPage() {
           <Logo size="large" showText={false} />
         </div>
 
-        {/* Stepper visible only when verifying */}
-        {step !== 'login' && (
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <Step active={false} done label="Login" n={1} />
-            <div className="h-0.5 w-10 bg-brand-600" />
-            <Step active={step === 'otp'} done={step === 'done'} label="Verify Phone" n={2} />
-          </div>
-        )}
+        {/* Stepper */}
+        <div className="flex items-center justify-center gap-3 mb-6">
+          <Step active={step === 'phone'} done={step !== 'phone'} label="Phone" n={1} />
+          <div className={`h-0.5 w-10 ${step !== 'phone' ? 'bg-brand-600' : 'bg-gray-300'}`} />
+          <Step active={step === 'otp'} done={step === 'done'} label="Verify" n={2} />
+        </div>
 
         <Card className="shadow-xl border-gray-100">
           <CardHeader className="text-center pb-4">
-            {step === 'login' && (
+            {step === 'phone' && (
               <>
+                <div className="mx-auto mb-2 w-12 h-12 rounded-full bg-brand-100 flex items-center justify-center">
+                  <Phone className="w-6 h-6 text-brand-600" />
+                </div>
                 <CardTitle className="text-2xl font-bold">Welcome Back!</CardTitle>
-                <p className="text-sm text-gray-500 mt-1">Login to continue your preparation</p>
+                <p className="text-sm text-gray-500 mt-1">
+                  Login with your phone number — we'll send you an OTP.
+                </p>
               </>
             )}
             {step === 'otp' && (
@@ -248,11 +165,9 @@ export default function LoginPage() {
                 <div className="mx-auto mb-2 w-12 h-12 rounded-full bg-brand-100 flex items-center justify-center">
                   <ShieldCheck className="w-6 h-6 text-brand-600" />
                 </div>
-                <CardTitle className="text-2xl font-bold">Verify Your Phone</CardTitle>
+                <CardTitle className="text-2xl font-bold">Enter OTP</CardTitle>
                 <p className="text-sm text-gray-500 mt-1">
-                  {otpSent
-                    ? <>We sent a 6-digit code to <span className="font-semibold text-gray-900">{phone}</span></>
-                    : 'Confirm your phone number to continue'}
+                  We sent a 6-digit code to <span className="font-semibold text-gray-900">{maskedPhone}</span>
                 </p>
               </>
             )}
@@ -268,94 +183,8 @@ export default function LoginPage() {
           </CardHeader>
 
           <CardContent>
-            {step === 'login' && (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-12 mb-5 border-gray-300 hover:bg-gray-50"
-                  onClick={handleGoogleLogin}
-                  disabled={googleLoading}
-                >
-                  {googleLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
-                    <>
-                      <GoogleIcon />
-                      Continue with Google
-                    </>
-                  )}
-                </Button>
-
-                <div className="relative mb-5">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-gray-200" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase tracking-wider">
-                    <span className="bg-white px-3 text-gray-400">or login with email</span>
-                  </div>
-                </div>
-
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <Field
-                    icon={<AtSign className="w-5 h-5 text-gray-400" />}
-                    id="identifier" type="text" placeholder="Email or phone number"
-                    value={formData.identifier}
-                    onChange={(v) => setFormData({ ...formData, identifier: v })}
-                    required
-                  />
-                  <div className="relative">
-                    <Field
-                      icon={<Lock className="w-5 h-5 text-gray-400" />}
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Password"
-                      value={formData.password}
-                      onChange={(v) => setFormData({ ...formData, password: v })}
-                      required
-                      paddingRight
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label="Toggle password visibility"
-                    >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
-                  </div>
-
-                  <div className="flex items-center justify-between text-sm">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input type="checkbox" className="rounded border-gray-300" />
-                      <span className="text-gray-600">Remember me</span>
-                    </label>
-                    <Link href="/forgot-password" className="text-brand-600 hover:underline">
-                      Forgot password?
-                    </Link>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full h-12 bg-brand-600 hover:bg-brand-700 text-base font-semibold"
-                    disabled={loading}
-                  >
-                    {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Login'}
-                  </Button>
-                </form>
-
-                <div className="mt-5 text-center">
-                  <p className="text-sm text-gray-600">
-                    Don't have an account?{' '}
-                    <Link href="/signup" className="text-brand-600 font-semibold hover:underline">
-                      Sign Up
-                    </Link>
-                  </p>
-                </div>
-              </>
-            )}
-
-            {step === 'otp' && (
-              <div className="space-y-5">
-                {/* Phone confirm/edit panel */}
+            {step === 'phone' && (
+              <form onSubmit={sendOtp} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="phone">Phone Number</Label>
                   <div className="relative">
@@ -367,85 +196,105 @@ export default function LoginPage() {
                       className="pl-10 h-12"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      disabled={!phoneEditable && otpSent}
+                      autoFocus
+                      required
                     />
                   </div>
-                  {!phoneEditable && otpSent && (
-                    <button
-                      type="button"
-                      onClick={() => { setPhoneEditable(true); setOtpSent(false); setOtp(''); }}
-                      className="text-xs text-brand-600 hover:underline"
-                    >
-                      Change number
-                    </button>
-                  )}
+                  <p className="text-xs text-gray-500">
+                    Include country code. 10-digit Indian numbers auto-prefix with +91.
+                  </p>
                 </div>
 
-                {!otpSent ? (
-                  <Button
-                    type="button"
-                    onClick={() => sendOtp()}
-                    className="w-full h-12 bg-brand-600 hover:bg-brand-700 text-base font-semibold"
-                    disabled={otpSending}
-                  >
-                    {otpSending ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2 className="w-5 h-5 animate-spin" /> Sending OTP…
-                      </span>
-                    ) : 'Send OTP'}
-                  </Button>
-                ) : (
-                  <form onSubmit={handleVerifyOtp} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="otp">Enter OTP</Label>
-                      <Input
-                        id="otp"
-                        type="text"
-                        inputMode="numeric"
-                        maxLength={8}
-                        placeholder="• • • • • •"
-                        className="h-14 text-center text-2xl tracking-[0.5em] font-bold"
-                        value={otp}
-                        onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
-                        autoFocus
-                        required
-                      />
-                    </div>
+                <Button
+                  type="submit"
+                  className="w-full h-12 bg-brand-600 hover:bg-brand-700 text-base font-semibold"
+                  disabled={sending}
+                >
+                  {sending ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" /> Sending OTP…
+                    </span>
+                  ) : 'Send OTP'}
+                </Button>
 
-                    <Button
-                      type="submit"
-                      className="w-full h-12 bg-brand-600 hover:bg-brand-700 text-base font-semibold"
-                      disabled={otpVerifying}
-                    >
-                      {otpVerifying ? (
-                        <span className="inline-flex items-center gap-2">
-                          <Loader2 className="w-5 h-5 animate-spin" /> Verifying…
-                        </span>
-                      ) : 'Verify & Continue'}
-                    </Button>
+                <p className="text-center text-sm text-gray-600 pt-2">
+                  Don't have an account?{' '}
+                  <Link href="/signup" className="text-brand-600 font-semibold hover:underline">
+                    Sign Up
+                  </Link>
+                </p>
+              </form>
+            )}
 
-                    <div className="flex items-center justify-between text-sm">
-                      <button
+            {step === 'otp' && (
+              <form onSubmit={(e) => verifyOtp(e, false)} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="otp">6-Digit OTP</Label>
+                  <Input
+                    id="otp"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={8}
+                    placeholder="• • • • • •"
+                    className="h-14 text-center text-2xl tracking-[0.5em] font-bold"
+                    value={otp}
+                    onChange={(e) => { setOtp(e.target.value.replace(/\D/g, '')); setForceConfirm(false); }}
+                    autoFocus
+                    required
+                  />
+                </div>
+
+                {forceConfirm && (
+                  <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 flex gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <div className="text-sm text-amber-800 flex-1">
+                      <p className="font-semibold">Already logged in on another device.</p>
+                      <p className="text-amber-700 mt-0.5">
+                        Click "Continue here" to log out of the other device and sign in here.
+                      </p>
+                      <Button
                         type="button"
-                        onClick={handleLogout}
-                        className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-1"
+                        size="sm"
+                        className="mt-2 bg-amber-600 hover:bg-amber-700 text-white"
+                        onClick={() => verifyOtp(null, true)}
+                        disabled={verifying}
                       >
-                        <ArrowLeft className="w-4 h-4" /> Back to login
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { if (resendIn === 0 && !otpSending) sendOtp(); }}
-                        disabled={resendIn > 0 || otpSending}
-                        className="text-brand-600 disabled:text-gray-400 font-medium hover:underline"
-                      >
-                        {otpSending
-                          ? 'Sending…'
-                          : resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend OTP'}
-                      </button>
+                        {verifying ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Continue here →'}
+                      </Button>
                     </div>
-                  </form>
+                  </div>
                 )}
-              </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-12 bg-brand-600 hover:bg-brand-700 text-base font-semibold"
+                  disabled={verifying}
+                >
+                  {verifying ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" /> Verifying…
+                    </span>
+                  ) : 'Verify & Login'}
+                </Button>
+
+                <div className="flex items-center justify-between text-sm">
+                  <button
+                    type="button"
+                    onClick={() => { setStep('phone'); setOtp(''); setForceConfirm(false); }}
+                    className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-1"
+                  >
+                    <ArrowLeft className="w-4 h-4" /> Change number
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { if (resendIn === 0 && !sending) sendOtp(); }}
+                    disabled={resendIn > 0 || sending}
+                    className="text-brand-600 disabled:text-gray-400 font-medium hover:underline"
+                  >
+                    {sending ? 'Sending…' : (resendIn > 0 ? `Resend in ${resendIn}s` : 'Resend OTP')}
+                  </button>
+                </div>
+              </form>
             )}
 
             {step === 'done' && (
@@ -461,12 +310,14 @@ export default function LoginPage() {
           <Link href="/terms-of-service" className="underline">Terms</Link> and{' '}
           <Link href="/privacy-policy" className="underline">Privacy Policy</Link>.
         </p>
+        <p className="text-center text-[11px] text-gray-400 mt-3">
+          <Link href="/admin-login" className="hover:text-gray-600">Admin login</Link>
+        </p>
       </div>
     </div>
   );
 }
 
-// ─────────────────────────── helpers ───────────────────────────
 function Step({ active, done, label, n }) {
   const dotBase = 'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors';
   let dotCls = 'bg-gray-200 text-gray-500';
@@ -481,33 +332,5 @@ function Step({ active, done, label, n }) {
         {label}
       </span>
     </div>
-  );
-}
-
-function Field({ icon, id, type, placeholder, value, onChange, required, paddingRight }) {
-  return (
-    <div className="relative">
-      <span className="absolute left-3 top-1/2 -translate-y-1/2">{icon}</span>
-      <Input
-        id={id}
-        type={type}
-        placeholder={placeholder}
-        className={`pl-10 h-12 ${paddingRight ? 'pr-10' : ''}`}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        required={required}
-      />
-    </div>
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-      <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-      <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-      <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-      <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-    </svg>
   );
 }

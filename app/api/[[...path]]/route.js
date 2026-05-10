@@ -2248,16 +2248,17 @@ export async function POST(request) {
     // Ensure database is connected for all POST endpoints
     await connectToDatabase();
 
-    // User Registration
+    // User Registration (phone-OTP based; password no longer required)
     if (path === '/auth/signup') {
       const { name, email, phone, password } = body;
       
-      if (!name || !email || !password) {
-        return jsonResponse({ success: false, error: 'Name, email and password are required' }, 400);
+      if (!name || !email || !phone) {
+        return jsonResponse({ success: false, error: 'Name, email and phone are required' }, 400);
       }
 
       // Always normalize email to lowercase for consistent lookup at login time
       const emailLower = String(email).trim().toLowerCase();
+      const phoneTrimmed = String(phone).trim();
 
       const users = await getCollection('users');
       const existingUser = await users.findOne({ email: emailLower });
@@ -2265,21 +2266,20 @@ export async function POST(request) {
         return jsonResponse({ success: false, error: 'Email already registered' }, 400);
       }
 
-      // Phone is optional. If provided, ensure it's unique.
-      if (phone) {
-        const existingPhone = await users.findOne({ phone });
-        if (existingPhone) {
-          return jsonResponse({ success: false, error: 'Phone number already registered' }, 400);
-        }
+      // Phone is required and must be unique
+      const existingPhone = await users.findOne({ phone: phoneTrimmed });
+      if (existingPhone) {
+        return jsonResponse({ success: false, error: 'Phone number already registered' }, 400);
       }
 
-      const hashedPassword = await hashPassword(password);
-      
+      // Password is optional in OTP-only mode. If provided (e.g. legacy callers), hash it.
+      const hashedPassword = password ? await hashPassword(password) : '';
+
       const newUser = {
         id: uuidv4(),
         name: String(name).trim(),
         email: emailLower,
-        phone: phone || '',
+        phone: phoneTrimmed,
         password: hashedPassword,
         role: 'USER',
         // Phone verification is REQUIRED before accessing the platform.
@@ -2287,6 +2287,8 @@ export async function POST(request) {
         phoneVerified: false,
         authProvider: 'local',
         tokenVersion: 0,
+        activeSessionId: '',
+        lastLoginAt: null,
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -2405,6 +2407,15 @@ export async function POST(request) {
         return jsonResponse({ success: false, error: 'Invalid credentials' }, 401);
       }
 
+      // Password login is now restricted to ADMIN/SUPER_ADMIN only.
+      // Regular users must log in via phone OTP at /api/auth/login-otp/*
+      if (user.role !== 'ADMIN' && user.role !== 'SUPER_ADMIN') {
+        return jsonResponse({
+          success: false,
+          error: 'Password login is disabled. Please log in using your phone number.'
+        }, 403);
+      }
+
       const isValid = await verifyPassword(password, user.password);
 
       if (!isValid) {
@@ -2441,6 +2452,17 @@ export async function POST(request) {
 
     // Logout
     if (path === '/auth/logout') {
+      // Clear the active session in DB so the user can log in again from another device.
+      try {
+        const currentUser = await getAuthUser(request);
+        if (currentUser) {
+          const users = await getCollection('users');
+          await users.updateOne(
+            { id: currentUser.id },
+            { $set: { activeSessionId: '', updatedAt: new Date() } }
+          );
+        }
+      } catch (_) { /* best-effort, never block logout */ }
       const response = jsonResponse({ success: true, message: 'Logged out successfully' });
       response.cookies.delete('auth_token');
       return response;
@@ -2684,20 +2706,30 @@ export async function POST(request) {
         }
 
         const users = await getCollection('users');
+        const newTv = (currentUser.tokenVersion || 0) + 1;
+        const newSessionId = uuidv4();
         await users.updateOne(
           { id: currentUser.id },
-          { $set: { phone: targetPhone, phoneVerified: true, updatedAt: new Date() } }
+          { $set: {
+            phone: targetPhone,
+            phoneVerified: true,
+            tokenVersion: newTv,
+            activeSessionId: newSessionId,
+            lastLoginAt: new Date(),
+            updatedAt: new Date()
+          } }
         );
         const updated = await users.findOne({ id: currentUser.id });
         const { password, otp, otpExpiry, ...safe } = updated || {};
 
-        // Re-issue JWT with phoneVerified:true so middleware sees the updated state
+        // Re-issue JWT with new tokenVersion + sessionId so middleware sees the updated state
         const newToken = createToken({
           userId: updated.id,
           email: updated.email,
           role: updated.role,
           phoneVerified: true,
-          tokenVersion: updated.tokenVersion || 0
+          tokenVersion: newTv,
+          sessionId: newSessionId,
         });
         const response = jsonResponse({
           success: true,
@@ -2718,15 +2750,14 @@ export async function POST(request) {
       }
     }
 
-    // ============== FORGOT PASSWORD (PHONE OTP) ==============
-    // Step 1: Send OTP to a registered phone (returns 404 if not found).
-    if (path === '/auth/forgot-password/send-otp') {
+    // ============== LOGIN VIA PHONE OTP ==============
+    // Step 1: Send OTP to a registered phone number. Returns 404 if phone not found.
+    if (path === '/auth/login-otp/send') {
       const { phone } = body || {};
       if (!phone) {
         return jsonResponse({ success: false, error: 'Phone number is required' }, 400);
       }
 
-      // Build E.164 candidates for lookup (10-digit Indian numbers auto-prefix +91)
       const idRaw = String(phone).trim();
       const hasPlus = idRaw.startsWith('+');
       const digits = idRaw.replace(/\D/g, '');
@@ -2738,19 +2769,28 @@ export async function POST(request) {
       if (!hasPlus && digits.length > 10 && digits.startsWith('91')) candidates.add('+' + digits);
 
       const users = await getCollection('users');
-      const user = await users.findOne({ phone: { $in: Array.from(candidates) } });
-
-      if (!user) {
+      const matches = await users.find({ phone: { $in: Array.from(candidates) } }).limit(2).toArray();
+      if (matches.length === 0) {
         return jsonResponse({
           success: false,
-          error: 'No account is registered with this phone number'
+          error: 'No account found with this phone number. Please sign up first.',
+          code: 'ACCOUNT_NOT_FOUND'
         }, 404);
       }
-
-      // Use the canonical phone string actually stored on the user (Twilio Verify needs E.164)
-      const targetPhone = user.phone && /^\+\d/.test(user.phone)
-        ? user.phone
-        : (digits.length === 10 ? '+91' + digits : (hasPlus ? idRaw : '+' + digits));
+      if (matches.length > 1) {
+        return jsonResponse({
+          success: false,
+          error: 'Multiple accounts share this phone. Please contact support.',
+        }, 400);
+      }
+      const user = matches[0];
+      const targetPhone = String(user.phone || '').trim();
+      if (!/^\+\d{10,15}$/.test(targetPhone)) {
+        return jsonResponse({
+          success: false,
+          error: 'This account has no valid phone on file. Please contact support.'
+        }, 400);
+      }
 
       try {
         const twilio = require('twilio');
@@ -2762,42 +2802,33 @@ export async function POST(request) {
           .services(process.env.TWILIO_VERIFY_SERVICE_SID)
           .verifications.create({ to: targetPhone, channel: 'sms' });
 
+        const masked = targetPhone.replace(/(\+\d{2})\d+(\d{4})$/, '$1XXXXXX$2');
         return jsonResponse({
           success: true,
           message: 'OTP sent successfully',
-          data: { phone: targetPhone, status: verification.status }
+          data: { userId: user.id, maskedPhone: masked, status: verification.status }
         });
       } catch (error) {
-        console.error('Forgot-password send-otp Twilio error:', {
-          code: error?.code,
-          status: error?.status,
-          message: error?.message,
-          moreInfo: error?.moreInfo,
-        });
+        console.error('Login-OTP send error:', { code: error?.code, message: error?.message });
         const userMessage = error?.code === 20003
           ? 'SMS service is misconfigured. Please contact support.'
           : error?.code === 60200
-            ? 'Invalid phone number. Please include the country code.'
+            ? 'Invalid phone number on file. Please contact support.'
             : 'Failed to send OTP. Please try again.';
-        return jsonResponse({
-          success: false,
-          error: userMessage,
-          ...(error?.code ? { errorCode: error.code } : {}),
-        }, 400);
+        return jsonResponse({ success: false, error: userMessage, ...(error?.code ? { errorCode: error.code } : {}) }, 400);
       }
     }
 
-    // Step 2: Verify OTP and reset password atomically.
-    if (path === '/auth/forgot-password/reset') {
-      const { phone, code, newPassword } = body || {};
-      if (!phone || !code || !newPassword) {
-        return jsonResponse({ success: false, error: 'Phone, OTP code, and new password are required' }, 400);
-      }
-      if (String(newPassword).length < 6) {
-        return jsonResponse({ success: false, error: 'Password must be at least 6 characters' }, 400);
+    // Step 2: Verify OTP, enforce single-device session, issue JWT.
+    // Body: { phone, code, forceLogout? }
+    // - If user has an "active session" (lastLoginAt within 7 days, activeSessionId set),
+    //   reject with 409 ALREADY_LOGGED_IN unless forceLogout=true is passed.
+    if (path === '/auth/login-otp/verify') {
+      const { phone, code, forceLogout } = body || {};
+      if (!phone || !code) {
+        return jsonResponse({ success: false, error: 'Phone and OTP are required' }, 400);
       }
 
-      // Lookup user by phone
       const idRaw = String(phone).trim();
       const hasPlus = idRaw.startsWith('+');
       const digits = idRaw.replace(/\D/g, '');
@@ -2809,14 +2840,239 @@ export async function POST(request) {
       if (!hasPlus && digits.length > 10 && digits.startsWith('91')) candidates.add('+' + digits);
 
       const users = await getCollection('users');
-      const user = await users.findOne({ phone: { $in: Array.from(candidates) } });
-      if (!user) {
-        return jsonResponse({ success: false, error: 'No account is registered with this phone number' }, 404);
+      const matches = await users.find({ phone: { $in: Array.from(candidates) } }).limit(2).toArray();
+      if (matches.length === 0) {
+        return jsonResponse({ success: false, error: 'Account not found' }, 404);
+      }
+      if (matches.length > 1) {
+        return jsonResponse({ success: false, error: 'Multiple accounts share this phone. Please contact support.' }, 400);
+      }
+      const user = matches[0];
+      const targetPhone = String(user.phone || '').trim();
+
+      // 1. Verify OTP first (so attackers can't probe session state)
+      try {
+        const twilio = require('twilio');
+        const client = twilio(
+          process.env.TWILIO_ACCOUNT_SID,
+          process.env.TWILIO_AUTH_TOKEN
+        );
+        const check = await client.verify.v2
+          .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+          .verificationChecks.create({ to: targetPhone, code });
+        if (check.status !== 'approved') {
+          return jsonResponse({ success: false, error: 'Invalid or expired OTP' }, 400);
+        }
+      } catch (error) {
+        console.error('Login-OTP verify error:', { code: error?.code, message: error?.message });
+        return jsonResponse({ success: false, error: 'OTP verification failed' }, 400);
       }
 
-      const targetPhone = user.phone && /^\+\d/.test(user.phone)
-        ? user.phone
-        : (digits.length === 10 ? '+91' + digits : (hasPlus ? idRaw : '+' + digits));
+      // 2. Single-device check (admins are exempt)
+      const isAdmin = user.role === 'ADMIN' || user.role === 'SUPER_ADMIN';
+      if (!isAdmin && !forceLogout) {
+        const lastLogin = user.lastLoginAt ? new Date(user.lastLoginAt).getTime() : 0;
+        const ageMs = Date.now() - lastLogin;
+        const sessionAlive = user.activeSessionId && ageMs < 7 * 24 * 60 * 60 * 1000;
+        if (sessionAlive) {
+          return jsonResponse({
+            success: false,
+            error: 'You are already logged in on another device. Please log out from that device first, or use "Continue here" to force log out the other device.',
+            code: 'ALREADY_LOGGED_IN',
+            canForce: true,
+          }, 409);
+        }
+      }
+
+      // 3. Create new session: bump tokenVersion (kicks any old JWTs), generate sessionId
+      const newTv = (user.tokenVersion || 0) + 1;
+      const newSessionId = uuidv4();
+      await users.updateOne(
+        { id: user.id },
+        { $set: {
+          tokenVersion: newTv,
+          activeSessionId: newSessionId,
+          lastLoginAt: new Date(),
+          phoneVerified: true,
+          updatedAt: new Date(),
+        } }
+      );
+
+      const token = createToken({
+        userId: user.id,
+        email: user.email,
+        role: user.role,
+        phoneVerified: true,
+        tokenVersion: newTv,
+        sessionId: newSessionId,
+      });
+      const response = jsonResponse({
+        success: true,
+        message: 'Login successful',
+        data: {
+          token,
+          user: {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            phone: user.phone || '',
+            role: user.role,
+            phoneVerified: true,
+          }
+        }
+      });
+      response.cookies.set('auth_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60,
+      });
+      return response;
+    }
+
+    // ============== FORGOT PASSWORD (PHONE OR EMAIL OTP) ==============
+    // Step 1: Send OTP to a registered user. Accepts either phone OR email as identifier.
+    if (path === '/auth/forgot-password/send-otp') {
+      const { phone, email, identifier } = body || {};
+      const idRaw = String(identifier ?? phone ?? email ?? '').trim();
+      if (!idRaw) {
+        return jsonResponse({ success: false, error: 'Email or phone number is required' }, 400);
+      }
+
+      const users = await getCollection('users');
+      let user = null;
+
+      if (idRaw.includes('@')) {
+        // Email lookup — unique key, safe.
+        user = await users.findOne({ email: idRaw.toLowerCase() });
+      } else {
+        // Phone lookup — multi-candidate. If multiple matches (duplicate phones in DB),
+        // require the user to use email instead.
+        const hasPlus = idRaw.startsWith('+');
+        const digits = idRaw.replace(/\D/g, '');
+        const candidates = new Set();
+        candidates.add(idRaw);
+        if (digits) candidates.add(digits);
+        if (digits) candidates.add('+' + digits);
+        if (!hasPlus && digits.length === 10) candidates.add('+91' + digits);
+        if (!hasPlus && digits.length > 10 && digits.startsWith('91')) candidates.add('+' + digits);
+
+        const matches = await users.find({ phone: { $in: Array.from(candidates) } }).limit(2).toArray();
+        if (matches.length > 1) {
+          return jsonResponse({
+            success: false,
+            error: 'Multiple accounts share this phone number. Please reset using your email instead.'
+          }, 400);
+        }
+        user = matches[0] || null;
+      }
+
+      if (!user) {
+        return jsonResponse({
+          success: false,
+          error: 'No account is registered with this email or phone number'
+        }, 404);
+      }
+
+      // Account must have a verifiable phone to receive the OTP.
+      const userPhone = String(user.phone || '').trim();
+      if (!/^\+\d{10,15}$/.test(userPhone)) {
+        return jsonResponse({
+          success: false,
+          error: 'This account has no verified phone number on file. Please contact support.'
+        }, 400);
+      }
+
+      try {
+        const twilio = require('twilio');
+        const client = twilio(
+          process.env.TWILIO_ACCOUNT_SID,
+          process.env.TWILIO_AUTH_TOKEN
+        );
+        const verification = await client.verify.v2
+          .services(process.env.TWILIO_VERIFY_SERVICE_SID)
+          .verifications.create({ to: userPhone, channel: 'sms' });
+
+        // Mask the phone in response (e.g., +91XXXXXX1456) — never expose full number to a non-owner.
+        const masked = userPhone.replace(/(\+\d{2})\d+(\d{4})$/, '$1XXXXXX$2');
+
+        return jsonResponse({
+          success: true,
+          message: 'OTP sent successfully',
+          data: { userId: user.id, maskedPhone: masked, status: verification.status }
+        });
+      } catch (error) {
+        console.error('Forgot-password send-otp Twilio error:', {
+          code: error?.code,
+          status: error?.status,
+          message: error?.message,
+          moreInfo: error?.moreInfo,
+        });
+        const userMessage = error?.code === 20003
+          ? 'SMS service is misconfigured. Please contact support.'
+          : error?.code === 60200
+            ? 'Invalid phone number on file. Please contact support.'
+            : 'Failed to send OTP. Please try again.';
+        return jsonResponse({
+          success: false,
+          error: userMessage,
+          ...(error?.code ? { errorCode: error.code } : {}),
+        }, 400);
+      }
+    }
+
+    // Step 2: Verify OTP and reset password atomically. Accepts userId (preferred) or phone/email.
+    if (path === '/auth/forgot-password/reset') {
+      const { userId, phone, email, identifier, code, newPassword } = body || {};
+      if (!code || !newPassword) {
+        return jsonResponse({ success: false, error: 'OTP code and new password are required' }, 400);
+      }
+      if (String(newPassword).length < 6) {
+        return jsonResponse({ success: false, error: 'Password must be at least 6 characters' }, 400);
+      }
+
+      const users = await getCollection('users');
+      let user = null;
+
+      if (userId) {
+        // Preferred: lookup by stable user id from step 1
+        user = await users.findOne({ id: String(userId) });
+      } else {
+        const idRaw = String(identifier ?? phone ?? email ?? '').trim();
+        if (!idRaw) {
+          return jsonResponse({ success: false, error: 'Account identifier is required' }, 400);
+        }
+        if (idRaw.includes('@')) {
+          user = await users.findOne({ email: idRaw.toLowerCase() });
+        } else {
+          const hasPlus = idRaw.startsWith('+');
+          const digits = idRaw.replace(/\D/g, '');
+          const candidates = new Set();
+          candidates.add(idRaw);
+          if (digits) candidates.add(digits);
+          if (digits) candidates.add('+' + digits);
+          if (!hasPlus && digits.length === 10) candidates.add('+91' + digits);
+          if (!hasPlus && digits.length > 10 && digits.startsWith('91')) candidates.add('+' + digits);
+          const matches = await users.find({ phone: { $in: Array.from(candidates) } }).limit(2).toArray();
+          if (matches.length > 1) {
+            return jsonResponse({
+              success: false,
+              error: 'Multiple accounts share this phone number. Please reset using your email instead.'
+            }, 400);
+          }
+          user = matches[0] || null;
+        }
+      }
+
+      if (!user) {
+        return jsonResponse({ success: false, error: 'Account not found' }, 404);
+      }
+
+      const targetPhone = String(user.phone || '').trim();
+      if (!/^\+\d{10,15}$/.test(targetPhone)) {
+        return jsonResponse({ success: false, error: 'Account has no verified phone on file' }, 400);
+      }
 
       try {
         const twilio = require('twilio');
@@ -2836,8 +3092,7 @@ export async function POST(request) {
         return jsonResponse({ success: false, error: 'OTP verification failed' }, 400);
       }
 
-      // OTP verified — update password (hashed), mark phone verified, bump tokenVersion
-      // to invalidate any existing JWT sessions issued before the reset.
+      // OTP verified — atomically update password, mark phone verified, bump tokenVersion.
       const newHash = await hashPassword(newPassword);
       const newTokenVersion = (user.tokenVersion || 0) + 1;
       await users.updateOne(

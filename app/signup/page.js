@@ -112,12 +112,8 @@ export default function SignupPage() {
   const handleSignup = async (e) => {
     e.preventDefault();
 
-    if (!formData.name.trim() || !formData.email.trim() || !formData.password) {
+    if (!formData.name.trim() || !formData.email.trim()) {
       toast.error('Please fill in all required fields');
-      return;
-    }
-    if (formData.password.length < 6) {
-      toast.error('Password must be at least 6 characters');
       return;
     }
 
@@ -137,7 +133,6 @@ export default function SignupPage() {
           name: formData.name.trim(),
           email: formData.email.trim().toLowerCase(),
           phone: e164Phone,
-          password: formData.password,
         }),
       });
       const result = await response.json();
@@ -294,28 +289,8 @@ export default function SignupPage() {
                       required
                     />
                     <p className="text-xs text-gray-500 mt-1.5 ml-1">
-                      Required for account verification. 10-digit Indian numbers auto-prefix with +91.
+                      Required — we'll send an OTP to verify your phone. 10-digit Indian numbers auto-prefix with +91.
                     </p>
-                  </div>
-                  <div className="relative">
-                    <Field
-                      icon={<Lock className="w-5 h-5 text-gray-400" />}
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Create password (min 6 characters)"
-                      value={formData.password}
-                      onChange={(v) => setFormData({ ...formData, password: v })}
-                      required
-                      paddingRight
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      onClick={() => setShowPassword(!showPassword)}
-                      aria-label="Toggle password visibility"
-                    >
-                      {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                    </button>
                   </div>
 
                   <Button

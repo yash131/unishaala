@@ -44,6 +44,7 @@ const PUBLIC_EXACT_PATHS = new Set([
   '/',
   '/login',
   '/signup',
+  '/admin-login',
   '/verify-otp',
   '/verify-phone',
   '/forgot-password',

@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/Logo';
 import {
-  Phone, ShieldCheck, Lock, Eye, EyeOff,
+  Phone, AtSign, ShieldCheck, Lock, Eye, EyeOff,
   Loader2, CheckCircle2, ArrowLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -30,7 +30,9 @@ export default function ForgotPasswordPage() {
 
   // 'phone' → 'reset' → 'done'
   const [step, setStep] = useState('phone');
-  const [phone, setPhone] = useState('');
+  const [identifier, setIdentifier] = useState('');
+  const [maskedPhone, setMaskedPhone] = useState('');
+  const [userId, setUserId] = useState('');
   const [otp, setOtp] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -48,22 +50,35 @@ export default function ForgotPasswordPage() {
 
   const sendOtp = async (e) => {
     if (e) e.preventDefault();
-    const e164 = normalizePhoneE164(phone);
-    if (!isValidE164(e164)) {
-      toast.error('Please enter a valid phone number with country code');
+    const idTrimmed = String(identifier).trim();
+    if (!idTrimmed) {
+      toast.error('Please enter your email or phone number');
       return;
+    }
+    // If it looks like a phone (no @), normalize to E.164 first
+    let payload;
+    if (idTrimmed.includes('@')) {
+      payload = { identifier: idTrimmed.toLowerCase() };
+    } else {
+      const e164 = normalizePhoneE164(idTrimmed);
+      if (!isValidE164(e164)) {
+        toast.error('Please enter a valid phone number with country code');
+        return;
+      }
+      payload = { identifier: e164 };
     }
     setSending(true);
     try {
       const res = await fetch('/api/auth/forgot-password/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: e164 }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json();
       if (json?.success) {
-        toast.success(`OTP sent to ${e164}`);
-        setPhone(e164);
+        setUserId(json.data?.userId || '');
+        setMaskedPhone(json.data?.maskedPhone || '');
+        toast.success(`OTP sent to ${json.data?.maskedPhone || 'your phone'}`);
         setStep('reset');
         setResendIn(30);
       } else {
@@ -95,7 +110,12 @@ export default function ForgotPasswordPage() {
       const res = await fetch('/api/auth/forgot-password/reset', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, code: otp, newPassword }),
+        body: JSON.stringify({
+          userId, // preferred unique identifier from step 1
+          identifier: identifier.trim(),
+          code: otp,
+          newPassword,
+        }),
       });
       const json = await res.json();
       if (json?.success) {
@@ -131,11 +151,11 @@ export default function ForgotPasswordPage() {
             {step === 'phone' && (
               <>
                 <div className="mx-auto mb-2 w-12 h-12 rounded-full bg-brand-100 flex items-center justify-center">
-                  <Phone className="w-6 h-6 text-brand-600" />
+                  <AtSign className="w-6 h-6 text-brand-600" />
                 </div>
                 <CardTitle className="text-2xl font-bold">Forgot Password?</CardTitle>
                 <p className="text-sm text-gray-500 mt-1">
-                  Enter your registered phone number — we'll send an OTP to verify.
+                  Enter your registered email or phone — we'll send an OTP to your verified phone.
                 </p>
               </>
             )}
@@ -146,7 +166,7 @@ export default function ForgotPasswordPage() {
                 </div>
                 <CardTitle className="text-2xl font-bold">Reset Password</CardTitle>
                 <p className="text-sm text-gray-500 mt-1">
-                  We sent a 6-digit code to <span className="font-semibold text-gray-900">{phone}</span>
+                  We sent a 6-digit code to <span className="font-semibold text-gray-900">{maskedPhone || 'your phone'}</span>
                 </p>
               </>
             )}
@@ -165,22 +185,22 @@ export default function ForgotPasswordPage() {
             {step === 'phone' && (
               <form onSubmit={sendOtp} className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number</Label>
+                  <Label htmlFor="identifier">Email or Phone Number</Label>
                   <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                     <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="+91 98765 43210"
+                      id="identifier"
+                      type="text"
+                      placeholder="you@example.com  or  +91 98765 43210"
                       className="pl-10 h-12"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
                       autoFocus
                       required
                     />
                   </div>
                   <p className="text-xs text-gray-500">
-                    Include country code. 10-digit Indian numbers auto-prefix with +91.
+                    Tip: If multiple accounts share the same phone, use your email instead.
                   </p>
                 </div>
 
@@ -281,7 +301,7 @@ export default function ForgotPasswordPage() {
                     onClick={() => { setStep('phone'); setOtp(''); setNewPassword(''); setConfirmPassword(''); }}
                     className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-1"
                   >
-                    <ArrowLeft className="w-4 h-4" /> Change number
+                    <ArrowLeft className="w-4 h-4" /> Change account
                   </button>
                   <button
                     type="button"

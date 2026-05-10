@@ -1,35 +1,40 @@
 # Test Credentials
 
-## Admin
+## Admin (Email + Password — special path)
+- URL: `/admin-login` (linked from regular `/login` page footer)
 - Email: `admin@unishaala.com`
 - Password: `Shivani@1234`
 - Role: SUPER_ADMIN
-- phoneVerified: true (admins bypass phone gating)
+- Auto-redirected to `/admin` on success
+- Note: `/api/auth/login` (password endpoint) now ONLY works for users with role ADMIN/SUPER_ADMIN. Non-admin users calling it get 403 "Password login is disabled."
 
-## Phone Verification (NEW — Mandatory)
-- Twilio Verify Service is now ENFORCED for ALL non-admin users.
-- After login/signup, non-admin users with `phoneVerified !== true` are redirected to `/verify-otp`.
-- **Public paths:** `/`, `/login`, `/signup`, `/verify-otp`, `/verify-phone`, `/forgot-password`, legal pages, `/api/*`, `/auth/*`, static assets.
-- **Login accepts email OR phone** as identifier (`identifier` field; backend also accepts legacy `email` field). 10-digit Indian numbers auto-prefix with +91.
-- **Signup form** = Name + Email + Phone (mandatory + verified via Twilio OTP) + Password. NO Google button on signup.
-- **Google OAuth** is on Login page only. If a Google email does NOT exist in DB → redirect to `/signup?error=google_account_not_found&email=<email>` (account auto-creation removed). Existing-account users link/refresh as before.
-- Anonymous visitors hitting non-public URLs are redirected to `/signup?next=<url>`.
-- Logged-in but unverified visitors are redirected to `/verify-otp?next=<url>`.
-- Admins bypass phone gating.
+## Regular Users (Phone + OTP only)
+- URL: `/login` and `/signup`
+- **Signup:** Name + Email + Phone (NO password). After form submit → OTP step (auto-sent to phone) → verify → auto-login.
+- **Login:** Phone only → OTP sent → verify → login.
 - API endpoints:
-  - `POST /api/auth/send-otp` — body: `{ phone: "+919999999999" }`
-  - `POST /api/auth/verify-phone-otp` — body: `{ phone, code }` (stateless verification only)
-  - `POST /api/auth/verify-my-phone` — body: `{ phone, code }` — verifies AND persists `phoneVerified:true` on the logged-in user, re-issues JWT.
-- Twilio creds live in `/app/.env` (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID).
-- Existing users were migrated: all non-admin users had `phoneVerified` reset to `false` (one-time migration tracked via `site_settings.id='phone_verify_gating_v2'`).
+  - `POST /api/auth/login-otp/send` — body `{ phone: "+91xxxxxxxxxx" }` → 200 with `{userId, maskedPhone}` OR 404 with `code:"ACCOUNT_NOT_FOUND"`
+  - `POST /api/auth/login-otp/verify` — body `{ phone, code, forceLogout? }` →
+    - 200 `{ token, user }` on success
+    - 409 `{ code: "ALREADY_LOGGED_IN", canForce: true }` if user has an active session on another device. Resend with `forceLogout: true` to take over.
+    - 400 on invalid OTP
+  - `POST /api/auth/signup` — body `{ name, email, phone }` (password optional, ignored). Returns user with `phoneVerified: false` + auth_token cookie.
+  - `POST /api/auth/verify-my-phone` — same as before, also bumps tokenVersion and sets activeSessionId.
+  - `POST /api/auth/logout` — clears cookie AND clears activeSessionId in DB (so user can log in elsewhere).
+- `/api/auth/forgot-password/*` endpoints still exist but irrelevant in OTP-only mode (no password to forget).
 
-## Test user (must verify on next login)
-- Email: `user@example.com` (and `user1@example.com`) — phoneVerified now `false` after migration.
-- Password: unknown — create a new user via POST /api/auth/signup if needed.
+## Single-Device Session Restriction
+- Each user has DB fields: `activeSessionId`, `lastLoginAt`, `tokenVersion`.
+- A new login is BLOCKED with HTTP 409 if `lastLoginAt < 7 days ago` AND `activeSessionId` is set.
+- User must click "Continue here" to force-logout the other device (passes `forceLogout: true`), which:
+  - Bumps tokenVersion (kicks the old JWT — old device sees 401 on next /auth/me call)
+  - Sets new activeSessionId
+- Admins (ADMIN/SUPER_ADMIN role) are exempt from single-device restriction.
+- On manual logout, `activeSessionId` is cleared so user can immediately log in elsewhere.
 
-## Google OAuth (native)
-- Provider: Google Cloud Console (user-owned).
-- Client ID configured in `/app/.env` as `GOOGLE_CLIENT_ID`.
-- Redirect URI: `https://dark-mode-theme-2.preview.emergentagent.com/api/auth/google/callback`
-- Authorized JS origin: `https://dark-mode-theme-2.preview.emergentagent.com`
-- Google login users with `phoneVerified:false` → redirected to `/verify-otp` after callback.
+## Twilio
+- TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_VERIFY_SERVICE_SID — all in `/app/.env`.
+- Verify Service handles all OTP send/check operations (no SMS quota beyond Twilio Verify pricing).
+
+## JWT Secret
+- `JWT_SECRET=unishaala-secret-key-2025` pinned in `/app/.env` for deterministic password hashing across pods.
